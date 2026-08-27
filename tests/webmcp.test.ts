@@ -45,8 +45,17 @@ describe('WebMCP boundary', () => {
 
     expect(result).toMatchObject({
       success: true,
-      data: { workerCount: 5, militaryCount: 0, visibleThreatSummary: '5 enemy units on the battlefield.' },
+      data: { workerCount: 5, militaryCount: 0, visibleThreatSummary: 'No enemy forces currently visible.' },
     });
     expect(activity.getEntries()[0]).toMatchObject({ kind: 'QUERY' });
+  });
+
+  it('does not confirm or command guessed targets hidden by fog of war', async () => {
+    const { engine, handlers } = createFixture();
+    const result = await handlers.orderUnits({
+      unitIds: ['unit_player_villager_01'], order: 'attack', targetId: 'building_enemy_town_hall',
+    });
+    expect(result).toMatchObject({ success: false, error: { code: 'TARGET_NOT_VISIBLE' } });
+    expect(engine.pendingCommandCount).toBe(0);
   });
 });

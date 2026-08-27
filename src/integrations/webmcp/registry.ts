@@ -1,5 +1,8 @@
 import type { MarshalActivityStore } from '../../ui/MarshalActivity';
-import { ASSIGN_WORKERS_INPUT_SCHEMA, EMPTY_INPUT_SCHEMA } from './schemas';
+import {
+  ASSIGN_WORKERS_INPUT_SCHEMA, CONSTRUCT_BUILDING_INPUT_SCHEMA, EMPTY_INPUT_SCHEMA,
+  ORDER_UNITS_INPUT_SCHEMA, TRAIN_UNIT_INPUT_SCHEMA,
+} from './schemas';
 import type { WebMcpToolHandlers } from './tools';
 
 export type WebMcpConnectionResult =
@@ -17,7 +20,7 @@ export type WebMcpConnectionResult =
       message: string;
     };
 
-const WEBMCP_TOOL_COUNT = 3;
+const WEBMCP_TOOL_COUNT = 7;
 
 let registrationController: AbortController | undefined;
 
@@ -62,6 +65,26 @@ export async function registerWebMcpTools(
       inputSchema: ASSIGN_WORKERS_INPUT_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.assignWorkers(input),
+    },
+    {
+      name: 'get_command_entities', title: 'Get command entities',
+      description: 'Read stable IDs and current state for friendly units, friendly buildings, and currently visible enemies. Fog of war is enforced.',
+      inputSchema: EMPTY_INPUT_SCHEMA, annotations: { readOnlyHint: true }, execute: () => handlers.getCommandEntities(),
+    },
+    {
+      name: 'construct_building', title: 'Construct building',
+      description: 'Order specific villagers to place and construct a real building through the deterministic command queue.',
+      inputSchema: CONSTRUCT_BUILDING_INPUT_SCHEMA, annotations: { readOnlyHint: false }, execute: (input) => handlers.constructBuilding(input),
+    },
+    {
+      name: 'train_unit', title: 'Train unit',
+      description: 'Queue a supported unit at a completed friendly production building.',
+      inputSchema: TRAIN_UNIT_INPUT_SCHEMA, annotations: { readOnlyHint: false }, execute: (input) => handlers.trainUnit(input),
+    },
+    {
+      name: 'order_units', title: 'Order units',
+      description: 'Move, attack, attack-move, stop, hold, defend, or retreat with specific friendly units and an optional formation.',
+      inputSchema: ORDER_UNITS_INPUT_SCHEMA, annotations: { readOnlyHint: false }, execute: (input) => handlers.orderUnits(input),
     },
   ];
 

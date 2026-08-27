@@ -20,7 +20,7 @@ describe('world economy, construction, and production', () => {
     const engine = new SimulationEngine();
     const workerIds = ['unit_player_villager_01', 'unit_player_villager_02'];
     const beforeWood = engine.getSnapshot().players.player_kingdom?.resources.wood ?? 0;
-    engine.dispatch('human', { type: 'place_building', playerId: 'player_kingdom', workerIds, buildingType: 'house', position: { x: 650, y: 650 } });
+    engine.dispatch('human', { type: 'place_building', playerId: 'player_kingdom', workerIds, buildingType: 'house', position: { x: 850, y: 1400 } });
     const [placed] = engine.step();
     expect(placed).toMatchObject({ ok: true, data: { buildingId: expect.any(String) } });
     expect(engine.getSnapshot().players.player_kingdom?.resources.wood).toBe(beforeWood - 60);

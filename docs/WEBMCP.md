@@ -13,7 +13,7 @@ The adapter registers native, page-local tools through `document.modelContext.re
 
 Vite development and preview headers are configured in `vite.config.ts`. `public/_headers` covers compatible static hosts, and `vercel.json` covers Vercel. Other hosts must configure the same two response headers.
 
-The game intentionally renders no WebMCP panel, chatbot, status badge, connection widget, or tool inspector. Tool discovery and invocation belong to the browser agent. For nonvisual diagnostics, registration writes `connected`, `unavailable`, or `failed` to `document.documentElement.dataset.webmcpStatus`.
+Tool discovery and invocation belong to the browser agent. The game renders only a compact Marshal activity drawer for short command outcomes and diagnostics, not a chat interface or tool inspector. Registration writes `connected`, `unavailable`, or `failed` to `document.documentElement.dataset.webmcpStatus`.
 
 ## Result envelope
 
@@ -65,3 +65,27 @@ Failures return `{ "success": false, "error": { "code", "message", "suggestions"
 - Errors: `INVALID_INPUT`, `PLAYER_NOT_FOUND`, or a structured command validation error.
 - Associated command: `AssignWorkers` through `SimulationEngine.dispatch('webmcp', ...)`.
 - Visibility: affects only the player's owned villagers. Requested totals above the workforce are capped deterministically and reported as a warning.
+
+## `get_command_entities`
+
+- Purpose: Return stable IDs and command-relevant state for friendly units/buildings plus currently visible enemy contacts.
+- Parameters: none; extra properties are rejected.
+- Visibility: enemy units and buildings are filtered inside `GameQueries`; hidden contacts are never returned.
+
+## `construct_building`
+
+- Parameters: constructible `buildingType`, one or more stable `workerIds`, and `x`/`y` world coordinates.
+- Result: the normal atomic `place_building` command result, including the new construction-site ID.
+- Errors: invalid workers, cost, bounds, and overlap failures are structured and do not mutate state.
+
+## `train_unit`
+
+- Parameters: stable `buildingId` and supported `unitType`.
+- Result: queue position and command summary.
+- Errors: production requirements, resources, queue capacity, and population capacity use the same validation as the HUD.
+
+## `order_units`
+
+- Parameters: stable `unitIds`, an order (`move`, `attack`, `attack_move`, `stop`, `hold_position`, `defend_area`, or `retreat`), and the appropriate target ID or coordinates. Formation and stance are optional.
+- Result: affected unit IDs and the authoritative command summary.
+- Visibility: attack targets must be discoverable through `get_command_entities`; the handler does not grant hidden-state access.

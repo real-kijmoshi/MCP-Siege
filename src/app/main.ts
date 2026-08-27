@@ -33,26 +33,27 @@ function renderApplicationShell(): void {
           <div class="resource-item resource-${resource}">
             ${resourceIcon(resource)}<strong data-resource-value="${resource}">0</strong><small data-resource-rate="${resource}">+0.0/s</small>
           </div>`).join('')}
-        <div class="resource-item population-item" id="population-item">
+        <div class="resource-item population-item" id="population-item" title="Population used / capacity. Build Houses to increase capacity.">
           <strong id="population-value">5 / 10</strong><small id="population-status">POPULATION</small>
         </div>
       </header>
       <button class="marshal-toggle" id="marshal-toggle" aria-controls="marshal-drawer" aria-expanded="false">
         <span class="marshal-orb"></span><strong>MARSHAL</strong><span id="marshal-chevron">+</span>
       </button>
-      <div class="control-hint"><b>LMB</b> SELECT <i></i><b>RMB</b> MOVE / GATHER / ATTACK <i></i><b>WASD</b> PAN <i></i><b>WHEEL</b> ZOOM</div>
+      <div class="control-hint"><b>LMB</b> SELECT / BOX <i></i><b>RMB</b> CONTEXT ORDER <i></i><b>CTRL+1–9</b> GROUP <i></i><b>WASD</b> PAN</div>
       <div class="command-toast" id="command-toast" role="status" aria-live="polite"></div>
 
       <section class="bottom-hud" aria-label="RTS command interface">
         <button class="minimap" id="minimap" aria-label="Battlefield minimap">
-          <span class="mini-hall"></span><span id="minimap-entities"></span>
+          <canvas class="minimap-fog" id="minimap-fog" aria-hidden="true"></canvas><span id="minimap-entities"></span>
           <span class="minimap-viewport" id="minimap-viewport"></span><span class="minimap-compass">N</span>
         </button>
-        <article class="selection-panel">
+        <article class="selection-panel" id="selection-panel">
           <div class="selection-portrait" id="selection-portrait"><span>TH</span></div>
           <div class="selection-copy">
             <small id="selection-kicker">STRUCTURE</small><h1 id="selection-name">Town Hall</h1>
             <div class="health-row"><span class="health-track"><i id="selection-health-fill"></i></span><b id="selection-health">1200 / 1200</b></div>
+            <div class="selection-composition" id="selection-composition"></div>
             <div class="selection-stats">
               <span><small>ROLE</small><b id="selection-detail">ECONOMY</b></span>
               <span><small>STATE</small><b id="selection-state">READY</b></span>
@@ -83,7 +84,7 @@ async function bootstrap(): Promise<void> {
   const engine = new SimulationEngine();
   const queries = new GameQueries(() => engine.getSnapshot());
   const activity = new MarshalActivityStore();
-  const battlefield = createGame(engine);
+  const battlefield = createGame(engine, queries);
   const hud = new HUD(engine, queries, activity, battlefield.scene);
   const runner = new FixedStepRunner(engine);
   runner.start();

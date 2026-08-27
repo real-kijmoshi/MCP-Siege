@@ -3,9 +3,14 @@ import { handleAssignWorkers } from '../commands/handlers/assignWorkers';
 import { handleMoveUnits } from '../commands/handlers/moveUnits';
 import {
   handleAttackTarget,
+  handleAssistBuilding,
+  handleCancelProduction,
   handleGatherResource,
+  handleIssueUnitOrder,
   handlePlaceBuilding,
+  handleRepairBuilding,
   handleResearchUpgrade,
+  handleSetRallyPoint,
   handleTrainUnit,
 } from '../commands/handlers/gameplay';
 import type {
@@ -21,8 +26,10 @@ import {
   advanceGathering,
   advanceMovement,
   advanceProduction,
+  advanceStrategicSites,
   enemyAiCommands,
 } from './Systems';
+import { updateVisibility } from './Visibility';
 
 export type CommandResultListener = (command: GameCommand, result: CommandResult) => void;
 
@@ -34,6 +41,7 @@ export class SimulationEngine {
 
   public constructor(seed = 13_371) {
     this.state = createInitialGameState(seed);
+    updateVisibility(this.state);
   }
 
   public dispatch(source: CommandSource, payload: GameCommandPayload): GameCommand {
@@ -66,7 +74,9 @@ export class SimulationEngine {
     advanceGathering(this.state);
     advanceConstruction(this.state);
     advanceProduction(this.state);
+    advanceStrategicSites(this.state);
     advanceCombat(this.state);
+    updateVisibility(this.state);
     return tickResults;
   }
 
@@ -104,6 +114,16 @@ export class SimulationEngine {
         return handleResearchUpgrade(command, this.state);
       case 'attack_target':
         return handleAttackTarget(command, this.state);
+      case 'assist_building':
+        return handleAssistBuilding(command, this.state);
+      case 'repair_building':
+        return handleRepairBuilding(command, this.state);
+      case 'cancel_production':
+        return handleCancelProduction(command, this.state);
+      case 'set_rally_point':
+        return handleSetRallyPoint(command, this.state);
+      case 'issue_unit_order':
+        return handleIssueUnitOrder(command, this.state);
     }
   }
 }

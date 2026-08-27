@@ -50,16 +50,20 @@ describe('native WebMCP registration', () => {
     expect(activity.getEntries()).toHaveLength(0);
   });
 
-  it('registers all three tools with strict schemas and lifecycle signals', async () => {
+  it('registers the full command surface with strict schemas and lifecycle signals', async () => {
     const { activity, handlers } = fixture();
     const modelContext = new FakeModelContext();
     const result = await registerWebMcpTools(handlers, activity, modelContext);
 
-    expect(result).toEqual({ status: 'connected', toolCount: 3 });
+    expect(result).toEqual({ status: 'connected', toolCount: 7 });
     expect(modelContext.registrations.map(({ tool }) => tool.name)).toEqual([
       'get_game_overview',
       'get_economy',
       'assign_workers',
+      'get_command_entities',
+      'construct_building',
+      'train_unit',
+      'order_units',
     ]);
     expect(modelContext.registrations.every(({ signal }) => signal instanceof AbortSignal)).toBe(true);
     expect(

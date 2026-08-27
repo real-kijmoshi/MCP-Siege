@@ -1,8 +1,13 @@
 import type { BuildingType, ResourceStockpile, UnitType, UpgradeType } from '../types/domain';
 
 export const TICKS_PER_SECOND = 20;
-export const WORLD_WIDTH = 1600;
-export const WORLD_HEIGHT = 950;
+export const WORLD_WIDTH = 3200;
+export const WORLD_HEIGHT = 2000;
+export const FOG_CELL_SIZE = 50;
+export const FOG_COLUMNS = WORLD_WIDTH / FOG_CELL_SIZE;
+export const FOG_ROWS = WORLD_HEIGHT / FOG_CELL_SIZE;
+export const UNIT_VISION_RADIUS = 400;
+export const BUILDING_VISION_RADIUS = 500;
 
 export interface BuildingDefinition {
   label: string;
@@ -20,7 +25,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDefinition> = {
   storehouse: { label: 'Storehouse', cost: { wood: 80, stone: 20 }, buildTicks: 220, hitPoints: 550, populationCap: 0, footprint: 42, purpose: 'Improves nearby gathering' },
   barracks: { label: 'Barracks', cost: { wood: 120, stone: 30 }, buildTicks: 300, hitPoints: 750, populationCap: 0, footprint: 54, purpose: 'Trains swordsmen and spearmen' },
   archery_range: { label: 'Archery Range', cost: { wood: 140 }, buildTicks: 300, hitPoints: 650, populationCap: 0, footprint: 52, purpose: 'Trains archers' },
-  stable: { label: 'Stable', cost: { wood: 160, stone: 40 }, buildTicks: 360, hitPoints: 780, populationCap: 0, footprint: 58, purpose: 'Trains knights' },
+  stable: { label: 'Stable', cost: { wood: 160, stone: 40 }, buildTicks: 360, hitPoints: 780, populationCap: 0, footprint: 58, purpose: 'Trains scouts and knights' },
   armoury: { label: 'Armoury', cost: { wood: 100, iron: 60 }, buildTicks: 320, hitPoints: 700, populationCap: 0, footprint: 48, purpose: 'Researches military upgrades' },
   siege_workshop: { label: 'Siege Workshop', cost: { wood: 180, stone: 80, iron: 50 }, buildTicks: 420, hitPoints: 850, populationCap: 0, footprint: 62, purpose: 'Builds siege engines' },
   watch_tower: { label: 'Watch Tower', cost: { wood: 80, stone: 50 }, buildTicks: 260, hitPoints: 650, populationCap: 0, footprint: 30, purpose: 'Automatically attacks nearby enemies' },
@@ -45,13 +50,14 @@ export const UNITS: Record<UnitType, UnitDefinition> = {
   spearman: { label: 'Spearman', cost: { food: 45, wood: 20 }, trainTicks: 200, hitPoints: 75, damage: 9, range: 30, speed: 2.3, population: 1 },
   archer: { label: 'Archer', cost: { food: 45, wood: 35 }, trainTicks: 220, hitPoints: 55, damage: 8, range: 125, speed: 2.35, population: 1 },
   knight: { label: 'Knight', cost: { food: 90, iron: 70 }, trainTicks: 360, hitPoints: 180, damage: 18, range: 25, speed: 3.1, population: 2 },
+  scout: { label: 'Scout', cost: { food: 65, wood: 20 }, trainTicks: 220, hitPoints: 80, damage: 6, range: 24, speed: 3.8, population: 1 },
   catapult: { label: 'Catapult', cost: { wood: 120, stone: 80 }, trainTicks: 440, hitPoints: 150, damage: 34, range: 170, speed: 1.15, population: 3 },
   battering_ram: { label: 'Battering Ram', cost: { wood: 140, iron: 40 }, trainTicks: 400, hitPoints: 240, damage: 45, range: 25, speed: 1.25, population: 3 },
 };
 
 export const PRODUCTION: Partial<Record<BuildingType, UnitType[]>> = {
   town_hall: ['villager'], barracks: ['swordsman', 'spearman'],
-  archery_range: ['archer'], stable: ['knight'],
+  archery_range: ['archer'], stable: ['scout', 'knight'],
   siege_workshop: ['catapult', 'battering_ram'],
 };
 

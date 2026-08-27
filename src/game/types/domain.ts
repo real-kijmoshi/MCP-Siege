@@ -9,20 +9,27 @@ export const BUILDING_TYPES = [
 export type BuildingType = (typeof BUILDING_TYPES)[number];
 
 export const UNIT_TYPES = [
-  'villager', 'swordsman', 'spearman', 'archer', 'knight', 'catapult', 'battering_ram',
+  'villager', 'swordsman', 'spearman', 'archer', 'knight', 'scout', 'catapult', 'battering_ram',
 ] as const;
 export type UnitType = (typeof UNIT_TYPES)[number];
+
+export const FORMATION_TYPES = ['line', 'column', 'square', 'wedge', 'loose'] as const;
+export type FormationType = (typeof FORMATION_TYPES)[number];
+export const COMBAT_STANCES = ['aggressive', 'defensive', 'hold_ground'] as const;
+export type CombatStance = (typeof COMBAT_STANCES)[number];
+export const MILITARY_ORDERS = ['attack_move', 'stop', 'hold_position', 'defend_area', 'retreat', 'set_formation', 'set_stance'] as const;
+export type MilitaryOrderType = (typeof MILITARY_ORDERS)[number];
 
 export const UPGRADE_TYPES = [
   'infantry_weapons_1', 'infantry_armor_1', 'archer_damage_1', 'cavalry_armor_1',
 ] as const;
 export type UpgradeType = (typeof UPGRADE_TYPES)[number];
 
-export type WorkerJob = 'idle' | 'moving' | 'gathering' | 'building';
+export type WorkerJob = 'idle' | 'moving' | 'gathering' | 'building' | 'repairing';
 export interface Vector2D { x: number; y: number }
 
 export interface UnitOrder {
-  kind: 'move' | 'gather' | 'build' | 'attack';
+  kind: 'move' | 'gather' | 'build' | 'repair' | 'attack' | 'attack_move' | 'hold' | 'defend' | 'retreat';
   targetPosition: Vector2D;
   targetId?: string;
 }
@@ -36,6 +43,8 @@ export interface UnitState {
   maxHitPoints: number;
   order?: UnitOrder;
   attackCooldown: number;
+  formation: FormationType;
+  stance: CombatStance;
 }
 
 export interface VillagerState extends UnitState {
@@ -62,6 +71,21 @@ export interface BuildingState {
   hitPoints: number;
   maxHitPoints: number;
   productionQueue: ProductionOrder[];
+  rallyPoint?: Vector2D;
+}
+
+export const STRATEGIC_SITE_TYPES = ['abandoned_watch_tower', 'capture_point', 'ruined_fort'] as const;
+export type StrategicSiteType = (typeof STRATEGIC_SITE_TYPES)[number];
+export interface StrategicSiteState {
+  id: string;
+  type: StrategicSiteType;
+  position: Vector2D;
+  label: string;
+  purpose: string;
+  controllingPlayerId?: string;
+  capturePlayerId?: string;
+  captureProgress: number;
+  captureRequired: number;
 }
 
 export interface ResourceNodeState {
