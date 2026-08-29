@@ -2,20 +2,50 @@
 
 ## Product promise
 
-Iron & Oath is a small medieval RTS battle in which a human commander and a WebMCP Marshal share the same legitimate command surface. The Marshal can summarize and coordinate work without hidden information or privileged state access.
+Siege is one large battle in which a human commander and a WebMCP Marshal share
+a single legitimate command surface. The battlefield is deliberately larger than
+one person can drive by hand, so delegation is a real advantage rather than a
+demonstration.
+
+## The fantasy
+
+You command regiments, not soldiers. Around 7,200 men in eighteen formations
+hold a river line. Reading the battle is meant to be possible at a glance:
+colour is faction, shape is troop type, and zoomed out each regiment collapses
+to a blob with a name and a morale bar.
+
+## What makes decisions interesting
+
+- **Counters.** Spearmen break cavalry; cavalry ride down archers and siege;
+  heavy infantry grind ordinary infantry; siege devastates anything packed tight.
+- **Formations.** Line for frontage, column for crossings, wedge to charge,
+  square against cavalry, loose to survive bombardment. Each trades something.
+- **Morale.** Most engagements are decided by regiments breaking, not by being
+  annihilated. A broken regiment refuses orders and streams for the rear, and
+  rallies if it gets clear — so committing a reserve at the right moment matters
+  more than arithmetic.
+- **Terrain.** The river is impassable except at three crossings, which makes
+  the bridges genuinely decisive. Forest, hills and the village favour defenders.
+- **Fog.** You fight on estimates. So does the Marshal.
 
 ## Intentionally limited scope
 
-The target is one polished match, not a campaign or general-purpose RTS engine. The progression is:
+One scenario, one enemy, one battle. Non-goals: multiplayer, accounts,
+persistence, campaigns, base building, technology trees, heroes, diplomacy,
+procedural maps, mobile controls, per-soldier animation, and any embedded LLM
+infrastructure.
 
-1. Start with one Town Hall, five villagers, small resources, raw deposits, and open land.
-2. Gather through direct world interaction; construct housing, economy, military, and defense buildings with workers.
-3. Grow population through Houses, use timed production queues, research a few Armoury upgrades, and field mixed units.
-4. Fight a predictable enemy that visibly gathers, builds, produces, defends, and attacks through the same command boundary.
-5. Add fog of war, formations, obstacle-aware navigation, alerts, and balancing without replacing this loop.
+Reinforcements are a manpower counter and timed waves — enough to give the top
+bar something true to show and to supply the "reinforcements arrive" beat. They
+are not an economy and should not become one.
 
-The match uses food, wood, stone, and iron; villagers; a focused medieval roster; and one enemy. Multiplayer, accounts, persistence, campaigns, large technology trees, heroes, diplomacy, procedural maps, mobile controls, and custom LLM infrastructure are non-goals.
+## The scenario arc
 
-## Match opening
+The opening is quiet, so the controls can be learned by hand. Then, on a fixed
+timeline: the enemy centre storms the bridge, cavalry sweeps the eastern
+crossing, more cavalry pressures the western ford, the siege train comes into
+range, and the enemy reserve follows the centre.
 
-The player sees one Town Hall and five idle villagers surrounded by mostly open land. Nearby raw deposits invite the first direct orders. Nearly every structure visible later exists because the player or enemy constructed it. WebMCP remains an invisible browser capability supplied by the host browser or agent.
+By roughly the four-minute mark there are more simultaneous decisions than one
+person can drive. That is the designed moment: hold one front yourself and give
+another to the Marshal.

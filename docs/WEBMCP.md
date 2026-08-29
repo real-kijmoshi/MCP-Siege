@@ -1,91 +1,179 @@
 # WebMCP Tools
 
-The adapter registers native, page-local tools through `document.modelContext.registerTool`. It does not embed an AI chat interface or connect to a backend MCP server. Every input schema is strict (`additionalProperties: false`), and official definitions come from the `webmcp-types` package.
+The page registers native, page-local tools through
+`document.modelContext.registerTool`. It does not embed an AI chat interface, a
+tool inspector, or a backend MCP server. Every input schema is strict
+(`additionalProperties: false`) and is enforced again by a runtime validator;
+official type definitions come from the `webmcp-types` package.
 
 ## Browser prerequisites
 
-- The page must run in a secure context: HTTPS or localhost.
-- The response must opt into origin isolation with `Origin-Agent-Cluster: ?1`.
-- The `tools` permissions policy must allow the page. The project sends `Permissions-Policy: tools=(self)`.
-- For local Chrome development, enable `chrome://flags/#enable-webmcp-testing`, relaunch Chrome, and reload the page.
-- For deployed Chrome testing during the experimental period, enroll the deployment origin in the WebMCP origin trial.
-- The agent or extension must implement native WebMCP discovery. A generic chat sidebar that can only read the DOM does not make `document.modelContext` available.
+- A secure context: HTTPS or localhost.
+- `Origin-Agent-Cluster: ?1` on the response.
+- `Permissions-Policy: tools=(self)`.
+- A client implementing native WebMCP discovery. A sidebar that can only read
+  the DOM does not make `document.modelContext` available.
 
-Vite development and preview headers are configured in `vite.config.ts`. `public/_headers` covers compatible static hosts, and `vercel.json` covers Vercel. Other hosts must configure the same two response headers.
-
-Tool discovery and invocation belong to the browser agent. The game renders only a compact Marshal activity drawer for short command outcomes and diagnostics, not a chat interface or tool inspector. Registration writes `connected`, `unavailable`, or `failed` to `document.documentElement.dataset.webmcpStatus`.
+`vite.config.ts` covers dev and preview, `public/_headers` covers static hosts,
+`vercel.json` covers Vercel. Registration writes `connected`, `unavailable` or
+`failed` to `document.documentElement.dataset.webmcpStatus`.
 
 ## Result envelope
 
-Successful reads return:
+Reads and successful commands return:
 
 ```json
-{ "success": true, "data": {} }
+{ "success": true, "data": { } }
 ```
 
-Successful commands return:
+A command adds the simulation's own verdict:
 
 ```json
 {
   "success": true,
   "data": {
     "ok": true,
-    "commandId": "cmd_1",
-    "summary": "Worker orders updated: 5 food, 4 wood, 2 stone, 1 iron.",
-    "affectedEntities": ["unit_villager_01"]
+    "commandId": "cmd_42",
+    "appliedAtTick": 1180,
+    "summary": "Cavalry I attacks West Crossing.",
+    "groupIds": ["cavalry_i"],
+    "warnings": []
   }
 }
 ```
 
-Failures return `{ "success": false, "error": { "code", "message", "suggestions" } }`. Enemy summaries are currently limited to information visible on the open battlefield; future fog-of-war target errors must not confirm hidden entity existence.
+Failures return `{ "success": false, "error": { "code", "message", "suggestions" } }`.
+Errors never confirm the existence of anything hidden by fog.
 
-## `get_game_overview`
+## Addressing
 
-- Purpose: Return a concise player status, not a state dump.
-- Parameters: none; extra properties are rejected.
-- Result: tick, resources, population/cap, worker and military counts, regiment count, alerts, visible threat summary, and ongoing production.
-- Errors: `QUERY_FAILED` if projection fails.
-- Associated query: `GameQueries.getGameOverview(playerId)`.
-- Visibility: scoped to the requesting player. Future threat data is filtered inside the query.
+Regiments are addressed by stable id from `get_armies` (`legion_i`,
+`cavalry_ii`, …). Locations are named zones, never coordinates:
 
-## `get_economy`
+`player_base · west_forest · west_crossing · village · central_field ·
+central_bridge · central_hill · east_field · east_crossing · east_forest ·
+northern_ridge · enemy_outer_defense · enemy_base`
 
-- Purpose: Inspect stockpiles, gathering rates, worker distribution, idle workers, construction jobs, and production queues.
-- Parameters: none; extra properties are rejected.
-- Result: an economy projection for the player.
-- Errors: `QUERY_FAILED` if projection fails.
-- Associated query: `GameQueries.getEconomy(playerId)`.
-- Visibility: returns only the player's economy.
+Individual soldiers are not addressable at all.
 
-## `assign_workers`
+## Read tools
 
-- Purpose: Set desired economic-worker counts by resource.
-- Parameters: `food`, `wood`, `stone`, and `iron`; each is a required integer from 0 to 200. Extra properties are rejected.
-- Result: command ID, summary, affected villager IDs, resulting assignments, idle count, and warnings.
-- Errors: `INVALID_INPUT`, `PLAYER_NOT_FOUND`, or a structured command validation error.
-- Associated command: `AssignWorkers` through `SimulationEngine.dispatch('webmcp', ...)`.
-- Visibility: affects only the player's owned villagers. Requested totals above the workforce are capped deterministically and reported as a warning.
+All take no parameters except `get_army_details`. All are `readOnlyHint: true`.
 
-## `get_command_entities`
+| Tool | Returns |
+|---|---|
+| `get_battle_overview` | Strength, visible enemy strength, per-front status, recent alerts, reinforcements, plan status. The place to start. |
+| `get_armies` | Every regiment: strength, percent remaining, formation, stance, morale, activity, zone, composition. |
+| `get_army_details` | One regiment in depth: casualties, current order and its age, what its formation is good for, nearby friendlies, known threats. Takes `groupId`. |
+| `get_visible_enemies` | Enemy forces in sight right now. |
+| `get_intelligence` | Everything known, including stale last-known positions. Strength is estimated. |
+| `get_front_status` | West, centre, east and rear: relative strength, committed regiments, zone control. |
+| `get_alerts` | Recent strategic events. |
+| `get_strategic_zones` | The named map: terrain, front, control, and which zones are crossings. |
+| `get_active_orders` | What every regiment is doing, plus armed conditionals with their triggers. |
+| `get_plan` | The plan currently drafted or executing. |
 
-- Purpose: Return stable IDs and command-relevant state for friendly units/buildings plus currently visible enemy contacts.
-- Parameters: none; extra properties are rejected.
-- Visibility: enemy units and buildings are filtered inside `GameQueries`; hidden contacts are never returned.
+Fog rules, applied inside `GameQueries`:
 
-## `construct_building`
+- Enemy regiments never seen are absent entirely, not listed as unknown.
+- `estimatedStrength` is rounded to the nearest 25.
+- Contacts not currently visible carry `visibleNow: false` and
+  `lastSeenSecondsAgo`; their positions are stale by design.
+- Zone control over unexplored ground reads `unknown`.
 
-- Parameters: constructible `buildingType`, one or more stable `workerIds`, and `x`/`y` world coordinates.
-- Result: the normal atomic `place_building` command result, including the new construction-site ID.
-- Errors: invalid workers, cost, bounds, and overlap failures are structured and do not mutate state.
+## Command tools
 
-## `train_unit`
+### `order_group`
 
-- Parameters: stable `buildingId` and supported `unitType`.
-- Result: queue position and command summary.
-- Errors: production requirements, resources, queue capacity, and population capacity use the same validation as the HUD.
+`groupIds` (1–12), `order`, and optionally `targetZone`, `targetGroupId`,
+`formation`, `stance`.
 
-## `order_units`
+`order` is one of `move`, `attack_zone`, `attack_group`, `defend_zone`, `hold`,
+`retreat`, `scout`, `support`. `attack_zone` drives onto the objective; `move`
+and `defend_zone` stop on its near edge so arriving regiments muster instead of
+stacking. `attack_group` and `support` require `targetGroupId`.
 
-- Parameters: stable `unitIds`, an order (`move`, `attack`, `attack_move`, `stop`, `hold_position`, `defend_area`, or `retreat`), and the appropriate target ID or coordinates. Formation and stance are optional.
-- Result: affected unit IDs and the authoritative command summary.
-- Visibility: attack targets must be discoverable through `get_command_entities`; the handler does not grant hidden-state access.
+Errors: `GROUP_NOT_FOUND` (missing, not yours, or destroyed), `INVALID_TARGET`,
+`GROUP_ROUTING` (a broken regiment refuses orders until it rallies),
+`INVALID_INPUT`.
+
+An attack on an enemy regiment routes to its **last known** position from your
+own contacts. Attacking a force never seen is refused.
+
+### `reorganize_armies`
+
+`operation` is `split`, `merge` or `rename`.
+
+- `split` — `groupId`, `percent` (1–99), `name`. The detachment is drawn evenly
+  across the roster, so it inherits the parent's mix of troop types.
+- `merge` — `groupIds` (2–8); the first absorbs the rest. Optional `name`.
+- `rename` — `groupId`, `name`.
+
+### `set_conditional_order` / `cancel_conditional_order`
+
+Arms an order that fires once, later, when a trigger is met. Takes `groupId`,
+`action`, an optional target and formation or stance, a `condition`, and a
+`note`. Cancel with the `conditionalId` returned, or find it in
+`get_active_orders`.
+
+`immediate` is rejected here: that is just an order.
+
+### `focus_siege`
+
+`siegeGroupId`, `targetZone`. Commits siege to bombard a zone, deployed loose
+and holding ground. Fails with `NOT_A_SIEGE_GROUP` if the regiment has no engines.
+
+### `direct_reinforcements`
+
+Optional `targetZone` or `targetGroupId`. Commits a banked wave as a new
+regiment. Fails with `NO_REINFORCEMENTS` and an estimate of the wait.
+
+## Plan Mode
+
+A plan is inert state. Creating or revising one moves nothing; the battlefield
+draws it as numbered translucent arrows with highlighted target zones so the
+commander can read the operation before committing.
+
+### `create_plan`
+
+`name` and `steps` (1–20). Each step takes `groupId`, `action`, an optional
+target, an optional `formation`/`stance`, a `startCondition`, and a `note` shown
+on the overlay.
+
+Every step is validated up front, so a plan is never half-valid at execution.
+Creating a plan supersedes any previous draft.
+
+### `modify_plan`
+
+`planId` and `modifications`: `add_step`, `remove_step`, `replace_step`,
+`move_step`, `rename`. Draft plans only — an executing plan returns
+`PLAN_NOT_EDITABLE`. Modifications are validated against a copy, so a bad edit
+cannot leave a mangled plan.
+
+### `execute_plan`
+
+Immediate steps become orders at once; conditional steps are armed and fire when
+their trigger is met. Returns how many of each.
+
+### `cancel_plan`
+
+Disarms pending steps. Orders already issued still stand — cancelling a plan is
+not a recall of troops already marching.
+
+## Condition vocabulary
+
+Triggers are data drawn from a closed set, never code:
+
+| Kind | Fields | Fires when |
+|---|---|---|
+| `immediate` | — | At once (plan steps only) |
+| `after_step` | `stepId` | That step has fired |
+| `morale_below` | `groupId`, `value` | Morale drops below the value |
+| `strength_below` | `groupId`, `percent` | Strength drops below the percentage |
+| `enemy_enters_zone` | `zoneId` | A visible enemy is in that zone |
+| `friendly_zone_lost` | `zoneId` | You no longer control it |
+| `enemy_unit_type_visible` | `category`, optional `zoneId` | That troop type is seen |
+| `timer_elapsed` | `seconds` | That long after arming |
+
+Conditions are evaluated against the arming side's own intelligence, so a
+trigger can never react to something that side cannot see. Each fires once.

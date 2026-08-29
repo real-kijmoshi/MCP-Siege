@@ -1,4 +1,4 @@
-import { FIXED_STEP_MS } from '../config/economy';
+import { FIXED_STEP_MS } from '../config/battle';
 import type { SimulationEngine } from './Engine';
 
 export class FixedStepRunner {

@@ -1,47 +1,65 @@
+import { buildScenario } from '../config/scenario';
 import { CommandQueue } from '../commands/CommandQueue';
-import { handleAssignWorkers } from '../commands/handlers/assignWorkers';
-import { handleMoveUnits } from '../commands/handlers/moveUnits';
 import {
-  handleAttackTarget,
-  handleAssistBuilding,
-  handleCancelProduction,
-  handleGatherResource,
-  handleIssueUnitOrder,
-  handlePlaceBuilding,
-  handleRepairBuilding,
-  handleResearchUpgrade,
-  handleSetRallyPoint,
-  handleTrainUnit,
-} from '../commands/handlers/gameplay';
+  handleCancelConditionalOrder,
+  handleSetConditionalOrder,
+} from '../commands/handlers/conditionals';
+import {
+  handleChangeFormation,
+  handleDirectReinforcements,
+  handleFocusSiege,
+  handleOrderGroups,
+} from '../commands/handlers/groupOrders';
+import {
+  handleCancelPlan,
+  handleCreatePlan,
+  handleExecutePlan,
+  handleModifyPlan,
+} from '../commands/handlers/plans';
+import {
+  handleMergeGroups,
+  handleRenameGroup,
+  handleSplitGroup,
+} from '../commands/handlers/reorganize';
 import type {
   CommandResult,
   CommandSource,
   GameCommand,
   GameCommandPayload,
 } from '../commands/types';
-import { cloneGameState, createInitialGameState, type GameSnapshot, type GameState } from './GameState';
-import {
-  advanceCombat,
-  advanceConstruction,
-  advanceGathering,
-  advanceMovement,
-  advanceProduction,
-  advanceStrategicSites,
-  enemyAiCommands,
-} from './Systems';
-import { updateVisibility } from './Visibility';
+import { advanceAlerts, resetAlertTracking } from './Alerts';
+import { advanceCombat } from './Combat';
+import { collectTriggeredOrders } from './Conditions';
+import { createEmptyState, type GameState } from './GameState';
+import { advanceMorale } from './Morale';
+import { advanceMovement } from './Movement';
+import { advanceReinforcements } from './Reinforcements';
+import { advanceVisibility, seedInitialVisibility } from './Visibility';
+import { advanceZoneControl, seedZoneControl } from './ZoneControl';
+import { enemyAiCommands } from './EnemyAi';
 
 export type CommandResultListener = (command: GameCommand, result: CommandResult) => void;
 
+/**
+ * The simulation.
+ *
+ * It owns the only mutable game state in the application. Human input, the
+ * external Marshal and the enemy AI all reach it through `dispatch`, and
+ * nothing else may write. Systems run in a fixed order every tick and never
+ * consult wall-clock time, so a seed and a command log fully determine a battle.
+ */
 export class SimulationEngine {
   private readonly state: GameState;
   private readonly queue = new CommandQueue();
   private readonly resultListeners = new Set<CommandResultListener>();
   private readonly results = new Map<string, CommandResult>();
 
-  public constructor(seed = 13_371) {
-    this.state = createInitialGameState(seed);
-    updateVisibility(this.state);
+  public constructor(seed = 20_260_829) {
+    this.state = createEmptyState(seed);
+    buildScenario(this.state);
+    seedInitialVisibility(this.state);
+    seedZoneControl(this.state);
+    resetAlertTracking(this.state);
   }
 
   public dispatch(source: CommandSource, payload: GameCommandPayload): GameCommand {
@@ -55,38 +73,55 @@ export class SimulationEngine {
       sequence,
     };
     this.queue.enqueue(command);
-    return structuredClone(command);
+    return command;
   }
 
   public step(): CommandResult[] {
     this.state.currentTick += 1;
+
+    // The enemy and any conditional that just came true submit ordinary
+    // commands, which land alongside the player's in the same ordered queue.
     for (const payload of enemyAiCommands(this.state)) this.dispatch('enemy_ai', payload);
+    for (const payload of collectTriggeredOrders(this.state)) this.dispatch('conditional', payload);
+
     const tickResults: CommandResult[] = [];
     for (const command of this.queue.drainReady(this.state.currentTick)) {
       const result = this.applyCommand(command);
-      this.state.commandLog.push({ command: structuredClone(command), result: structuredClone(result) });
-      if (this.state.commandLog.length > 200) this.state.commandLog.shift();
-      this.results.set(command.id, structuredClone(result));
-      tickResults.push(structuredClone(result));
-      for (const listener of this.resultListeners) listener(structuredClone(command), structuredClone(result));
+      this.results.set(command.id, result);
+      if (this.results.size > 400) {
+        const oldest = this.results.keys().next().value;
+        if (oldest !== undefined) this.results.delete(oldest);
+      }
+      tickResults.push(result);
+      for (const listener of this.resultListeners) listener(command, result);
     }
+
     advanceMovement(this.state);
-    advanceGathering(this.state);
-    advanceConstruction(this.state);
-    advanceProduction(this.state);
-    advanceStrategicSites(this.state);
     advanceCombat(this.state);
-    updateVisibility(this.state);
+    advanceMorale(this.state);
+    advanceVisibility(this.state);
+    advanceZoneControl(this.state);
+    advanceReinforcements(this.state);
+    advanceAlerts(this.state);
+    this.pruneCombatEvents();
+
     return tickResults;
   }
 
-  public getSnapshot(): GameSnapshot {
-    return cloneGameState(this.state);
+  /**
+   * Direct, read-only access to live state.
+   *
+   * The renderer reads through this every frame; cloning thousands of units at
+   * sixty frames a second is not affordable, so the contract is enforced by
+   * convention and by the read-only view types rather than by copying.
+   * WebMCP never sees this: it goes through `GameQueries` projections.
+   */
+  public getState(): GameState {
+    return this.state;
   }
 
   public getCommandResult(commandId: string): CommandResult | undefined {
-    const result = this.results.get(commandId);
-    return result === undefined ? undefined : structuredClone(result);
+    return this.results.get(commandId);
   }
 
   public onCommandResult(listener: CommandResultListener): () => void {
@@ -98,32 +133,42 @@ export class SimulationEngine {
     return this.queue.size;
   }
 
+  private pruneCombatEvents(): void {
+    const events = this.state.combatEvents;
+    const cutoff = this.state.currentTick - 6;
+    let index = 0;
+    while (index < events.length && (events[index]?.tick ?? 0) < cutoff) index += 1;
+    if (index > 0) events.splice(0, index);
+  }
+
   private applyCommand(command: GameCommand): CommandResult {
     switch (command.type) {
-      case 'assign_workers':
-        return handleAssignWorkers(command, this.state);
-      case 'move_units':
-        return handleMoveUnits(command, this.state);
-      case 'gather_resource':
-        return handleGatherResource(command, this.state);
-      case 'place_building':
-        return handlePlaceBuilding(command, this.state);
-      case 'train_unit':
-        return handleTrainUnit(command, this.state);
-      case 'research_upgrade':
-        return handleResearchUpgrade(command, this.state);
-      case 'attack_target':
-        return handleAttackTarget(command, this.state);
-      case 'assist_building':
-        return handleAssistBuilding(command, this.state);
-      case 'repair_building':
-        return handleRepairBuilding(command, this.state);
-      case 'cancel_production':
-        return handleCancelProduction(command, this.state);
-      case 'set_rally_point':
-        return handleSetRallyPoint(command, this.state);
-      case 'issue_unit_order':
-        return handleIssueUnitOrder(command, this.state);
+      case 'order_groups':
+        return handleOrderGroups(command, this.state);
+      case 'change_formation':
+        return handleChangeFormation(command, this.state);
+      case 'split_group':
+        return handleSplitGroup(command, this.state);
+      case 'merge_groups':
+        return handleMergeGroups(command, this.state);
+      case 'rename_group':
+        return handleRenameGroup(command, this.state);
+      case 'set_conditional_order':
+        return handleSetConditionalOrder(command, this.state);
+      case 'cancel_conditional_order':
+        return handleCancelConditionalOrder(command, this.state);
+      case 'focus_siege':
+        return handleFocusSiege(command, this.state);
+      case 'direct_reinforcements':
+        return handleDirectReinforcements(command, this.state);
+      case 'create_plan':
+        return handleCreatePlan(command, this.state);
+      case 'modify_plan':
+        return handleModifyPlan(command, this.state);
+      case 'execute_plan':
+        return handleExecutePlan(command, this.state);
+      case 'cancel_plan':
+        return handleCancelPlan(command, this.state);
     }
   }
 }

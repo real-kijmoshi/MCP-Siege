@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 const webMcpHeaders = {
   'Origin-Agent-Cluster': '?1',

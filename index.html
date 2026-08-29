@@ -3,12 +3,112 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b0e0c" />
-    <meta name="description" content="A deterministic medieval RTS controlled by a human commander and a WebMCP Marshal." />
-    <title>Iron & Oath — WebMCP RTS</title>
+    <title>Siege — WebMCP Battle Command</title>
+    <meta
+      name="description"
+      content="A large-scale battle command game that exposes its live battlefield to an external AI Marshal through WebMCP."
+    />
   </head>
   <body>
-    <main id="app"></main>
+    <div id="app">
+      <header class="top-bar">
+        <div class="brand">
+          <strong>SIEGE</strong>
+          <small>BATTLE COMMAND</small>
+        </div>
+
+        <div class="stat" title="Total men under your command">
+          <small>STRENGTH</small>
+          <b id="stat-strength">0</b>
+        </div>
+        <div class="stat" title="Enemy strength you can currently see">
+          <small>ENEMY SEEN</small>
+          <b id="stat-enemy">0</b>
+        </div>
+        <div class="stat" title="Reinforcement waves ready to commit">
+          <small>REINFORCEMENTS</small>
+          <b id="stat-reinforcements">0</b>
+        </div>
+        <div class="stat" title="Time elapsed">
+          <small>ELAPSED</small>
+          <b id="stat-clock">0:00</b>
+        </div>
+
+        <div class="spacer"></div>
+
+        <div class="speed-control" role="group" aria-label="Simulation speed">
+          <button type="button" data-speed="0" id="speed-pause" title="Pause [Space]">❚❚</button>
+          <button type="button" data-speed="1" class="active">1×</button>
+          <button type="button" data-speed="2">2×</button>
+          <button type="button" data-speed="4">4×</button>
+        </div>
+
+        <div class="webmcp-status" id="webmcp-status" title="WebMCP tool availability">
+          <span class="dot"></span>
+          <small id="webmcp-label">DETECTING</small>
+        </div>
+      </header>
+
+      <main class="stage">
+        <aside class="army-list" aria-label="Army groups">
+          <h2>ARMY GROUPS</h2>
+          <div id="army-list-body"></div>
+        </aside>
+
+        <div class="map-wrap">
+          <canvas id="battlefield" aria-label="Battlefield"></canvas>
+
+          <div class="alert-feed" id="alert-feed" role="status" aria-live="polite"></div>
+          <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+          <div class="minimap-wrap">
+            <canvas id="minimap" aria-label="Battlefield minimap"></canvas>
+          </div>
+
+          <div class="hint">
+            <b>LMB</b> select · <b>DRAG</b> box · <b>RMB</b> move/attack · <b>WHEEL</b> zoom ·
+            <b>WASD</b> pan · <b>CTRL+1-9</b> group · <b>SPACE</b> pause
+          </div>
+        </div>
+      </main>
+
+      <footer class="command-bar">
+        <div class="selection-readout" id="selection-readout">
+          <small>NO SELECTION</small>
+          <b>Select a group on the map or in the list</b>
+        </div>
+
+        <div class="commands" id="commands">
+          <button type="button" data-command="move" title="Move to the zone under the cursor">
+            <span>↑</span>MOVE
+          </button>
+          <button type="button" data-command="attack" title="Attack the nearest known enemy">
+            <span>⚔</span>ATTACK
+          </button>
+          <button type="button" data-command="hold" title="Hold position">
+            <span>⬣</span>HOLD
+          </button>
+          <button type="button" data-command="defend" title="Defend the current zone">
+            <span>⛨</span>DEFEND
+          </button>
+          <button type="button" data-command="formation" title="Change formation">
+            <span>▦</span>FORMATION
+          </button>
+          <button type="button" data-command="split" title="Split the selected group in half">
+            <span>⇄</span>SPLIT
+          </button>
+          <button type="button" data-command="merge" title="Merge the selected groups">
+            <span>⇉</span>MERGE
+          </button>
+          <button type="button" data-command="retreat" title="Withdraw to the rear">
+            <span>↩</span>RETREAT
+          </button>
+        </div>
+
+        <div class="formation-menu" id="formation-menu" hidden></div>
+      </footer>
+    </div>
+
     <script type="module" src="/src/app/main.ts"></script>
   </body>
 </html>

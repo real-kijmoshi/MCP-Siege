@@ -1,6 +1,30 @@
-import type { CommandLogEntry } from '../commands/types';
-import type { BuildingState, PlayerState, ResourceNodeState, StrategicSiteState, UnitState, VillagerState } from '../types/domain';
+import { FOG_COLUMNS, FOG_ROWS } from '../config/battle';
+import type {
+  ArmyGroup,
+  BattleAlert,
+  BattlePlan,
+  CombatEvent,
+  EnemyContact,
+  PendingConditionalOrder,
+  PlayerId,
+} from '../types/domain';
 import type { RandomState } from './Random';
+import { UnitPool } from './UnitPool';
+
+/** Three-state fog, one byte per cell: 0 unexplored, 1 explored, 2 visible. */
+export interface VisibilityGrid {
+  cells: Uint8Array;
+}
+
+export interface PlayerBattleState {
+  id: PlayerId;
+  name: string;
+  /** Accrues over time and pays for reinforcement waves. */
+  manpower: number;
+  /** Waves banked and ready to deploy. */
+  availableWaves: number;
+  wavesDeployed: number;
+}
 
 export interface GameState {
   gameSeed: number;
@@ -8,155 +32,134 @@ export interface GameState {
   currentTick: number;
   commandSequence: number;
   entitySequence: number;
-  players: Record<string, PlayerState>;
-  villagers: Record<string, VillagerState>;
-  units: Record<string, UnitState>;
-  buildings: Record<string, BuildingState>;
-  resourceNodes: Record<string, ResourceNodeState>;
-  strategicSites: Record<string, StrategicSiteState>;
-  visibility: Record<string, PlayerVisibilityState>;
-  commandLog: CommandLogEntry[];
-}
-export type GameSnapshot = GameState;
 
-export interface PlayerVisibilityState {
-  explored: boolean[];
-  visible: boolean[];
-}
+  units: UnitPool;
+  /** Indexed by group slot; units store the slot in `UnitPool.group`. */
+  groups: ArmyGroup[];
+  groupIndexById: Map<string, number>;
 
-function createVillagers(ownerId: string, prefix: string, x: number, y: number): Record<string, VillagerState> {
-  const villagers: Record<string, VillagerState> = {};
-  for (let index = 1; index <= 5; index += 1) {
-    const id = `unit_${prefix}_villager_${String(index).padStart(2, '0')}`;
-    villagers[id] = {
-      id, ownerId, type: 'villager', job: 'idle',
-      position: { x: x + ((index - 1) % 3) * 24, y: y + Math.floor((index - 1) / 3) * 26 },
-      hitPoints: 40, maxHitPoints: 40, attackCooldown: 0, formation: 'loose', stance: 'defensive',
-    };
-  }
-  return villagers;
-}
+  players: Record<PlayerId, PlayerBattleState>;
+  visibility: Record<PlayerId, VisibilityGrid>;
+  /** What each side remembers about the other. Keyed by enemy group id. */
+  contacts: Record<PlayerId, Map<string, EnemyContact>>;
+  /** Which side currently holds each zone, by zone id. */
+  zoneControl: Map<string, PlayerId | undefined>;
+  /** Previous controller per zone, so only genuine changes raise an alert. */
+  zoneControlPrevious: Map<string, PlayerId | undefined>;
 
-function node(id: string, type: ResourceNodeState['type'], x: number, y: number, capacity: number): ResourceNodeState {
-  return { id, type, position: { x, y }, remaining: capacity, capacity };
+  plans: BattlePlan[];
+  conditionals: PendingConditionalOrder[];
+  /** Ids of plan steps that have already fired, backing `after_step`. */
+  completedSteps: Set<string>;
+
+  alerts: BattleAlert[];
+  /** Alert key to the tick it may next fire, preventing spam. */
+  alertCooldowns: Map<string, number>;
+
+  /** Cosmetic, bounded, render-only. Excluded from the determinism checksum. */
+  combatEvents: CombatEvent[];
 }
 
-function addCluster(
-  target: Record<string, ResourceNodeState>, baseId: string, type: ResourceNodeState['type'],
-  points: Array<readonly [number, number]>, capacity: number,
-): void {
-  points.forEach(([x, y], index) => {
-    const id = index === 0 ? baseId : `${baseId}_${String(index + 1).padStart(2, '0')}`;
-    target[id] = node(id, type, x, y, capacity);
-  });
+function createVisibilityGrid(): VisibilityGrid {
+  return { cells: new Uint8Array(FOG_COLUMNS * FOG_ROWS) };
 }
 
-function forestPatch(originX: number, originY: number, columns: number, rows: number): Array<readonly [number, number]> {
-  const points: Array<readonly [number, number]> = [];
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      points.push([
-        originX + column * 58 + (row % 2) * 24 + ((column * 17 + row * 11) % 19),
-        originY + row * 57 + ((column * 13 + row * 7) % 17),
-      ]);
-    }
-  }
-  return points;
-}
-
-function createResourceNodes(): Record<string, ResourceNodeState> {
-  const nodes: Record<string, ResourceNodeState> = {};
-
-  // Southwest opening: berries and timber are close; stone and iron pull expansion toward the ridge.
-  addCluster(nodes, 'resource_player_food', 'food', [
-    [920, 1570], [965, 1535], [1005, 1590], [950, 1630], [1040, 1555], [1000, 1660],
-  ], 460);
-  addCluster(nodes, 'resource_player_forest', 'wood', [
-    ...forestPatch(90, 1030, 6, 10), ...forestPatch(390, 1130, 3, 7),
-  ], 360);
-  addCluster(nodes, 'resource_player_stone', 'stone', [
-    [1110, 1110], [1165, 1080], [1215, 1135], [1080, 1170], [1160, 1190], [1240, 1070],
-  ], 680);
-  addCluster(nodes, 'resource_player_iron', 'iron', [
-    [1320, 1740], [1380, 1705], [1440, 1755], [1360, 1800], [1480, 1685],
-  ], 620);
-
-  // Northeast territory mirrors the resource journey without revealing it to the player.
-  addCluster(nodes, 'resource_enemy_food', 'food', [
-    [2440, 430], [2490, 390], [2535, 445], [2460, 485], [2570, 390], [2540, 505],
-  ], 460);
-  addCluster(nodes, 'resource_enemy_forest', 'wood', [
-    ...forestPatch(2920, 210, 4, 9), ...forestPatch(2380, 30, 4, 3),
-  ], 360);
-  addCluster(nodes, 'resource_enemy_stone', 'stone', [
-    [2130, 690], [2190, 650], [2245, 705], [2160, 755], [2270, 645], [2220, 790],
-  ], 680);
-  addCluster(nodes, 'resource_enemy_iron', 'iron', [
-    [2770, 770], [2830, 730], [2890, 780], [2810, 825], [2930, 720],
-  ], 620);
-
-  // A central wood line shapes the open army field without prebuilding any settlement.
-  addCluster(nodes, 'resource_central_forest', 'wood', forestPatch(2330, 1120, 6, 5), 340);
-  return nodes;
-}
-
-export function createInitialGameState(seed = 13_371): GameState {
-  const playerVillagers = createVillagers('player_kingdom', 'player', 690, 1510);
-  const enemyVillagers = createVillagers('enemy_kingdom', 'enemy', 2570, 330);
-  const villagers = { ...playerVillagers, ...enemyVillagers };
+export function createEmptyState(seed: number): GameState {
   return {
-    gameSeed: seed, random: { value: seed >>> 0 || 1 }, currentTick: 0,
-    commandSequence: 1, entitySequence: 1,
+    gameSeed: seed,
+    random: { value: seed >>> 0 || 1 },
+    currentTick: 0,
+    commandSequence: 1,
+    entitySequence: 1,
+
+    units: new UnitPool(),
+    groups: [],
+    groupIndexById: new Map(),
+
     players: {
-      player_kingdom: {
-        id: 'player_kingdom', name: 'Crownlands',
-        resources: { food: 180, wood: 220, stone: 90, iron: 60 },
-        population: 5, populationCap: 10, completedUpgrades: [],
-      },
-      enemy_kingdom: {
-        id: 'enemy_kingdom', name: 'Ashen Host',
-        resources: { food: 180, wood: 220, stone: 90, iron: 60 },
-        population: 5, populationCap: 10, completedUpgrades: [],
-      },
-    },
-    villagers,
-    units: { ...villagers },
-    buildings: {
-      building_player_town_hall: {
-        id: 'building_player_town_hall', ownerId: 'player_kingdom', type: 'town_hall',
-        position: { x: 610, y: 1570 }, status: 'complete', constructionProgress: 1,
-        constructionRequired: 1, hitPoints: 1200, maxHitPoints: 1200, productionQueue: [],
-      },
-      building_enemy_town_hall: {
-        id: 'building_enemy_town_hall', ownerId: 'enemy_kingdom', type: 'town_hall',
-        position: { x: 2660, y: 300 }, status: 'complete', constructionProgress: 1,
-        constructionRequired: 1, hitPoints: 1200, maxHitPoints: 1200, productionQueue: [],
-      },
-    },
-    resourceNodes: createResourceNodes(),
-    strategicSites: {
-      landmark_western_watch: {
-        id: 'landmark_western_watch', type: 'abandoned_watch_tower', position: { x: 1390, y: 820 },
-        label: 'Abandoned Watch Tower', purpose: 'Capture for extended vision over the western crossing.',
-        captureProgress: 0, captureRequired: 240,
-      },
-      landmark_bridge_crossing: {
-        id: 'landmark_bridge_crossing', type: 'capture_point', position: { x: 1690, y: 1020 },
-        label: 'Bridge Crossing', purpose: 'Control the central bridge to gain a steady food and wood trickle.',
-        captureProgress: 0, captureRequired: 200,
-      },
-      landmark_ruined_fort: {
-        id: 'landmark_ruined_fort', type: 'ruined_fort', position: { x: 2070, y: 1280 },
-        label: 'Ruined Fort', purpose: 'Capture this defensible landmark for stone and iron income.',
-        captureProgress: 0, captureRequired: 280,
-      },
+      player: { id: 'player', name: 'Crownlands', manpower: 0, availableWaves: 0, wavesDeployed: 0 },
+      enemy: { id: 'enemy', name: 'Ashen Host', manpower: 0, availableWaves: 0, wavesDeployed: 0 },
     },
     visibility: {
-      player_kingdom: { explored: [], visible: [] },
-      enemy_kingdom: { explored: [], visible: [] },
+      player: createVisibilityGrid(),
+      enemy: createVisibilityGrid(),
     },
-    commandLog: [],
+    contacts: {
+      player: new Map(),
+      enemy: new Map(),
+    },
+    zoneControl: new Map(),
+    zoneControlPrevious: new Map(),
+
+    plans: [],
+    conditionals: [],
+    completedSteps: new Set(),
+
+    alerts: [],
+    alertCooldowns: new Map(),
+
+    combatEvents: [],
   };
 }
 
-export function cloneGameState(state: GameState): GameSnapshot { return structuredClone(state); }
+/* ----------------------------------------------------------------- helpers */
+
+export function findGroup(state: GameState, groupId: string): ArmyGroup | undefined {
+  const index = state.groupIndexById.get(groupId);
+  return index === undefined ? undefined : state.groups[index];
+}
+
+export function groupSlotOf(state: GameState, groupId: string): number {
+  return state.groupIndexById.get(groupId) ?? -1;
+}
+
+export function registerGroup(state: GameState, group: ArmyGroup): number {
+  const slot = state.groups.length;
+  state.groups.push(group);
+  state.groupIndexById.set(group.id, slot);
+  return slot;
+}
+
+/** Live groups only. Empty groups linger as slots so unit indices stay stable. */
+export function activeGroups(state: GameState, ownerId?: PlayerId): ArmyGroup[] {
+  return state.groups.filter(
+    (group) => group.members.length > 0 && (ownerId === undefined || group.ownerId === ownerId),
+  );
+}
+
+export function nextEntityId(state: GameState, prefix: string): string {
+  const id = `${prefix}_${state.entitySequence}`;
+  state.entitySequence += 1;
+  return id;
+}
+
+/**
+ * Order-independent checksum of everything the simulation mutates. Determinism
+ * tests compare this across identical runs.
+ */
+export function stateChecksum(state: GameState): number {
+  let hash = state.units.checksum();
+  const mix = (value: number): void => {
+    hash ^= value | 0;
+    hash = Math.imul(hash, 16_777_619) >>> 0;
+  };
+  mix(state.currentTick);
+  mix(state.random.value);
+  mix(state.commandSequence);
+  for (const group of state.groups) {
+    mix(group.members.length);
+    mix(Math.round(group.morale * 100));
+    mix(Math.round(group.anchor.x * 16));
+    mix(Math.round(group.anchor.y * 16));
+    mix(Math.round(group.facing * 1000));
+    mix(group.path.length);
+    mix(group.order.kind.length * 31 + group.formation.length);
+  }
+  for (const playerId of ['player', 'enemy'] as const) {
+    mix(Math.round(state.players[playerId].manpower));
+    mix(state.contacts[playerId].size);
+  }
+  mix(state.conditionals.length);
+  mix(state.alerts.length);
+  return hash >>> 0;
+}

@@ -1,111 +1,289 @@
-export const RESOURCE_TYPES = ['food', 'wood', 'stone', 'iron'] as const;
-export type ResourceType = (typeof RESOURCE_TYPES)[number];
-export type ResourceStockpile = Record<ResourceType, number>;
+/**
+ * Shared vocabulary for the battle simulation.
+ *
+ * Everything the player and the external Marshal can name lives here. Individual
+ * soldiers are deliberately absent: they exist only as indices into the typed
+ * arrays of `UnitPool` and are never addressable across the WebMCP boundary.
+ */
 
-export const BUILDING_TYPES = [
-  'town_hall', 'house', 'storehouse', 'barracks', 'archery_range', 'stable',
-  'armoury', 'siege_workshop', 'watch_tower', 'wall', 'gate',
+export interface Vector2D {
+  x: number;
+  y: number;
+}
+
+/** Faction slot used inside the typed arrays. */
+export const FACTION_PLAYER = 0;
+export const FACTION_ENEMY = 1;
+
+export type PlayerId = 'player' | 'enemy';
+
+export const PLAYER_IDS = ['player', 'enemy'] as const;
+
+export function factionOf(playerId: PlayerId): number {
+  return playerId === 'player' ? FACTION_PLAYER : FACTION_ENEMY;
+}
+
+export function playerIdOf(faction: number): PlayerId {
+  return faction === FACTION_PLAYER ? 'player' : 'enemy';
+}
+
+export function opponentOf(playerId: PlayerId): PlayerId {
+  return playerId === 'player' ? 'enemy' : 'player';
+}
+
+/* ------------------------------------------------------------------ units */
+
+export const UNIT_CATEGORIES = [
+  'infantry',
+  'spearman',
+  'archer',
+  'cavalry',
+  'heavy_infantry',
+  'siege',
+  'scout',
 ] as const;
-export type BuildingType = (typeof BUILDING_TYPES)[number];
+export type UnitCategory = (typeof UNIT_CATEGORIES)[number];
 
-export const UNIT_TYPES = [
-  'villager', 'swordsman', 'spearman', 'archer', 'knight', 'scout', 'catapult', 'battering_ram',
+/** Numeric encoding stored in `UnitPool.category`. */
+export function categoryIndex(category: UnitCategory): number {
+  return UNIT_CATEGORIES.indexOf(category);
+}
+
+export function categoryAt(index: number): UnitCategory {
+  return UNIT_CATEGORIES[index] ?? 'infantry';
+}
+
+export function isUnitCategory(value: string): value is UnitCategory {
+  return (UNIT_CATEGORIES as readonly string[]).includes(value);
+}
+
+/* ------------------------------------------------------------- formations */
+
+export const FORMATIONS = [
+  'line',
+  'column',
+  'block',
+  'wedge',
+  'double_line',
+  'loose',
+  'square',
 ] as const;
-export type UnitType = (typeof UNIT_TYPES)[number];
+export type Formation = (typeof FORMATIONS)[number];
 
-export const FORMATION_TYPES = ['line', 'column', 'square', 'wedge', 'loose'] as const;
-export type FormationType = (typeof FORMATION_TYPES)[number];
-export const COMBAT_STANCES = ['aggressive', 'defensive', 'hold_ground'] as const;
-export type CombatStance = (typeof COMBAT_STANCES)[number];
-export const MILITARY_ORDERS = ['attack_move', 'stop', 'hold_position', 'defend_area', 'retreat', 'set_formation', 'set_stance'] as const;
-export type MilitaryOrderType = (typeof MILITARY_ORDERS)[number];
+export const STANCES = ['aggressive', 'defensive', 'hold_ground'] as const;
+export type Stance = (typeof STANCES)[number];
 
-export const UPGRADE_TYPES = [
-  'infantry_weapons_1', 'infantry_armor_1', 'archer_damage_1', 'cavalry_armor_1',
+/* ----------------------------------------------------------------- morale */
+
+export const MORALE_STATES = ['confident', 'stable', 'shaken', 'breaking', 'routing'] as const;
+export type MoraleState = (typeof MORALE_STATES)[number];
+
+/* ------------------------------------------------------------------ zones */
+
+export const ZONE_IDS = [
+  'player_base',
+  'west_forest',
+  'west_crossing',
+  'central_field',
+  'central_bridge',
+  'central_hill',
+  'village',
+  'east_field',
+  'east_crossing',
+  'east_forest',
+  'northern_ridge',
+  'enemy_outer_defense',
+  'enemy_base',
 ] as const;
-export type UpgradeType = (typeof UPGRADE_TYPES)[number];
+export type ZoneId = (typeof ZONE_IDS)[number];
 
-export type WorkerJob = 'idle' | 'moving' | 'gathering' | 'building' | 'repairing';
-export interface Vector2D { x: number; y: number }
-
-export interface UnitOrder {
-  kind: 'move' | 'gather' | 'build' | 'repair' | 'attack' | 'attack_move' | 'hold' | 'defend' | 'retreat';
-  targetPosition: Vector2D;
-  targetId?: string;
+export function isZoneId(value: string): value is ZoneId {
+  return (ZONE_IDS as readonly string[]).includes(value);
 }
 
-export interface UnitState {
-  id: string;
-  ownerId: string;
-  type: UnitType;
-  position: Vector2D;
-  hitPoints: number;
-  maxHitPoints: number;
-  order?: UnitOrder;
-  attackCooldown: number;
-  formation: FormationType;
-  stance: CombatStance;
+/** Coarse front assignment used by overview and front-status projections. */
+export const FRONTS = ['west', 'center', 'east', 'rear'] as const;
+export type Front = (typeof FRONTS)[number];
+
+/* ----------------------------------------------------------------- orders */
+
+export const ORDER_KINDS = [
+  'idle',
+  'move',
+  'attack_zone',
+  'attack_group',
+  'defend_zone',
+  'hold',
+  'retreat',
+  'scout',
+  'support',
+] as const;
+export type OrderKind = (typeof ORDER_KINDS)[number];
+
+export interface ArmyOrder {
+  kind: OrderKind;
+  /** Semantic destination. Absent for `idle` and `hold`. */
+  targetZone?: ZoneId;
+  /** Present for `attack_group` and `support`. */
+  targetGroupId?: string;
+  /** Resolved world destination the group navigates toward. */
+  destination?: Vector2D;
+  issuedAtTick: number;
 }
 
-export interface VillagerState extends UnitState {
-  type: 'villager';
-  job: WorkerJob;
-  carriedResource?: ResourceType;
-}
+/* ----------------------------------------------------------------- groups */
 
-export interface ProductionOrder {
-  id: string;
-  unitType: UnitType;
-  remainingTicks: number;
-  totalTicks: number;
-}
-
-export interface BuildingState {
-  id: string;
-  ownerId: string;
-  type: BuildingType;
-  position: Vector2D;
-  status: 'blueprint' | 'complete';
-  constructionProgress: number;
-  constructionRequired: number;
-  hitPoints: number;
-  maxHitPoints: number;
-  productionQueue: ProductionOrder[];
-  rallyPoint?: Vector2D;
-}
-
-export const STRATEGIC_SITE_TYPES = ['abandoned_watch_tower', 'capture_point', 'ruined_fort'] as const;
-export type StrategicSiteType = (typeof STRATEGIC_SITE_TYPES)[number];
-export interface StrategicSiteState {
-  id: string;
-  type: StrategicSiteType;
-  position: Vector2D;
-  label: string;
-  purpose: string;
-  controllingPlayerId?: string;
-  capturePlayerId?: string;
-  captureProgress: number;
-  captureRequired: number;
-}
-
-export interface ResourceNodeState {
-  id: string;
-  type: ResourceType;
-  position: Vector2D;
-  remaining: number;
-  capacity: number;
-}
-
-export interface PlayerState {
+export interface ArmyGroup {
   id: string;
   name: string;
-  resources: ResourceStockpile;
-  population: number;
-  populationCap: number;
-  completedUpgrades: UpgradeType[];
+  ownerId: PlayerId;
+  /** Live unit indices into `UnitPool`. Kept sorted for deterministic iteration. */
+  members: number[];
+  formation: Formation;
+  stance: Stance;
+  order: ArmyOrder;
+  /** Formation origin in world space. */
+  anchor: Vector2D;
+  /** Radians. Formation slots are generated around this heading. */
+  facing: number;
+  morale: number;
+  moraleState: MoraleState;
+  /** Group-level waypoints produced by `Navigation`. Consumed front to back. */
+  path: Vector2D[];
+  /** Strength at spawn, used for percentage readouts. */
+  initialStrength: number;
+  homeZone: ZoneId;
+  /** Tick of the most recent casualty. Drives "under attack" reporting. */
+  lastCasualtyTick: number;
+  /** Decaying casualty accumulator that feeds the morale system. */
+  recentCasualties: number;
+  /** Set while a group is retreating under its own morale, not by order. */
+  routing: boolean;
 }
 
-export type WorkerAssignments = Record<ResourceType, number>;
-export function emptyWorkerAssignments(): WorkerAssignments {
-  return { food: 0, wood: 0, stone: 0, iron: 0 };
+/* ------------------------------------------------------------- conditions */
+
+export const CONDITION_KINDS = [
+  'immediate',
+  'after_step',
+  'morale_below',
+  'strength_below',
+  'enemy_enters_zone',
+  'friendly_zone_lost',
+  'enemy_unit_type_visible',
+  'timer_elapsed',
+] as const;
+export type ConditionKind = (typeof CONDITION_KINDS)[number];
+
+/**
+ * A closed vocabulary of triggers. Deliberately not arbitrary code: the Marshal
+ * composes conditions from these shapes only (brief section 17).
+ */
+export type PlanCondition =
+  | { kind: 'immediate' }
+  | { kind: 'after_step'; stepId: string }
+  | { kind: 'morale_below'; groupId: string; value: number }
+  | { kind: 'strength_below'; groupId: string; percent: number }
+  | { kind: 'enemy_enters_zone'; zoneId: ZoneId }
+  | { kind: 'friendly_zone_lost'; zoneId: ZoneId }
+  | { kind: 'enemy_unit_type_visible'; category: UnitCategory; zoneId?: ZoneId }
+  | { kind: 'timer_elapsed'; seconds: number };
+
+/* ------------------------------------------------------------------ plans */
+
+export const PLAN_ACTIONS = [
+  'move',
+  'attack_zone',
+  'attack_group',
+  'defend_zone',
+  'hold',
+  'retreat',
+  'change_formation',
+  'support',
+] as const;
+export type PlanAction = (typeof PLAN_ACTIONS)[number];
+
+export interface PlanStep {
+  id: string;
+  index: number;
+  groupId: string;
+  action: PlanAction;
+  targetZone?: ZoneId;
+  targetGroupId?: string;
+  formation?: Formation;
+  stance?: Stance;
+  startCondition: PlanCondition;
+  note: string;
+}
+
+export type PlanStatus = 'draft' | 'executing' | 'complete' | 'cancelled';
+
+export interface BattlePlan {
+  id: string;
+  name: string;
+  status: PlanStatus;
+  createdAtTick: number;
+  steps: PlanStep[];
+}
+
+/** A step promoted to a live trigger by `execute_plan`, or a standing order. */
+export interface PendingConditionalOrder {
+  id: string;
+  planId?: string;
+  stepId?: string;
+  groupId: string;
+  action: PlanAction;
+  targetZone?: ZoneId;
+  targetGroupId?: string;
+  formation?: Formation;
+  stance?: Stance;
+  condition: PlanCondition;
+  createdAtTick: number;
+  note: string;
+}
+
+/* ----------------------------------------------------------- intelligence */
+
+/** What one side remembers about an enemy group it has seen. */
+export interface EnemyContact {
+  groupId: string;
+  name: string;
+  /** Rounded so exact truth never leaks across the fog boundary. */
+  estimatedStrength: number;
+  composition: UnitCategory[];
+  lastPosition: Vector2D;
+  lastSeenTick: number;
+  lastSeenZone: ZoneId;
+  visibleNow: boolean;
+}
+
+/* ---------------------------------------------------------------- effects */
+
+/**
+ * A sampled attack, kept only so the renderer can flash something. Purely
+ * cosmetic and bounded; nothing in the simulation reads it back.
+ */
+export interface CombatEvent {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  kind: 'melee' | 'arrow' | 'siege';
+  tick: number;
+}
+
+/* ----------------------------------------------------------------- alerts */
+
+export const ALERT_SEVERITIES = ['info', 'warning', 'critical'] as const;
+export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
+
+export interface BattleAlert {
+  id: string;
+  /** Stable key used to dedupe repeats of the same situation. */
+  key: string;
+  severity: AlertSeverity;
+  message: string;
+  tick: number;
+  zoneId?: ZoneId;
+  groupId?: string;
 }

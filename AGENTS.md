@@ -1,48 +1,71 @@
-# WebMCP Medieval RTS — Coding Agent Directives
+# Siege — Coding Agent Directives
 
 ## Authoritative state
 
 - There is one mutable `GameState`, owned by `SimulationEngine`.
-- Human input, WebMCP, enemy AI, and debug tools submit typed commands. They never mutate state directly.
-- Command handlers validate the whole command before mutation. Invalid commands are atomic failures.
-- Renderers and UI consume immutable snapshots and command results only.
+- Human input, WebMCP, the enemy AI and fired conditionals submit typed commands.
+  They never mutate state directly.
+- Command handlers validate the whole command before mutating. An invalid
+  command is an atomic failure that changes nothing.
+- The renderer reads live state through `engine.getState()` and must only read.
+  WebMCP never sees state; it sees `GameQueries` projections.
 
 ## Command and query boundaries
 
-- All state changes cross `GameCommands` and the deterministic `CommandQueue`.
+- All state changes cross `GameCommandPayload` and the deterministic `CommandQueue`.
 - WebMCP action tools submit commands; read tools call `GameQueries`.
-- Queries return purpose-built projections, never raw `GameState` references.
-- Every public entity ID is stable and serializable. Never expose Phaser objects or renderer handles.
-- Fog-of-war filtering belongs inside `GameQueries`, not in callers.
+- `applyOrderToGroup` in `commands/handlers/shared.ts` is the single definition of
+  what an order means. Do not add a second path.
+- Fog-of-war filtering belongs inside `GameQueries` and `Visibility`, never in callers.
+- Regiments are the only entity addressable across the WebMCP boundary. Individual
+  soldiers are pool indices and must never be exposed or referenced by id.
 
 ## Determinism
 
-- The simulation runs at 20 ticks per second with a 50 ms fixed step.
-- Simulation behavior must not depend on wall-clock time, DOM state, render delta, or unordered iteration.
-- Commands are ordered by `issuedAtTick`, then `sequence`.
-- Randomness must use the seeded PRNG owned by simulation state.
-- Keep simulation code pure TypeScript and independent of Phaser.
+- 20 ticks per second, 50 ms fixed step.
+- Behaviour must not depend on wall-clock time, DOM state, render delta, or
+  unordered iteration. Iterate arrays and sorted keys, never a bare `Map` order
+  that callers can influence.
+- Randomness must use the seeded PRNG owned by simulation state. Cosmetic
+  scattering may use an index hash instead, so it does not consume that stream.
+- Module-level mutable values are permitted only as scratch buffers that are
+  fully reset before use. Anything that carries state across ticks belongs in
+  `GameState`, or two engines in one process will interfere.
+
+## Performance
+
+- The simulation targets ~8,000 units. Per-tick work must stay O(units) with a
+  small constant and allocate nothing in steady state.
+- Units live in `UnitPool` typed arrays with a free list. Do not introduce
+  per-unit objects.
+- Combat uses the spatial hash; target acquisition is staggered across ticks.
+- Group-level navigation only. Never run a path search per soldier.
+- The renderer batches by faction and category into preallocated buffers and
+  switches level of detail by zoom. Keep fills per frame in the low tens.
 
 ## Module ownership
 
-- `src/game/simulation/`: authoritative state, engine, clock, deterministic utilities.
-- `src/game/commands/`: command contracts, queue, validation, and handlers.
+- `src/game/simulation/`: authoritative state, engine, systems, deterministic utilities.
+- `src/game/commands/`: command contracts, queue, validation, handlers.
 - `src/game/queries/`: visibility-safe external projections.
-- `src/rendering/phaser/`: visuals and raw input capture only.
+- `src/rendering/canvas/`: drawing and raw input capture only.
 - `src/ui/`: DOM presentation and command dispatch only.
-- `src/integrations/webmcp/`: feature detection, schemas, registration, and tool result adaptation only.
+- `src/integrations/webmcp/`: feature detection, schemas, registration, result shaping.
 
 ## WebMCP constraints
 
 - Register through feature-detected `document.modelContext.registerTool(...)`.
-- Use strict JSON Schema inputs with `additionalProperties: false`.
-- Return structured, actionable results and errors without leaking hidden state.
-- The normal game must work when WebMCP is unavailable.
+- Strict JSON Schema inputs with `additionalProperties: false`, and a matching
+  runtime validator. The schema guides the caller; the validator protects the game.
+- Locations are named zones, never raw coordinates.
+- Return structured, actionable errors that never confirm the existence of
+  anything hidden by fog.
+- The page must contain no chat interface, tool inspector, or Marshal panel. The
+  game must be fully playable when WebMCP is unavailable.
 
 ## Verification and handoff
 
-- Test simulation systems without Phaser.
-- Before finishing a workstream run `npm run typecheck`, `npm run test`, and `npm run build`.
-- Manually verify user-visible behavior when possible.
+- Test simulation systems without a browser; `tests/` runs in node.
+- Before finishing a workstream run `npm run typecheck`, `npm run test`, `npm run build`.
 - Update `docs/STATUS.md` after every meaningful completed workstream.
 - Do not silently expand the intentionally limited scope in `docs/GAME_DESIGN.md`.

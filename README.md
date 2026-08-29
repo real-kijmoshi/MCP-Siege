@@ -1,69 +1,156 @@
-# Iron & Oath: WebMCP Medieval RTS
+# Siege — a WebMCP-first battle command game
 
-Iron & Oath is a compact browser RTS prototype for the OpenAI WebMCP Challenge. A human commander manages the same deterministic simulation through familiar controls that an AI Marshal can inspect and command through page-native WebMCP tools.
+A browser strategy game about commanding **more army than one person can drive by
+hand**, built so that an external AI agent can fight alongside you through
+[WebMCP](https://github.com/webmachinelearning/webmcp).
 
-The playable vertical slice begins with one Town Hall, five villagers, raw resources, and open land. Workers physically gather and construct; Houses unlock population, production buildings own timed queues, Armouries provide focused upgrades, and a similarly constrained enemy grows and attacks.
+Roughly 7,200 soldiers in eighteen regiments hold a river line. You are the
+Commander. An agent in a WebMCP-capable browser — ChatGPT's in-app browser, or
+Chrome with the WebMCP flag — is your **Marshal**. It reads the same fog-limited
+intelligence you do, drafts operations you can see drawn over the battlefield
+before anything moves, and issues orders through exactly the same command queue
+your mouse does.
 
-## Run locally
+There is no chat panel in this page. The agent lives in the browser; the page
+provides the world.
+
+## Running it
 
 ```bash
 npm install
-npm run dev
+npm run dev      # http://localhost:5173
 ```
-
-Open the URL printed by Vite (normally `http://localhost:5173`).
-
-## Validate
 
 ```bash
-npm run typecheck
-npm run test
-npm run build
+npm run typecheck   # strict TypeScript
+npm run test        # 46 deterministic tests, no browser needed
+npm run build       # static bundle, ~35 kB gzipped
 ```
 
-The production output is a static site in `dist/`.
+Deploys as a static site. `vercel.json` and `public/_headers` carry the two
+response headers WebMCP requires.
 
-## Controls
+## Turning on the Marshal
 
-- Left-click or drag-select villagers and units.
-- Right-click raw resources to gather, open land to move, enemies to attack, incomplete buildings to assist, or damaged friendly buildings to repair.
-- With villagers selected, choose a building in the command panel and left-click open land to place its blueprint.
-- Select a completed Town Hall or military building to queue units.
-- Select a completed Armoury to research a focused upgrade.
-- Double-click a unit to select nearby units of its type. Use Shift to add to a selection.
-- Press Ctrl+1–9 to assign control groups and 1–9 to recall them; double-tap a group number to center it.
-- Press A to select all villagers, H for the Town Hall, F to center, M to arm movement, G for attack-move, S to stop, or X to hold.
-- Click or drag the minimap to move the camera.
-- Pan the map with `WASD` or arrow keys.
-- Zoom with the mouse wheel.
+WebMCP is an experimental browser API. The page needs three things:
 
-Every action crosses the same deterministic command queue. WebMCP exposes the same gathering, building, production, and unit-order systems using stable IDs and fog-safe queries.
+1. **A secure context** — HTTPS or localhost.
+2. **Origin isolation** — `Origin-Agent-Cluster: ?1`.
+3. **The tools permission** — `Permissions-Policy: tools=(self)`.
 
-## Test WebMCP manually
+The dev server, `vercel.json` and `public/_headers` all set 2 and 3 already.
 
-This project uses native in-browser WebMCP through `document.modelContext`. It does not embed a chatbot or require an MCP backend.
+Then use a client that implements native WebMCP discovery:
 
-For local development in Chrome:
+- **Chrome**: enable `chrome://flags/#enable-webmcp-testing`, relaunch, open the page.
+- **ChatGPT's in-app browser**: open the deployed URL inside it.
 
-1. Open `chrome://flags/#enable-webmcp-testing`.
-2. Set **WebMCP for testing** to **Enabled**, then relaunch Chrome.
-3. Restart `npm run dev` after pulling configuration changes, and reload the game tab.
-4. Inspect the page from a WebMCP-capable browser agent or the Model Context Tool Inspector extension.
+A sidebar that can only read the DOM will not work — `document.modelContext` has
+to exist. The status dot in the top bar reads `WEBMCP READY` when registration
+succeeds; hover it for the reason when it does not.
 
-The Vite server sends `Origin-Agent-Cluster: ?1` and `Permissions-Policy: tools=(self)`, which native WebMCP requires. Discovery and invocation happen in the browser agent; the compact Marshal activity drawer only reports short command outcomes and diagnostics and is not a chat interface.
+The game is fully playable with no agent at all.
 
-Registered tools:
+## Playing it by hand
 
-- `get_game_overview` — concise player/economy status.
-- `get_economy` — stockpiles, rates, and worker jobs.
-- `assign_workers` — reallocates economic workers through the command queue.
-- `get_command_entities` — stable friendly IDs and visible enemy contacts.
-- `construct_building` — places a validated worker-built structure.
-- `train_unit` — queues a supported unit at a production building.
-- `order_units` — moves, attacks, attack-moves, stops, holds, defends, or retreats with an optional formation and stance.
+| Input | Action |
+|---|---|
+| Left click | Select the regiment under the cursor |
+| Drag | Box-select regiments |
+| Shift + click | Add to or remove from the selection |
+| Right click | Move there, or attack the enemy under the cursor |
+| Shift + right click | Queue a waypoint |
+| Wheel | Zoom at the cursor |
+| WASD / arrows / middle-drag | Pan |
+| Ctrl + 1–9 / 1–9 | Assign / recall a control group |
+| F · Space · +/- · Esc | Focus selection · pause · speed · clear |
 
-For nonvisual diagnostics, the page records `connected`, `unavailable`, or `failed` in `document.documentElement.dataset.webmcpStatus`. This does not add any WebMCP-facing UI to the game.
+Zoom out far enough and regiments collapse into density blobs with names and
+morale bars, which is the view you actually want when three fronts are moving.
 
-For deployed Chrome testing, WebMCP currently requires participation in its browser origin trial. Static deployment headers are included for hosts that support `_headers` files and for Vercel.
+## What the Marshal can do
 
-See [docs/WEBMCP.md](docs/WEBMCP.md) for the full contracts.
+Nineteen tools. Reads are fog-limited; every write goes through the same
+`CommandQueue` as your own clicks.
+
+**Read** — `get_battle_overview`, `get_armies`, `get_army_details`,
+`get_visible_enemies`, `get_intelligence`, `get_front_status`, `get_alerts`,
+`get_strategic_zones`, `get_active_orders`, `get_plan`
+
+**Command** — `order_group`, `reorganize_armies`, `set_conditional_order`,
+`cancel_conditional_order`, `focus_siege`, `direct_reinforcements`
+
+**Plan Mode** — `create_plan`, `modify_plan`, `execute_plan`, `cancel_plan`
+
+Locations are named zones (`central_bridge`, `west_crossing`, `east_field`, …),
+never pixels, so the Marshal reasons in the same terms you do.
+
+### Plan Mode
+
+`create_plan` moves nothing. It drafts an operation, and the battlefield draws it
+as numbered translucent arrows with target zones and triggers. You revise it in
+conversation — "keep the cavalry further west", "hold half the reserve back" —
+and `modify_plan` updates the preview. Only `execute_plan` commits it. Steps can
+be gated on conditions, so a plan can arm itself and fire later.
+
+Things to try:
+
+> What's happening on the battlefield?
+> Where am I weakest?
+> Draft a plan to take the central bridge without losing the cavalry. Don't execute it.
+> Move the cavalry flank further west, and keep half the reserve behind the bridge.
+> Execute.
+> Retreat Legion II if its morale falls below 25%.
+> Handle the eastern flank. I'll manage the centre.
+
+### Fog of war is real
+
+The Marshal cannot see through fog. `get_intelligence` returns only what you have
+observed, strength figures are rounded to the nearest 25, and contacts you have
+lost sight of are reported as stale last-known positions. Ordering an attack on a
+force you have never seen is refused — so scouting matters, and the agent cannot
+be used as an oracle.
+
+## The scenario
+
+A river with three crossings splits an 8,000 × 5,000 battlefield. You hold the
+south with nine regiments; the Ashen Host holds the north with nine of its own.
+
+The opening is quiet enough to command by hand. Then the enemy centre storms the
+bridge, cavalry sweeps the east, more cavalry threatens the western ford, and the
+siege train comes into range — several fronts at once, which is the point. That
+is when handing a front to the Marshal stops being a demo and starts being how
+you keep up.
+
+## How it fits together
+
+```
+Human input ──┐
+WebMCP tools ─┼─> GameCommand ─> CommandQueue ─> handlers ─> GameState ─> systems
+Enemy AI ─────┘                                                 │
+                                        ┌───────────────────────┴──────────────┐
+                                   read-only view                        GameQueries
+                                   (Canvas renderer)                  (fog-safe projections)
+                                                                             │
+                                                                       WebMCP reads
+```
+
+One authoritative `GameState`, a deterministic 20 Hz tick, and a single command
+path. Soldiers live in struct-of-arrays typed buffers and have no identity
+outside the simulation; **regiments are the only thing addressable over WebMCP**,
+which is what keeps a projection small enough for an agent to reason about.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
+[docs/WEBMCP.md](docs/WEBMCP.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md) and
+[docs/DECISIONS.md](docs/DECISIONS.md).
+
+## Testing tools without an agent
+
+Open with `?mcpdebug=1` and the handler map is on `window.__battle.tools`:
+
+```js
+await window.__battle.tools.getBattleOverview();
+await window.__battle.tools.createPlan({ name: 'Test', steps: [/* … */] });
+```
+
+It is a console handle, not a UI.
