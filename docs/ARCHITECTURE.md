@@ -32,8 +32,14 @@ click, a WebMCP call, a plan step and the enemy AI cannot diverge in meaning.
 
 Each tick, in fixed order: conditionals are evaluated and dispatched, the enemy
 AI submits commands, the queue drains, then movement, combat, morale,
-visibility, zone control, reinforcements and alerts advance. Every system
-iterates in index or sorted order, and randomness is simulation-owned.
+visibility, zone control, the objective, reinforcements and alerts advance.
+Every system iterates in index or sorted order, and randomness is
+simulation-owned.
+
+Once the objective decides the battle the tick still advances, but no system
+runs and the queue is drained into `BATTLE_OVER` failures. Answering queued
+commands rather than dropping them is deliberate: a WebMCP call waits on a real
+`CommandResult`, so silently ignoring it would hang the caller until timeout.
 
 - **Movement** walks each regiment's anchor along waypoints at the pace of its
   slowest member, assigns formation slots, and steers soldiers into them. A
@@ -46,6 +52,10 @@ iterates in index or sorted order, and randomness is simulation-owned.
   decides most engagements: lines bend and break well before they are wiped out.
 - **Visibility** recomputes a three-state fog grid and updates each side's
   contact memory with rounded strength estimates.
+- **Objective** moves each king with his guard every tick, and every fifth tick
+  makes one pass over the army to weigh who holds the ground inside each capture
+  ring. It owns the win condition and the only path to `outcome`. Kings occupy
+  no slot in `UnitPool`; a king is a position, a name and a guard reference.
 
 ## Query lifecycle
 

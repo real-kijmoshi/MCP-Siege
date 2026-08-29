@@ -4,12 +4,12 @@ A browser strategy game about commanding **more army than one person can drive b
 hand**, built so that an external AI agent can fight alongside you through
 [WebMCP](https://github.com/webmachinelearning/webmcp).
 
-Roughly 7,200 soldiers in eighteen regiments hold a river line. You are the
-Commander. An agent in a WebMCP-capable browser — ChatGPT's in-app browser, or
-Chrome with the WebMCP flag — is your **Marshal**. It reads the same fog-limited
-intelligence you do, drafts operations you can see drawn over the battlefield
-before anything moves, and issues orders through exactly the same command queue
-your mouse does.
+Roughly 7,950 soldiers in twenty regiments hold a river line, and each side has
+a king to lose. You are the Commander. An agent in a WebMCP-capable browser —
+ChatGPT's in-app browser, or Chrome with the WebMCP flag — is your **Marshal**.
+It reads the same fog-limited intelligence you do, drafts operations you can see
+drawn over the battlefield before anything moves, and issues orders through
+exactly the same command queue your mouse does.
 
 There is no chat panel in this page. The agent lives in the browser; the page
 provides the world.
@@ -23,8 +23,8 @@ npm run dev      # http://localhost:5173
 
 ```bash
 npm run typecheck   # strict TypeScript
-npm run test        # 46 deterministic tests, no browser needed
-npm run build       # static bundle, ~35 kB gzipped
+npm run test        # 58 deterministic tests, no browser needed
+npm run build       # static bundle, ~39 kB gzipped
 ```
 
 Deploys as a static site. `vercel.json` and `public/_headers` carry the two
@@ -70,12 +70,13 @@ morale bars, which is the view you actually want when three fronts are moving.
 
 ## What the Marshal can do
 
-Nineteen tools. Reads are fog-limited; every write goes through the same
+Twenty-one tools. Reads are fog-limited; every write goes through the same
 `CommandQueue` as your own clicks.
 
-**Read** — `get_battle_overview`, `get_armies`, `get_army_details`,
-`get_visible_enemies`, `get_intelligence`, `get_front_status`, `get_alerts`,
-`get_strategic_zones`, `get_active_orders`, `get_plan`
+**Read** — `get_battle_overview`, `get_objective`, `get_armies`,
+`get_army_details`, `get_visible_enemies`, `get_intelligence`,
+`get_front_status`, `get_alerts`, `get_strategic_zones`, `get_active_orders`,
+`get_plan`
 
 **Command** — `order_group`, `reorganize_armies`, `set_conditional_order`,
 `cancel_conditional_order`, `focus_siege`, `direct_reinforcements`
@@ -96,11 +97,13 @@ be gated on conditions, so a plan can arm itself and fire later.
 Things to try:
 
 > What's happening on the battlefield?
-> Where am I weakest?
+> How do I win this, and how close am I?
+> Where is the Ashen King? Where am I weakest?
 > Draft a plan to take the central bridge without losing the cavalry. Don't execute it.
 > Move the cavalry flank further west, and keep half the reserve behind the bridge.
 > Execute.
 > Retreat Legion II if its morale falls below 25%.
+> If my king comes under threat, pull Reserve I back to the base.
 > Handle the eastern flank. I'll manage the centre.
 
 ### Fog of war is real
@@ -111,10 +114,34 @@ lost sight of are reported as stale last-known positions. Ordering an attack on 
 force you have never seen is refused — so scouting matters, and the agent cannot
 be used as an oracle.
 
+This binds the objective too. `get_objective` never carries the enemy king's
+position, only where he was last actually seen, and until he has been sighted
+once he is reported as unknown.
+
+## How you win
+
+**Take the Ashen King.** He rides with his Royal Guard in the enemy base, and he
+is taken by holding the ground around him — which means breaking or drawing off
+that guard first. Capture is rate capped, so any attempt gives the defender time
+to answer; while a king is beset, his whole army loses heart. A side reduced
+below 15% of its strength concedes the field instead.
+
+King Aldric is behind your own lines under the same rules, and at around the
+seven-minute mark the enemy sends cavalry for him. Winning the field and
+forgetting what it was for is a way to lose.
+
+The objective is drawn in the only gold on the map: a standard, a crown, and a
+dashed capture ring that fills as the ground is held.
+
+A king is not a hero unit. He has no abilities, no health bar and no slot in the
+unit pool, and no tool can target him — you act on him by ordering regiments to
+where he stands.
+
 ## The scenario
 
 A river with three crossings splits an 8,000 × 5,000 battlefield. You hold the
-south with nine regiments; the Ashen Host holds the north with nine of its own.
+south with nine regiments and a Royal Guard; the Ashen Host holds the north with
+nine of its own and a guard of theirs.
 
 The opening is quiet enough to command by hand. Then the enemy centre storms the
 bridge, cavalry sweeps the east, more cavalry threatens the western ford, and the

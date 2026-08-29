@@ -54,7 +54,9 @@ Regiments are addressed by stable id from `get_armies` (`legion_i`,
 central_bridge · central_hill · east_field · east_crossing · east_forest ·
 northern_ridge · enemy_outer_defense · enemy_base`
 
-Individual soldiers are not addressable at all.
+Individual soldiers are not addressable at all. Neither are kings: a king is
+reported by `get_objective`, but there is no tool that targets one and no id
+that names one. You act on him by ordering regiments to the ground he stands on.
 
 ## Read tools
 
@@ -62,7 +64,8 @@ All take no parameters except `get_army_details`. All are `readOnlyHint: true`.
 
 | Tool | Returns |
 |---|---|
-| `get_battle_overview` | Strength, visible enemy strength, per-front status, recent alerts, reinforcements, plan status. The place to start. |
+| `get_battle_overview` | The objective and how it stands, strength, visible enemy strength, per-front status, recent alerts, reinforcements, plan status. The place to start. |
+| `get_objective` | How the battle is won. Your king, his Royal Guard, any capture against him, and what is *known* of the enemy king. |
 | `get_armies` | Every regiment: strength, percent remaining, formation, stance, morale, activity, zone, composition. |
 | `get_army_details` | One regiment in depth: casualties, current order and its age, what its formation is good for, nearby friendlies, known threats. Takes `groupId`. |
 | `get_visible_enemies` | Enemy forces in sight right now. |
@@ -128,6 +131,30 @@ and holding ground. Fails with `NOT_A_SIEGE_GROUP` if the regiment has no engine
 Optional `targetZone` or `targetGroupId`. Commits a banked wave as a new
 regiment. Fails with `NO_REINFORCEMENTS` and an estimate of the wait.
 
+## The objective
+
+The battle is won by capturing the enemy king, or by breaking his army entirely.
+Each king rides with a Royal Guard regiment and is taken by holding the ground
+within 420 units of him: attackers must bring at least 110 strength and outweigh
+the defenders by a quarter before progress begins, and the rate is capped so no
+force is large enough to carry a king off before a relief column could arrive.
+
+`get_objective` is fog-limited in a specific way worth understanding:
+
+- **Your own king** is fully reported — status, capture percentage, guard
+  strength, and how many are for and against him. These are your men; you would
+  know.
+- **The enemy king** is reported only as `lastSeenZone`, `lastSeenSecondsAgo`
+  and `visibleNow`. There is no live position in the projection at any point,
+  and until he has been sighted once, `lastSeenZone` is absent and the note says
+  so. Capture progress against him is reported only while your own men are in
+  the ring, which is the one circumstance in which you would in fact know it.
+
+So a Marshal cannot locate the enemy sovereign by asking. It has to scout.
+
+Once the battle is decided, every command fails with `BATTLE_OVER` rather than
+hanging: the simulation has stopped, and the tool result says so.
+
 ## Plan Mode
 
 A plan is inert state. Creating or revising one moves nothing; the battlefield
@@ -174,6 +201,7 @@ Triggers are data drawn from a closed set, never code:
 | `friendly_zone_lost` | `zoneId` | You no longer control it |
 | `enemy_unit_type_visible` | `category`, optional `zoneId` | That troop type is seen |
 | `timer_elapsed` | `seconds` | That long after arming |
+| `king_besieged` | — | Your own king comes under threat of capture |
 
 Conditions are evaluated against the arming side's own intelligence, so a
 trigger can never react to something that side cannot see. Each fires once.

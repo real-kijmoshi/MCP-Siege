@@ -65,3 +65,44 @@ recall troops already marching.
 Enemy strength is rounded to the nearest 25, lost contacts decay into stale
 last-known positions, and an attack ordered against a force never seen is
 refused. Without this the agent becomes an oracle and scouting stops mattering.
+
+## ADR-010: The objective is a position, not a hero unit
+
+The battle is won by capturing the enemy king, but a king is not an entity in
+`UnitPool`. He is a record holding a name, a position, a guard regiment id and a
+capture bar; his position is copied from his guard's anchor each tick.
+
+The scope rule in the brief excludes heroes, and for good reason: a hero unit
+wants abilities, targeting, death handling and a special case in every system
+that iterates soldiers. Modelling the objective as a position keeps all of that
+out. Combat, movement, the spatial hash and the renderer's batching are entirely
+unchanged, and nothing new became addressable over WebMCP — regiments are still
+the only thing an agent can name.
+
+The capture contest reads the unit arrays but never writes them, so it composes
+with everything else rather than interleaving with it.
+
+## ADR-011: Capture is rate capped, and a king rides with his guard
+
+Two constraints keep the objective a fight rather than a race. A king moves with
+his Royal Guard, so he is only reachable once that regiment is broken or drawn
+off; and capture progress is capped regardless of how much strength is brought
+to bear, so any attempt leaves the defender time to answer.
+
+Without the cap, a large enough force takes a king the instant it arrives, and
+the correct play becomes one undefended sprint rather than an operation. Without
+the guard, the objective is a fixed point on the map and the whole battle
+collapses into a footrace to it.
+
+An army-wide morale penalty while its own king is beset is what makes defending
+worth doing. It is deliberately small — 0.03 per tick against a 0.055 passive
+recovery — because an earlier version of the morale system taught us how easily
+a compounding penalty turns into a spiral no side recovers from.
+
+## ADR-012: A decided battle stops the simulation
+
+When a king falls the engine advances the tick but runs no system, and every
+queued command is failed with `BATTLE_OVER`. The alternative — letting the
+battle grind on behind a victory banner — makes the result a UI claim rather
+than a fact about the state, and leaves the projections describing a battle that
+is supposedly finished.

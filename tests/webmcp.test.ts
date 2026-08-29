@@ -56,7 +56,9 @@ describe('registration', () => {
     expect(registered).toContain('execute_plan');
     expect(registered).toContain('order_group');
     expect(registered).toContain('set_conditional_order');
+    expect(registered).toContain('get_objective');
     expect(new Set(registered).size).toBe(registered.length);
+    expect(registered.length).toBe(21);
   });
 
   it('reports unavailability rather than throwing when the API is absent', async () => {

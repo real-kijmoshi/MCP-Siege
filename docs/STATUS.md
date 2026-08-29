@@ -5,8 +5,13 @@ works end to end.
 
 # Working
 
-- Around 7,200 units in eighteen regiments across two factions, simulating at
-  roughly 2.6 ms per tick against a 50 ms budget.
+- Around 7,950 units in twenty regiments across two factions, simulating at
+  roughly 2.2 ms per tick against a 50 ms budget.
+- A win condition: take the enemy king by holding the ground around him, or
+  break his army entirely. Kings ride with their Royal Guards, capture is rate
+  capped, a besieged king costs his whole army morale, and a decided battle
+  stops the simulation and refuses further orders rather than leaving a Marshal
+  call pending.
 - Struct-of-arrays unit pool with a free list; no per-unit objects, no steady-state
   allocation, and units are never exposed outside the simulation.
 - Deterministic 20 Hz simulation: identical seed and command script produce an
@@ -27,14 +32,15 @@ works end to end.
   queued waypoints, zoom, pan, control groups, pause and speed.
 - Minimal UI: status strip, regiment roster, command row, transient alerts. No
   Marshal panel of any kind.
-- Nineteen WebMCP tools with strict schemas and runtime validation, registered
+- Twenty-one WebMCP tools with strict schemas and runtime validation, registered
   through `document.modelContext` with abort-signal cleanup.
 - Plan Mode: draft, revise, execute and cancel, drawn over the battlefield as
   numbered arrows. Drafting is proven inert by test.
-- Conditional orders over a closed eight-trigger vocabulary, armed either
+- Conditional orders over a closed nine-trigger vocabulary, armed either
   directly or as gated plan steps.
-- 46 tests passing across simulation, determinism, performance, tactics, fog,
-  the tool surface, and Plan Mode. Typecheck and production build clean.
+- 58 tests passing across simulation, determinism, performance, tactics, fog,
+  the objective, the tool surface, and Plan Mode. Typecheck and production build
+  clean.
 
 # Intentionally Limited
 

@@ -19,6 +19,13 @@
 - Fog-of-war filtering belongs inside `GameQueries` and `Visibility`, never in callers.
 - Regiments are the only entity addressable across the WebMCP boundary. Individual
   soldiers are pool indices and must never be exposed or referenced by id.
+- Kings are objectives, not units. A king holds no slot in `UnitPool`, has no
+  abilities, and is not addressable by any tool. Act on him by ordering
+  regiments to the ground he stands on. `Objective.ts` reads the unit arrays and
+  must never write them.
+- The battle's outcome is owned by `Objective.ts` alone. Once it is decided the
+  engine runs no system and fails queued commands with `BATTLE_OVER`; never let
+  a WebMCP call wait on a result that will not come.
 
 ## Determinism
 
