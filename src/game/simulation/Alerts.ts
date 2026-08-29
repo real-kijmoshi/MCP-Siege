@@ -1,7 +1,7 @@
 import { TICKS_PER_SECOND } from '../config/battle';
 import { ZONE_IDS, type AlertSeverity, type BattleAlert, type ZoneId } from '../types/domain';
 import { activeGroups, nextEntityId, type GameState } from './GameState';
-import { ZONES } from './Zones';
+import { ZONES, zoneAt } from './Zones';
 
 /**
  * Strategic event generation.
@@ -21,9 +21,16 @@ const COOLDOWNS: Record<string, number> = {
   attack: TICKS_PER_SECOND * 20,
   idle: TICKS_PER_SECOND * 45,
   reinforcement: TICKS_PER_SECOND * 30,
+  objective: TICKS_PER_SECOND * 12,
 };
 
-function raise(
+/**
+ * Raises one alert, deduplicated by key and rate limited by family.
+ *
+ * Exported so the objective system can announce a decided battle on the tick it
+ * happens, rather than waiting for the next alert sweep that will never run.
+ */
+export function raiseAlert(
   state: GameState,
   key: string,
   family: keyof typeof COOLDOWNS,
@@ -47,8 +54,12 @@ function raise(
   if (state.alerts.length > MAX_ALERTS) state.alerts.shift();
 }
 
+const raise = raiseAlert;
+
 export function advanceAlerts(state: GameState): void {
   if (state.currentTick % ALERT_INTERVAL !== 0) return;
+
+  objectiveAlerts(state);
 
   for (const group of activeGroups(state, 'player')) {
     const strengthPercent = (group.members.length / Math.max(1, group.initialStrength)) * 100;
@@ -159,6 +170,69 @@ export function advanceAlerts(state: GameState): void {
       'reinforcement',
       'info',
       `Reinforcements available (${state.players.player.availableWaves} wave(s)).`,
+    );
+  }
+}
+
+/**
+ * The objective's own alerts.
+ *
+ * These matter more than any other line in the feed: a king being taken ends
+ * the battle, so they are the one thing a Marshal must never miss.
+ */
+function objectiveAlerts(state: GameState): void {
+  const own = state.objective.kings.player;
+  const foe = state.objective.kings.enemy;
+
+  if (own.besieged) {
+    raise(
+      state,
+      'objective:own:besieged',
+      'objective',
+      'critical',
+      `${own.name} is beset — ${Math.round(own.captureProgress)}% taken. Relieve him.`,
+      { zoneId: zoneAt(own.position.x, own.position.y) },
+    );
+  } else if (own.captureProgress > 0) {
+    raise(
+      state,
+      'objective:own:contested',
+      'objective',
+      'warning',
+      `${own.name} is still recovering from an assault (${Math.round(own.captureProgress)}%).`,
+    );
+  }
+
+  if (own.guardStrength === 0) {
+    raise(
+      state,
+      'objective:own:guard',
+      'objective',
+      'critical',
+      `The Royal Guard is destroyed. ${own.name} stands unprotected.`,
+    );
+  }
+
+  if (foe.besieged) {
+    raise(
+      state,
+      'objective:enemy:besieged',
+      'objective',
+      'info',
+      `Your men are closing on ${foe.name} — ${Math.round(foe.captureProgress)}% taken.`,
+    );
+  }
+
+  // Only reportable because seeing it required actually looking at him.
+  const sighting = foe.lastSightingByOpponent;
+  if (sighting !== undefined && state.currentTick - sighting.tick < ALERT_INTERVAL * 2) {
+    raise(
+      state,
+      `objective:enemy:sighted:${sighting.zoneId}`,
+      'objective',
+      'info',
+      `${foe.name} sighted at ${ZONES[sighting.zoneId].name}.`,
+      { zoneId: sighting.zoneId },
     );
   }
 }

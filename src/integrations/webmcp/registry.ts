@@ -49,11 +49,23 @@ export async function registerWebMcpTools(
       name: 'get_battle_overview',
       title: 'Get battle overview',
       description:
-        'Concise strategic picture of the battle: your strength, enemy strength you can see, ' +
-        'the state of each front, and current alerts. Start here. Read-only.',
+        'Concise strategic picture of the battle: the objective and how it stands, your strength, ' +
+        'enemy strength you can see, the state of each front, and current alerts. Start here. ' +
+        'Read-only.',
       inputSchema: EMPTY_INPUT_SCHEMA,
       annotations: { readOnlyHint: true },
       execute: () => handlers.getBattleOverview(),
+    },
+    {
+      name: 'get_objective',
+      title: 'Get the objective',
+      description:
+        'How the battle is won and how it currently stands: your own king, his Royal Guard and ' +
+        'any capture against him, and what is known of the enemy king. Fog of war applies to ' +
+        'the enemy sovereign — you get his last sighting, not his position. Read-only.',
+      inputSchema: EMPTY_INPUT_SCHEMA,
+      annotations: { readOnlyHint: true },
+      execute: () => handlers.getObjective(),
     },
     {
       name: 'get_armies',

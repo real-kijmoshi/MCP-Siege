@@ -3,6 +3,7 @@ import type { BattlePlan } from '../../game/types/domain';
 import { Camera } from './Camera';
 import { EffectsLayer } from './EffectsLayer';
 import { FogLayer } from './FogLayer';
+import { ObjectiveLayer } from './ObjectiveLayer';
 import { PALETTE } from './palette';
 import { PlanLayer } from './PlanLayer';
 import { TerrainLayer } from './TerrainLayer';
@@ -20,7 +21,8 @@ export interface DragBox {
  *
  * Reads live simulation state directly and draws it; it never writes. Layers
  * are ordered so the battlefield reads bottom-up: ground, then what is hidden,
- * then the armies, then what they are doing, then what is merely proposed.
+ * then the armies, then what they are doing, then the objective they are doing
+ * it for, then what is merely proposed.
  */
 export class Renderer {
   public readonly camera: Camera;
@@ -33,6 +35,7 @@ export class Renderer {
   private readonly units = new UnitLayer();
   private readonly effects = new EffectsLayer();
   private readonly plan = new PlanLayer();
+  private readonly objective = new ObjectiveLayer();
 
   private devicePixelRatioCache = 1;
 
@@ -77,6 +80,8 @@ export class Renderer {
     this.fog.draw(context, this.camera, state);
     this.units.draw(context, this.camera, state, this.selection);
     this.effects.draw(context, this.camera, state);
+    // Above the armies: the objective must never be buried under a melee.
+    this.objective.draw(context, this.camera, state);
     this.plan.draw(context, this.camera, state, plan);
 
     // Screen space for the marquee and the plan legend.

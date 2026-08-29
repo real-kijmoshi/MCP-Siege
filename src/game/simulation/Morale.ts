@@ -1,4 +1,4 @@
-import { MORALE, MORALE_THRESHOLDS } from '../config/battle';
+import { MORALE, MORALE_THRESHOLDS, OBJECTIVE } from '../config/battle';
 import type { ArmyGroup, MoraleState } from '../types/domain';
 import { activeGroups, type GameState } from './GameState';
 import { isDefensiveTerrain } from './Zones';
@@ -86,6 +86,19 @@ export function advanceMorale(state: GameState): void {
       if (isFlanked(group, groups)) delta -= MORALE.flankedPenalty;
       if (isDefensiveTerrain(group.anchor.x, group.anchor.y)) delta += MORALE.terrainBonus;
     }
+
+    // The sovereign. Men steady in sight of him, and every regiment in the army
+    // feels it when he is beset — which is what makes a raid on a lightly held
+    // base a real threat rather than a distraction to be ignored.
+    const king = state.objective.kings[group.ownerId];
+    if (!group.routing) {
+      const dx = king.position.x - group.anchor.x;
+      const dy = king.position.y - group.anchor.y;
+      if (dx * dx + dy * dy <= OBJECTIVE.rallyRadius * OBJECTIVE.rallyRadius) {
+        delta += OBJECTIVE.rallyBonus;
+      }
+    }
+    if (king.besieged) delta -= OBJECTIVE.besiegedPenalty;
 
     group.morale = Math.max(0, Math.min(100, group.morale + delta));
     group.moraleState = moraleStateOf(group.morale);

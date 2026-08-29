@@ -16,5 +16,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    /*
+     * Several tests march the full 8,000-unit scenario for minutes of game
+     * time, which is seconds of wall clock. The 5s default is not a meaningful
+     * budget for those — the performance test asserts the real one, per tick.
+     */
+    testTimeout: 60_000,
   },
 });

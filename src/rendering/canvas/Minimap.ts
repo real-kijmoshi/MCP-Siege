@@ -115,6 +115,11 @@ export class Minimap {
       context.fill();
     }
 
+    // The objectives, on top of everything. At this size they are the only
+    // things worth picking out by eye, so they are drawn as gold diamonds and
+    // never hidden behind a blob.
+    this.drawKings(state, scaleX, scaleY);
+
     // Camera viewport.
     const bounds = camera.visibleBounds;
     context.strokeStyle = 'rgba(240, 246, 240, 0.75)';
@@ -125,5 +130,40 @@ export class Minimap {
       (bounds.right - bounds.left) * scaleX,
       (bounds.bottom - bounds.top) * scaleY,
     );
+  }
+
+  /** Own king always; the enemy's only where he has actually been seen. */
+  private drawKings(state: GameState, scaleX: number, scaleY: number): void {
+    const context = this.context;
+    const own = state.objective.kings.player;
+    const foe = state.objective.kings.enemy;
+
+    const marks: Array<{ at: { x: number; y: number }; threatened: boolean; faded: boolean }> = [
+      { at: own.position, threatened: own.captureProgress > 0, faded: false },
+    ];
+
+    if (visibilityAt(state, 'player', foe.position.x, foe.position.y) === 2) {
+      marks.push({ at: foe.position, threatened: foe.captureProgress > 0, faded: false });
+    } else if (foe.lastSightingByOpponent !== undefined) {
+      marks.push({ at: foe.lastSightingByOpponent.position, threatened: false, faded: true });
+    }
+
+    for (const mark of marks) {
+      const x = mark.at.x * scaleX;
+      const y = mark.at.y * scaleY;
+      context.globalAlpha = mark.faded ? 0.45 : 1;
+      context.fillStyle = mark.threatened ? PALETTE.kingDanger : PALETTE.kingGold;
+      context.beginPath();
+      context.moveTo(x, y - 5);
+      context.lineTo(x + 4, y);
+      context.lineTo(x, y + 5);
+      context.lineTo(x - 4, y);
+      context.closePath();
+      context.fill();
+      context.strokeStyle = 'rgba(10, 8, 4, 0.9)';
+      context.lineWidth = 1;
+      context.stroke();
+    }
+    context.globalAlpha = 1;
   }
 }

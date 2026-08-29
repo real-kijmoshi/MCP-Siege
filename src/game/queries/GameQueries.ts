@@ -1,4 +1,4 @@
-import { FORMATION_PROFILES, TICKS_PER_SECOND, UNIT_STATS } from '../config/battle';
+import { FORMATION_PROFILES, OBJECTIVE, TICKS_PER_SECOND, UNIT_STATS } from '../config/battle';
 import { describeCondition } from '../simulation/Conditions';
 import { activeGroups, findGroup, type GameState } from '../simulation/GameState';
 import { ORDERED_ZONES, ZONES, zoneAt } from '../simulation/Zones';
@@ -7,6 +7,7 @@ import {
   FRONTS,
   opponentOf,
   type ArmyGroup,
+  type BattleOutcome,
   type BattleAlert,
   type Front,
   type MoraleState,
@@ -97,6 +98,55 @@ export interface BattleOverview {
   alerts: string[];
   reinforcementsReady: number;
   planStatus: string;
+  objective: ObjectiveSummary;
+}
+
+export type KingStatus = 'safe' | 'threatened' | 'besieged' | 'captured';
+
+/** One line each, for the tool that a Marshal reads first. */
+export interface ObjectiveSummary {
+  goal: string;
+  yourKing: string;
+  enemyKing: string;
+  outcome: BattleOutcome;
+}
+
+export interface OwnKingReport {
+  name: string;
+  status: KingStatus;
+  capturePercent: number;
+  /** Men of the Royal Guard still standing over him. */
+  guardStrength: number;
+  defenders: number;
+  attackers: number;
+  zone: ZoneId;
+  zoneName: string;
+}
+
+/**
+ * The enemy sovereign as *known*, not as he is.
+ *
+ * There is no live position here: only where he was last actually seen. Capture
+ * progress is reported only while your own men are in the ring around him,
+ * which is the one circumstance in which you would in fact know it.
+ */
+export interface EnemyKingReport {
+  name: string;
+  visibleNow: boolean;
+  lastSeenZone?: ZoneId;
+  lastSeenZoneName?: string;
+  lastSeenSecondsAgo?: number;
+  capturePercent: number;
+  note: string;
+}
+
+export interface ObjectiveReport {
+  goal: string;
+  outcome: BattleOutcome;
+  outcomeReason: string;
+  captureRadius: number;
+  yourKing: OwnKingReport;
+  enemyKing: EnemyKingReport;
 }
 
 export interface FrontReport {
@@ -388,6 +438,83 @@ export class GameQueries {
     return state.alerts.slice(-limit).reverse();
   }
 
+  /* ----------------------------------------------------------- objective */
+
+  private kingStatusOf(king: { captured: boolean; besieged: boolean; captureProgress: number }): KingStatus {
+    if (king.captured) return 'captured';
+    if (king.besieged) return 'besieged';
+    return king.captureProgress > 0 ? 'threatened' : 'safe';
+  }
+
+  public getObjective(playerId: PlayerId): ObjectiveReport {
+    const state = this.state();
+    const own = state.objective.kings[playerId];
+    const foe = state.objective.kings[opponentOf(playerId)];
+
+    const ownZone = zoneAt(own.position.x, own.position.y);
+    const sighting = foe.lastSightingByOpponent;
+    // "Now" is generous by a few ticks because sightings are only refreshed on
+    // the objective interval, not every frame.
+    const visibleNow =
+      sighting !== undefined && state.currentTick - sighting.tick <= OBJECTIVE.interval * 2;
+
+    const enemyKing: EnemyKingReport = {
+      name: foe.name,
+      visibleNow,
+      // Your own men are what fill this bar, so it is yours to know.
+      capturePercent: foe.attackers > 0 ? Math.round(foe.captureProgress) : 0,
+      note:
+        sighting === undefined
+          ? 'Never sighted. His standard has not been seen; scout the enemy rear.'
+          : visibleNow
+            ? 'In sight.'
+            : 'Last known position only. He may have moved.',
+    };
+    if (sighting !== undefined) {
+      enemyKing.lastSeenZone = sighting.zoneId;
+      enemyKing.lastSeenZoneName = ZONES[sighting.zoneId].name;
+      enemyKing.lastSeenSecondsAgo = this.seconds(state.currentTick - sighting.tick);
+    }
+
+    return {
+      goal:
+        `Take ${foe.name} by holding the ground around him, or break the ${this.getOpponentName(playerId)} ` +
+        'entirely. Losing your own king loses the battle.',
+      outcome: state.objective.outcome,
+      outcomeReason: state.objective.outcomeReason,
+      captureRadius: OBJECTIVE.captureRadius,
+      yourKing: {
+        name: own.name,
+        status: this.kingStatusOf(own),
+        capturePercent: Math.round(own.captureProgress),
+        guardStrength: own.guardStrength,
+        defenders: own.defenders,
+        attackers: own.attackers,
+        zone: ownZone,
+        zoneName: ZONES[ownZone].name,
+      },
+      enemyKing,
+    };
+  }
+
+  private summariseObjective(report: ObjectiveReport): ObjectiveSummary {
+    const own = report.yourKing;
+    const foe = report.enemyKing;
+    return {
+      goal: report.goal,
+      yourKing:
+        own.status === 'safe'
+          ? `${own.name} is safe (guard ${own.guardStrength}).`
+          : `${own.name} is ${own.status} — ${own.capturePercent}% taken, guard ${own.guardStrength}.`,
+      enemyKing: foe.visibleNow
+        ? `${foe.name} in sight at ${foe.lastSeenZoneName ?? 'unknown ground'} (${foe.capturePercent}% taken).`
+        : foe.lastSeenZoneName === undefined
+          ? `${foe.name} has never been sighted.`
+          : `${foe.name} last seen at ${foe.lastSeenZoneName}, ${foe.lastSeenSecondsAgo}s ago.`,
+      outcome: report.outcome,
+    };
+  }
+
   /* ------------------------------------------------------------ overview */
 
   public getBattleOverview(playerId: PlayerId): BattleOverview {
@@ -417,6 +544,7 @@ export class GameQueries {
       reinforcementsReady: state.players[playerId].availableWaves,
       planStatus:
         plan === undefined ? 'no active plan' : `${plan.name} (${plan.status})`,
+      objective: this.summariseObjective(this.getObjective(playerId)),
     };
   }
 

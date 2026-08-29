@@ -10,6 +10,7 @@ import type {
   PlayerId,
 } from '../types/domain';
 import { findGroup, type GameState } from './GameState';
+import { isOwnKingBesieged } from './Objective';
 
 /**
  * Conditional orders.
@@ -67,6 +68,11 @@ export function evaluateCondition(
 
     case 'timer_elapsed':
       return state.currentTick - armedAtTick >= condition.seconds * TICKS_PER_SECOND;
+
+    // Your own sovereign under threat is always knowledge you have; no fog
+    // question arises, because the men around him are your men.
+    case 'king_besieged':
+      return isOwnKingBesieged(state, playerId);
   }
 }
 
@@ -91,6 +97,8 @@ export function describeCondition(condition: PlanCondition): string {
         : `when enemy ${condition.category} become visible at ${condition.zoneId}`;
     case 'timer_elapsed':
       return `after ${condition.seconds}s`;
+    case 'king_besieged':
+      return 'if your king comes under threat';
   }
 }
 

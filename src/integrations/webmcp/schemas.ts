@@ -123,6 +123,13 @@ export const CONDITION_SCHEMA = {
       required: ['kind', 'seconds'],
       additionalProperties: false,
     },
+    {
+      type: 'object',
+      description: 'Fires while your own king is under threat of capture.',
+      properties: { kind: { const: 'king_besieged' } },
+      required: ['kind'],
+      additionalProperties: false,
+    },
   ],
 } as const;
 

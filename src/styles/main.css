@@ -18,6 +18,8 @@
   --warn: #e8c15a;
   --bad: #ff6b5b;
   --plan: #c08bff;
+  --king: #f5c451;
+  --king-danger: #ff7a3d;
   --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
 }
 
@@ -287,6 +289,180 @@ body {
   width: 100%;
   height: 100%;
   cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- objective */
+
+/*
+ * Two chips, top centre, and nothing more. The objective has to be legible at a
+ * glance without becoming a dashboard; when a king is actually under threat the
+ * chip does the shouting, not a panel.
+ */
+.objective-strip {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.objective {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 210px;
+  padding: 6px 12px 8px;
+  background: rgba(12, 16, 12, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.objective .crown {
+  font-size: 17px;
+  line-height: 1;
+  color: var(--king);
+}
+
+.objective .body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.objective small {
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  color: var(--text-faint);
+}
+
+.objective b {
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.objective .capture {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.objective .capture i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--king);
+  transition: width 0.2s linear;
+}
+
+.objective[data-status='threatened'] {
+  border-color: var(--warn);
+}
+
+.objective[data-status='besieged'] {
+  border-color: var(--king-danger);
+  animation: beset 1.1s ease-in-out infinite;
+}
+
+.objective[data-status='besieged'] .crown,
+.objective[data-status='besieged'] b {
+  color: var(--king-danger);
+}
+
+.objective[data-status='besieged'] .capture i {
+  background: var(--king-danger);
+}
+
+.objective[data-status='unseen'] {
+  opacity: 0.6;
+}
+
+@keyframes beset {
+  50% {
+    border-color: rgba(255, 122, 61, 0.35);
+  }
+}
+
+/* ------------------------------------------------------------------ outcome */
+
+.outcome {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 9, 7, 0.82);
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.4s ease-out;
+}
+
+.outcome[hidden] {
+  display: none;
+}
+
+.outcome-card {
+  text-align: center;
+  padding: 34px 54px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  max-width: 560px;
+}
+
+.outcome-card small {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--text-faint);
+}
+
+.outcome-card h1 {
+  margin: 8px 0 12px;
+  font-size: 40px;
+  letter-spacing: 0.1em;
+  color: var(--king);
+}
+
+.outcome-card.defeat h1 {
+  color: var(--bad);
+}
+
+.outcome-card p {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.outcome-card button {
+  margin-top: 22px;
+  padding: 9px 22px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.outcome-card button:hover {
+  border-color: var(--king);
+  color: var(--king);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .alert-feed {

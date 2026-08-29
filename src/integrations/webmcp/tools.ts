@@ -56,6 +56,7 @@ export interface WebMcpToolHandlers {
   getStrategicZones: () => ToolResult<unknown>;
   getActiveOrders: () => ToolResult<unknown>;
   getPlan: () => ToolResult<unknown>;
+  getObjective: () => ToolResult<unknown>;
 
   orderGroup: (input: unknown) => Promise<ToolResult<unknown>>;
   reorganizeArmies: (input: unknown) => Promise<ToolResult<unknown>>;
@@ -97,6 +98,7 @@ function parseCondition(raw: unknown): PlanCondition {
     'friendly_zone_lost',
     'enemy_unit_type_visible',
     'timer_elapsed',
+    'king_besieged',
   ] as const);
 
   switch (kind) {
@@ -138,6 +140,9 @@ function parseCondition(raw: unknown): PlanCondition {
     case 'timer_elapsed':
       rejectUnknown(input, ['kind', 'seconds']);
       return { kind, seconds: requireNumber(input, 'seconds', 1, 1800) };
+    case 'king_besieged':
+      rejectUnknown(input, ['kind']);
+      return { kind };
   }
 }
 
@@ -282,6 +287,8 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
         const plan = queries.getCurrentPlan(PLAYER);
         return plan === undefined ? { plan: null, note: 'No plan has been drafted.' } : { plan };
       }),
+
+    getObjective: () => readSafely(() => queries.getObjective(PLAYER)),
 
     /* -------------------------------------------------------- commands */
 

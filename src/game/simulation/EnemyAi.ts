@@ -48,13 +48,29 @@ const SCRIPT: readonly ScriptedOrder[] = [
   { atSeconds: 250, groupId: 'ashen_reserve', order: 'move', targetZone: 'enemy_outer_defense' },
   { atSeconds: 300, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'central_field', formation: 'wedge' },
   { atSeconds: 340, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'central_bridge' },
+
+  // And then they go for the king. If the player has spent the whole battle
+  // pushing north, this is the bill: the base is behind them, and the Royal
+  // Guard alone will not hold a cavalry wing followed by a legion.
+  { atSeconds: 400, groupId: 'night_riders', order: 'attack_zone', targetZone: 'player_base', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 460, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'player_base', formation: 'column' },
 ];
+
+/** The guard is seated with its king on the opening tick and does not leave. */
+const GUARD_ORDER: ScriptedOrder = {
+  atSeconds: 1,
+  groupId: 'ashen_guard',
+  order: 'defend_zone',
+  targetZone: 'enemy_base',
+  formation: 'square',
+  stance: 'hold_ground',
+};
 
 const REACTION_INTERVAL = TICKS_PER_SECOND * 5;
 
 function scriptedThisTick(state: GameState): GameCommandPayload[] {
   const commands: GameCommandPayload[] = [];
-  for (const entry of SCRIPT) {
+  for (const entry of [GUARD_ORDER, ...SCRIPT]) {
     // Fires on exactly the tick it comes due, so the script never repeats.
     if (state.currentTick !== Math.round(entry.atSeconds * TICKS_PER_SECOND)) continue;
     const group = findGroup(state, entry.groupId);
@@ -82,8 +98,12 @@ function reactions(state: GameState): GameCommandPayload[] {
   const contacts = [...state.contacts.enemy.values()].filter((contact) => contact.visibleNow);
   if (contacts.length === 0) return commands;
 
+  const guardId = state.objective.kings.enemy.guardGroupId;
+
   for (const group of activeGroups(state, 'enemy')) {
     if (group.routing) continue;
+    // The Royal Guard stands over its king whatever else is happening.
+    if (group.id === guardId) continue;
     if (group.order.kind !== 'idle' && group.order.kind !== 'hold') continue;
     // Siege is committed by the script alone; it must not wander into a melee.
     if (group.members.some((index) => state.units.categoryOf(index) === 'siege')) continue;
@@ -116,6 +136,43 @@ function reactions(state: GameState): GameCommandPayload[] {
   return commands;
 }
 
+/**
+ * Relief for the enemy king.
+ *
+ * Without this, a player who slips a column past the line simply walks up and
+ * takes the sovereign unopposed, and the objective stops being a fight. The
+ * order is only issued when the group is not already answering the call, so
+ * re-evaluating every few seconds does not keep resetting its march.
+ */
+function defendTheKing(state: GameState): GameCommandPayload[] {
+  if (state.currentTick % REACTION_INTERVAL !== 0) return [];
+
+  const king = state.objective.kings.enemy;
+  if (!king.besieged && king.captureProgress <= 0) return [];
+
+  const commands: GameCommandPayload[] = [];
+  for (const group of activeGroups(state, 'enemy')) {
+    if (group.routing || group.id === king.guardGroupId) continue;
+    if (group.members.some((index) => state.units.categoryOf(index) === 'siege')) continue;
+    if (group.order.kind === 'defend_zone' && group.order.targetZone === 'enemy_base') continue;
+
+    // Only what is close enough to matter: recalling the whole army would hand
+    // the player the entire field for the price of one raid.
+    const dx = king.position.x - group.anchor.x;
+    const dy = king.position.y - group.anchor.y;
+    if (dx * dx + dy * dy > 2600 * 2600) continue;
+
+    commands.push({
+      type: 'order_groups',
+      playerId: 'enemy',
+      groupIds: [group.id],
+      order: 'defend_zone',
+      targetZone: 'enemy_base',
+    });
+  }
+  return commands;
+}
+
 export function enemyAiCommands(state: GameState): GameCommandPayload[] {
-  return [...scriptedThisTick(state), ...reactions(state)];
+  return [...scriptedThisTick(state), ...defendTheKing(state), ...reactions(state)];
 }

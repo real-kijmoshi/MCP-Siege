@@ -5,6 +5,8 @@ import type {
   BattlePlan,
   CombatEvent,
   EnemyContact,
+  KingState,
+  ObjectiveState,
   PendingConditionalOrder,
   PlayerId,
 } from '../types/domain';
@@ -47,6 +49,9 @@ export interface GameState {
   /** Previous controller per zone, so only genuine changes raise an alert. */
   zoneControlPrevious: Map<string, PlayerId | undefined>;
 
+  /** Kings, capture progress and the result. See `simulation/Objective.ts`. */
+  objective: ObjectiveState;
+
   plans: BattlePlan[];
   conditionals: PendingConditionalOrder[];
   /** Ids of plan steps that have already fired, backing `after_step`. */
@@ -62,6 +67,25 @@ export interface GameState {
 
 function createVisibilityGrid(): VisibilityGrid {
   return { cells: new Uint8Array(FOG_COLUMNS * FOG_ROWS) };
+}
+
+/**
+ * A sovereign with nothing behind him yet. `buildScenario` names him, seats him
+ * with his guard and records the opening strength he will be measured against.
+ */
+function createPlaceholderKing(ownerId: PlayerId): KingState {
+  return {
+    ownerId,
+    name: ownerId === 'player' ? 'The King' : 'The Enemy King',
+    position: { x: 0, y: 0 },
+    guardGroupId: '',
+    guardStrength: 0,
+    captureProgress: 0,
+    captured: false,
+    besieged: false,
+    defenders: 0,
+    attackers: 0,
+  };
 }
 
 export function createEmptyState(seed: number): GameState {
@@ -90,6 +114,14 @@ export function createEmptyState(seed: number): GameState {
     },
     zoneControl: new Map(),
     zoneControlPrevious: new Map(),
+
+    objective: {
+      kings: { player: createPlaceholderKing('player'), enemy: createPlaceholderKing('enemy') },
+      initialStrength: { player: 0, enemy: 0 },
+      outcome: 'ongoing',
+      outcomeReason: '',
+      decidedAtTick: -1,
+    },
 
     plans: [],
     conditionals: [],
@@ -161,5 +193,13 @@ export function stateChecksum(state: GameState): number {
   }
   mix(state.conditionals.length);
   mix(state.alerts.length);
+  for (const playerId of ['player', 'enemy'] as const) {
+    const king = state.objective.kings[playerId];
+    mix(Math.round(king.captureProgress * 100));
+    mix(Math.round(king.position.x * 16));
+    mix(Math.round(king.position.y * 16));
+    mix(king.captured ? 1 : 0);
+  }
+  mix(state.objective.decidedAtTick);
   return hash >>> 0;
 }

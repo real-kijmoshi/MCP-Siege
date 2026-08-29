@@ -1,5 +1,5 @@
 import { fillFormationSlots } from '../simulation/Formations';
-import { registerGroup, type GameState } from '../simulation/GameState';
+import { findGroup, registerGroup, type GameState } from '../simulation/GameState';
 import { zoneAt } from '../simulation/Zones';
 import {
   factionOf,
@@ -118,6 +118,15 @@ export const PLAYER_GROUPS: readonly GroupSpec[] = [
     stance: 'defensive',
     composition: [['infantry', 400], ['spearman', 120], ['archer', 80]],
   },
+  {
+    id: 'royal_guard',
+    name: 'Royal Guard',
+    ownerId: 'player',
+    anchor: { x: 4000, y: 4620 },
+    formation: 'square',
+    stance: 'hold_ground',
+    composition: [['heavy_infantry', 260], ['spearman', 120]],
+  },
 ];
 
 export const ENEMY_GROUPS: readonly GroupSpec[] = [
@@ -197,11 +206,38 @@ export const ENEMY_GROUPS: readonly GroupSpec[] = [
     id: 'ashen_reserve',
     name: 'Ashen Reserve',
     ownerId: 'enemy',
-    anchor: { x: 4000, y: 640 },
+    anchor: { x: 4000, y: 840 },
     formation: 'block',
     stance: 'defensive',
     composition: [['infantry', 380], ['spearman', 120]],
   },
+  {
+    id: 'ashen_guard',
+    name: 'Ashen Guard',
+    ownerId: 'enemy',
+    anchor: { x: 4000, y: 560 },
+    formation: 'square',
+    stance: 'hold_ground',
+    composition: [['heavy_infantry', 260], ['spearman', 120]],
+  },
+];
+
+/**
+ * The two sovereigns.
+ *
+ * Each rides with the guard named here, which is the only reason a king is ever
+ * reachable: to take one you must first break or draw off the regiment around
+ * him. Neither king is a unit — see `simulation/Objective.ts`.
+ */
+export interface KingSpec {
+  ownerId: PlayerId;
+  name: string;
+  guardGroupId: string;
+}
+
+export const KING_SPECS: readonly KingSpec[] = [
+  { ownerId: 'player', name: 'King Aldric', guardGroupId: 'royal_guard' },
+  { ownerId: 'enemy', name: 'The Ashen King', guardGroupId: 'ashen_guard' },
 ];
 
 /* -------------------------------------------------------------- construction */
@@ -263,4 +299,33 @@ export function createGroupFromSpec(state: GameState, spec: GroupSpec): ArmyGrou
 export function buildScenario(state: GameState): void {
   for (const spec of PLAYER_GROUPS) createGroupFromSpec(state, spec);
   for (const spec of ENEMY_GROUPS) createGroupFromSpec(state, spec);
+  seatKings(state);
+}
+
+/**
+ * Seats both kings with their guards and records the strength each side is
+ * measured against, so a general collapse can be recognised later.
+ */
+function seatKings(state: GameState): void {
+  for (const spec of KING_SPECS) {
+    const guard = findGroup(state, spec.guardGroupId);
+    if (guard === undefined) throw new Error(`Missing royal guard "${spec.guardGroupId}".`);
+
+    state.objective.kings[spec.ownerId] = {
+      ownerId: spec.ownerId,
+      name: spec.name,
+      position: { x: guard.anchor.x, y: guard.anchor.y },
+      guardGroupId: spec.guardGroupId,
+      guardStrength: guard.members.length,
+      captureProgress: 0,
+      captured: false,
+      besieged: false,
+      defenders: guard.members.length,
+      attackers: 0,
+    };
+  }
+
+  for (const group of state.groups) {
+    state.objective.initialStrength[group.ownerId] += group.members.length;
+  }
 }

@@ -9,6 +9,7 @@ import { Renderer } from '../rendering/canvas/Renderer';
 import { AlertFeed, Toast } from '../ui/AlertFeed';
 import { ArmyList } from '../ui/ArmyList';
 import { CommandBar } from '../ui/CommandBar';
+import { ObjectiveBanner } from '../ui/ObjectiveBanner';
 import { TopBar } from '../ui/TopBar';
 import {
   getWebMcpCapabilityMessage,
@@ -42,6 +43,7 @@ async function bootstrap(): Promise<void> {
 
   const alertFeed = new AlertFeed();
   const toast = new Toast();
+  const objectiveBanner = new ObjectiveBanner();
 
   let speed = 1;
   const topBar = new TopBar((next) => {
@@ -109,6 +111,7 @@ async function bootstrap(): Promise<void> {
     minimap.draw(state, renderer.camera);
 
     topBar.update(queries.getBattleOverview('player'));
+    objectiveBanner.update(queries.getObjective('player'));
     armyList.render(queries.getArmies('player'), renderer.selection);
     alertFeed.push(queries.getAlerts('player', 6));
     commandBar.update();

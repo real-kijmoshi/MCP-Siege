@@ -16,8 +16,11 @@ describe('scenario', () => {
     const player = activeGroups(state, 'player');
     const enemy = activeGroups(state, 'enemy');
 
-    expect(player.length).toBe(9);
-    expect(enemy.length).toBe(9);
+    // Nine field regiments a side, plus the Royal Guard each king rides with.
+    expect(player.length).toBe(10);
+    expect(enemy.length).toBe(10);
+    expect(state.objective.kings.player.guardGroupId).toBe('royal_guard');
+    expect(state.objective.kings.enemy.guardGroupId).toBe('ashen_guard');
 
     const total = state.units.livingCount();
     expect(total).toBeGreaterThan(7000);

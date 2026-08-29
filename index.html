@@ -58,11 +58,39 @@
         <div class="map-wrap">
           <canvas id="battlefield" aria-label="Battlefield"></canvas>
 
+          <div class="objective-strip" id="objective-strip" aria-label="Objective">
+            <div class="objective" id="objective-own" data-status="safe">
+              <span class="crown">&#9819;</span>
+              <div class="body">
+                <small id="objective-own-name">YOUR KING</small>
+                <b id="objective-own-state">Safe</b>
+              </div>
+              <div class="capture"><i id="objective-own-bar"></i></div>
+            </div>
+            <div class="objective" id="objective-foe" data-status="safe">
+              <span class="crown">&#9818;</span>
+              <div class="body">
+                <small id="objective-foe-name">ENEMY KING</small>
+                <b id="objective-foe-state">Not sighted</b>
+              </div>
+              <div class="capture"><i id="objective-foe-bar"></i></div>
+            </div>
+          </div>
+
           <div class="alert-feed" id="alert-feed" role="status" aria-live="polite"></div>
           <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
           <div class="minimap-wrap">
             <canvas id="minimap" aria-label="Battlefield minimap"></canvas>
+          </div>
+
+          <div class="outcome" id="outcome" hidden>
+            <div class="outcome-card">
+              <small>THE FIELD IS DECIDED</small>
+              <h1 id="outcome-title">VICTORY</h1>
+              <p id="outcome-reason"></p>
+              <button type="button" id="outcome-restart">FIGHT AGAIN</button>
+            </div>
           </div>
 
           <div class="hint">

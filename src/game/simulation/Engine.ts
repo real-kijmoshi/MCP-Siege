@@ -21,11 +21,12 @@ import {
   handleRenameGroup,
   handleSplitGroup,
 } from '../commands/handlers/reorganize';
-import type {
-  CommandResult,
-  CommandSource,
-  GameCommand,
-  GameCommandPayload,
+import {
+  failure,
+  type CommandResult,
+  type CommandSource,
+  type GameCommand,
+  type GameCommandPayload,
 } from '../commands/types';
 import { advanceAlerts, resetAlertTracking } from './Alerts';
 import { advanceCombat } from './Combat';
@@ -33,6 +34,7 @@ import { collectTriggeredOrders } from './Conditions';
 import { createEmptyState, type GameState } from './GameState';
 import { advanceMorale } from './Morale';
 import { advanceMovement } from './Movement';
+import { advanceObjective } from './Objective';
 import { advanceReinforcements } from './Reinforcements';
 import { advanceVisibility, seedInitialVisibility } from './Visibility';
 import { advanceZoneControl, seedZoneControl } from './ZoneControl';
@@ -79,6 +81,12 @@ export class SimulationEngine {
   public step(): CommandResult[] {
     this.state.currentTick += 1;
 
+    // A taken king ends the battle. The clock keeps running so the page can
+    // still animate and report, but nothing manoeuvres and no order is
+    // accepted; anything already queued is failed rather than left pending, so
+    // a Marshal call cannot hang waiting on a result that will never come.
+    if (this.state.objective.outcome !== 'ongoing') return this.rejectQueuedCommands();
+
     // The enemy and any conditional that just came true submit ordinary
     // commands, which land alongside the player's in the same ordered queue.
     for (const payload of enemyAiCommands(this.state)) this.dispatch('enemy_ai', payload);
@@ -101,6 +109,7 @@ export class SimulationEngine {
     advanceMorale(this.state);
     advanceVisibility(this.state);
     advanceZoneControl(this.state);
+    advanceObjective(this.state);
     advanceReinforcements(this.state);
     advanceAlerts(this.state);
     this.pruneCombatEvents();
@@ -131,6 +140,24 @@ export class SimulationEngine {
 
   public get pendingCommandCount(): number {
     return this.queue.size;
+  }
+
+  /** Answers every outstanding command once the battle has been decided. */
+  private rejectQueuedCommands(): CommandResult[] {
+    const results: CommandResult[] = [];
+    for (const command of this.queue.drainReady(this.state.currentTick)) {
+      const result = failure(
+        command,
+        this.state.currentTick,
+        'BATTLE_OVER',
+        this.state.objective.outcomeReason,
+        ['The battle is decided. No further orders can be given.'],
+      );
+      this.results.set(command.id, result);
+      results.push(result);
+      for (const listener of this.resultListeners) listener(command, result);
+    }
+    return results;
   }
 
   private pruneCombatEvents(): void {

@@ -172,6 +172,7 @@ export const CONDITION_KINDS = [
   'friendly_zone_lost',
   'enemy_unit_type_visible',
   'timer_elapsed',
+  'king_besieged',
 ] as const;
 export type ConditionKind = (typeof CONDITION_KINDS)[number];
 
@@ -187,7 +188,8 @@ export type PlanCondition =
   | { kind: 'enemy_enters_zone'; zoneId: ZoneId }
   | { kind: 'friendly_zone_lost'; zoneId: ZoneId }
   | { kind: 'enemy_unit_type_visible'; category: UnitCategory; zoneId?: ZoneId }
-  | { kind: 'timer_elapsed'; seconds: number };
+  | { kind: 'timer_elapsed'; seconds: number }
+  | { kind: 'king_besieged' };
 
 /* ------------------------------------------------------------------ plans */
 
@@ -240,6 +242,53 @@ export interface PendingConditionalOrder {
   condition: PlanCondition;
   createdAtTick: number;
   note: string;
+}
+
+/* -------------------------------------------------------------- objective */
+
+/** What one side has actually observed of the opposing king. */
+export interface KingSighting {
+  position: Vector2D;
+  zoneId: ZoneId;
+  tick: number;
+}
+
+/**
+ * A sovereign.
+ *
+ * He is an objective, not a hero: he has no abilities, deals no damage and is
+ * never addressable as a unit. He rides with his Royal Guard and is taken by
+ * holding the ground around him, which is the only way the battle is won
+ * outright.
+ */
+export interface KingState {
+  ownerId: PlayerId;
+  name: string;
+  position: Vector2D;
+  /** The regiment he rides with. While it lives, he moves where it moves. */
+  guardGroupId: string;
+  guardStrength: number;
+  /** 0-100. Filled while the enemy holds the ground around him. */
+  captureProgress: number;
+  captured: boolean;
+  /** True while an enemy force dominates the capture ring. */
+  besieged: boolean;
+  /** Strength inside the ring at the last evaluation. */
+  defenders: number;
+  attackers: number;
+  /** What the *opposing* side has seen of him. Absent until he is sighted. */
+  lastSightingByOpponent?: KingSighting;
+}
+
+export type BattleOutcome = 'ongoing' | 'player_victory' | 'enemy_victory';
+
+export interface ObjectiveState {
+  kings: Record<PlayerId, KingState>;
+  /** Opening numbers per side, so a collapse can be measured against them. */
+  initialStrength: Record<PlayerId, number>;
+  outcome: BattleOutcome;
+  outcomeReason: string;
+  decidedAtTick: number;
 }
 
 /* ----------------------------------------------------------- intelligence */

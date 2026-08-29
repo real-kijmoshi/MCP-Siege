@@ -42,6 +42,10 @@ export const PALETTE = {
   plan: '#c08bff',
   planFill: 'rgba(192, 139, 255, 0.14)',
 
+  /** The only gold on the map: the objective, and nothing else. */
+  kingGold: '#f5c451',
+  kingDanger: '#ff7a3d',
+
   moraleGood: '#5fd08a',
   moraleWarn: '#e8c15a',
   moraleBad: '#ff6b5b',

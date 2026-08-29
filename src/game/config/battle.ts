@@ -344,6 +344,51 @@ export const REINFORCEMENTS = {
   waveSize: 220,
 } as const;
 
+/* ------------------------------------------------------------- the objective */
+
+/**
+ * Capturing the king.
+ *
+ * The battle is won by taking the opposing sovereign, not by attrition. He
+ * rides with his Royal Guard, so he is only reachable once that guard has been
+ * broken or drawn away — which is what turns the whole map into a problem of
+ * making an opening rather than of winning every melee.
+ */
+export const OBJECTIVE = {
+  /** How often the capture contest is evaluated, in ticks. */
+  interval: 5,
+  /** Ground around the king that must be held to take him. */
+  captureRadius: 420,
+  /**
+   * Strength that must be inside the ring before a capture even begins, so a
+   * lone scout riding past a king cannot start taking him.
+   */
+  minimumAssault: 110,
+  /** Attackers must outweigh defenders by this factor to make progress. */
+  dominance: 1.25,
+  /** Capture percentage added per interval at parity-plus-one dominance. */
+  progressPerInterval: 1,
+  /** Ceiling on the dominance multiplier, so numbers cannot take a king instantly. */
+  maximumRate: 3,
+  /** Percentage recovered per interval once the ring is relieved. */
+  decayPerInterval: 0.7,
+
+  /** Men fight harder in sight of their sovereign. Morale per tick. */
+  rallyBonus: 0.05,
+  rallyRadius: 900,
+  /**
+   * Dread while the king is beset, applied to every group in the army. Kept
+   * small deliberately: it must apply pressure over a minute, not collapse an
+   * army faster than it can march to the rescue.
+   */
+  besiegedPenalty: 0.03,
+
+  /** An army below this share of its original numbers concedes the field. */
+  collapsePercent: 15,
+  /** No side may collapse before this, so the opening cannot decide anything. */
+  graceSeconds: 60,
+} as const;
+
 /* --------------------------------------------------------------- navigation */
 
 /** How close a group anchor must get to a waypoint before advancing. */
