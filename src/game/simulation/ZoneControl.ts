@@ -1,7 +1,7 @@
 import { UNIT_STATS } from '../config/battle';
-import { ZONE_IDS, playerIdOf, type PlayerId, type ZoneId } from '../types/domain';
+import { playerIdOf, type PlayerId, type ZoneId } from '../types/domain';
 import type { GameState } from './GameState';
-import { ZONES } from './Zones';
+import { activeZoneIds, activeZones } from './Zones';
 
 /**
  * Who holds each named zone.
@@ -30,7 +30,10 @@ export function zonePresenceOf(zoneId: ZoneId): ZonePresence {
 export function advanceZoneControl(state: GameState): void {
   if (state.currentTick % CONTROL_INTERVAL !== 0) return;
 
-  for (const id of ZONE_IDS) presence.set(id, { player: 0, enemy: 0 });
+  const zoneIds = activeZoneIds();
+  const zones = activeZones();
+  presence.clear();
+  for (const id of zoneIds) presence.set(id, { player: 0, enemy: 0 });
 
   const units = state.units;
   for (let index = 0; index < units.count; index += 1) {
@@ -41,12 +44,11 @@ export function advanceZoneControl(state: GameState): void {
     const owner = playerIdOf(units.owner[index] ?? 0);
 
     // Only presence actually inside a zone counts, so control means occupation.
-    for (const id of ZONE_IDS) {
-      const zone = ZONES[id];
+    for (const zone of zones) {
       const dx = x - zone.center.x;
       const dy = y - zone.center.y;
       if (dx * dx + dy * dy > zone.radius * zone.radius) continue;
-      const entry = presence.get(id);
+      const entry = presence.get(zone.id);
       if (entry === undefined) continue;
       if (owner === 'player') entry.player += value;
       else entry.enemy += value;
@@ -54,7 +56,7 @@ export function advanceZoneControl(state: GameState): void {
     }
   }
 
-  for (const id of ZONE_IDS) {
+  for (const id of zoneIds) {
     const entry = presence.get(id) ?? { player: 0, enemy: 0 };
     const total = entry.player + entry.enemy;
     let controller: PlayerId | undefined;

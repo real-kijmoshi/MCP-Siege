@@ -83,5 +83,6 @@ export class ObjectiveBanner {
     if (this.outcomeReason !== null) this.outcomeReason.textContent = report.outcomeReason;
     this.outcomeCard?.classList.toggle('defeat', !won);
     this.outcome?.removeAttribute('hidden');
+    this.outcomeCard?.focus({ preventScroll: true });
   }
 }

@@ -37,6 +37,8 @@ export interface OrderGroupsPayload {
   destination?: Vector2D;
   formation?: Formation;
   stance?: Stance;
+  /** Append this destination after the group's existing march instead of replacing it. */
+  append?: boolean;
 }
 
 export interface ChangeFormationPayload {

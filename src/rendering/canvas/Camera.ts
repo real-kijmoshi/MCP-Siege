@@ -46,6 +46,27 @@ export class Camera {
     this.clamp();
   }
 
+  /**
+   * Frames a rectangle of the world.
+   *
+   * The opening shot used to be a fixed centre and a fixed zoom, which cut two
+   * regiments off the right edge before the player had touched anything. A
+   * commander's first frame should contain his whole army.
+   */
+  public fitBounds(
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+    padding = 400,
+  ): void {
+    const width = Math.max(1, right - left + padding * 2);
+    const height = Math.max(1, bottom - top + padding * 2);
+    const zoom = Math.min(this.viewportWidth / width, this.viewportHeight / height);
+    this.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+    this.centerOn((left + right) / 2, (top + bottom) / 2);
+  }
+
   public get centerX(): number {
     return this.x + this.worldWidth / 2;
   }

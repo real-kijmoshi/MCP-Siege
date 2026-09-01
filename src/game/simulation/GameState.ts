@@ -1,4 +1,6 @@
 import { FOG_COLUMNS, FOG_ROWS } from '../config/battle';
+import type { BattleMapId } from '../config/maps';
+import type { DifficultyId, ScenarioId } from '../config/matches';
 import type {
   ArmyGroup,
   BattleAlert,
@@ -30,6 +32,10 @@ export interface PlayerBattleState {
 
 export interface GameState {
   gameSeed: number;
+  scenarioId: ScenarioId;
+  difficultyId: DifficultyId;
+  /** The ground this battle is fought on. Set by `buildScenario` and never changed. */
+  mapId: BattleMapId;
   random: RandomState;
   currentTick: number;
   commandSequence: number;
@@ -88,9 +94,16 @@ function createPlaceholderKing(ownerId: PlayerId): KingState {
   };
 }
 
-export function createEmptyState(seed: number): GameState {
+export function createEmptyState(
+  seed: number,
+  scenarioId: ScenarioId = 'riverwatch',
+  difficultyId: DifficultyId = 'captain',
+): GameState {
   return {
     gameSeed: seed,
+    scenarioId,
+    difficultyId,
+    mapId: 'river_vale',
     random: { value: seed >>> 0 || 1 },
     currentTick: 0,
     commandSequence: 1,

@@ -1,16 +1,23 @@
 import '../styles/main.css';
+import '../styles/lobby.css';
 
-import { TICKS_PER_SECOND } from '../game/config/battle';
+import { MAP_HEIGHT, MAP_WIDTH, TICKS_PER_SECOND } from '../game/config/battle';
+import { DIFFICULTIES } from '../game/config/matches';
+import { SCENARIOS } from '../game/config/scenario';
 import { GameQueries } from '../game/queries/GameQueries';
 import { SimulationEngine } from '../game/simulation/Engine';
+import { activeGroups } from '../game/simulation/GameState';
+import { activeZoneIds } from '../game/simulation/Zones';
 import { Input } from '../rendering/canvas/Input';
 import { Minimap } from '../rendering/canvas/Minimap';
 import { Renderer } from '../rendering/canvas/Renderer';
 import { AlertFeed, Toast } from '../ui/AlertFeed';
 import { ArmyList } from '../ui/ArmyList';
 import { CommandBar } from '../ui/CommandBar';
+import { FirstOrders } from '../ui/FirstOrders';
 import { ObjectiveBanner } from '../ui/ObjectiveBanner';
 import { TopBar } from '../ui/TopBar';
+import { showLobby } from '../ui/Lobby';
 import {
   getWebMcpCapabilityMessage,
   registerWebMcpTools,
@@ -26,14 +33,53 @@ import { createWebMcpToolHandlers } from '../integrations/webmcp/tools';
  * order arrives from outside.
  */
 
+let fatalShown = false;
+
+function showFatalError(error: unknown): void {
+  if (fatalShown) return;
+  fatalShown = true;
+  // Keep technical detail in developer tools; the player gets a stable,
+  // actionable recovery screen rather than a stack trace or a frozen field.
+  // eslint-disable-next-line no-console
+  console.error('[siege] unrecoverable runtime error', error);
+  const screen = document.getElementById('fatal-screen');
+  const message = document.getElementById('fatal-message');
+  if (message !== null) {
+    message.textContent =
+      'The battle encountered an unexpected error. Reload to restore a clean deterministic state.';
+  }
+  screen?.removeAttribute('hidden');
+  screen?.querySelector<HTMLElement>('[tabindex="-1"]')?.focus({ preventScroll: true });
+}
+
 function requireCanvas(id: string): HTMLCanvasElement {
   const element = document.getElementById(id);
   if (!(element instanceof HTMLCanvasElement)) throw new Error(`Missing canvas #${id}.`);
   return element;
 }
 
+/**
+ * Opens on the whole of the player's own army.
+ *
+ * A fixed centre and zoom happened to cut two regiments off the edge in
+ * Riverwatch and framed the other two scenarios worse still, since each one
+ * deploys somewhere different.
+ */
+function frameBattlefield(renderer: Renderer): void {
+  // Start at command zoom. The previous opening framed only the player's
+  // deployment and often put the river, gaps, causeway and objective offscreen
+  // â€” precisely the ground a first order has to reason about.
+  renderer.camera.fitBounds(0, 0, MAP_WIDTH, MAP_HEIGHT, 160);
+}
+
 async function bootstrap(): Promise<void> {
-  const engine = new SimulationEngine();
+  const selection = await showLobby();
+  const engine = new SimulationEngine(selection);
+  const matchLabel = document.getElementById('match-label');
+  if (matchLabel !== null) {
+    matchLabel.textContent =
+      `${SCENARIOS[selection.scenarioId].name} · ${DIFFICULTIES[selection.difficultyId].name}`;
+  }
   const queries = new GameQueries(() => engine.getState());
 
   const battlefieldCanvas = requireCanvas('battlefield');
@@ -41,23 +87,30 @@ async function bootstrap(): Promise<void> {
   const minimapCanvas = requireCanvas('minimap');
   const minimap = new Minimap(minimapCanvas);
 
-  const alertFeed = new AlertFeed();
+  const alertFeed = new AlertFeed((x, y) => renderer.camera.centerOn(x, y));
   const toast = new Toast();
   const objectiveBanner = new ObjectiveBanner();
+  const firstOrders = new FirstOrders(selection.scenarioId);
 
   let speed = 1;
   const topBar = new TopBar((next) => {
     speed = next;
   });
 
-  const armyList = new ArmyList((groupId, additive) => {
-    if (!additive) renderer.selection.clear();
-    if (additive && renderer.selection.has(groupId)) renderer.selection.delete(groupId);
-    else renderer.selection.add(groupId);
-    commandBar.update();
-  });
+  const armyList = new ArmyList(
+    (groupId, additive) => {
+      if (!additive) renderer.selection.clear();
+      if (additive && renderer.selection.has(groupId)) renderer.selection.delete(groupId);
+      else renderer.selection.add(groupId);
+      commandBar.update();
+    },
+    (groupId) => input.focusGroup(groupId),
+  );
 
-  const commandBar = new CommandBar(engine, renderer.selection, (message) => toast.show(message));
+  const commandBar = new CommandBar(engine, renderer.selection, (message) => {
+    toast.show(message);
+    firstOrders.dismiss();
+  });
 
   const input = new Input(battlefieldCanvas, minimapCanvas, minimap, renderer, engine, {
     onSelectionChange: () => commandBar.update(),
@@ -71,13 +124,17 @@ async function bootstrap(): Promise<void> {
       speed = steps[Math.max(0, Math.min(steps.length - 1, current + delta))] ?? 1;
       topBar.syncSpeed(speed);
     },
-    onOrderIssued: (message) => toast.show(message),
+    onOrderIssued: (message) => {
+      toast.show(message);
+      firstOrders.dismiss();
+    },
   });
 
-  // Focus the player's centre so the opening frame shows the main line.
-  renderer.camera.centerOn(4000, 3300);
+  frameBattlefield(renderer);
 
   window.addEventListener('resize', () => {
+    // Only the viewport changes here. Re-framing would snatch the camera away
+    // from wherever the commander was actually looking.
     renderer.resize();
     minimap.resize();
   });
@@ -102,6 +159,10 @@ async function bootstrap(): Promise<void> {
         steps += 1;
       }
       if (accumulator > stepMs * 12) accumulator = 0;
+    } else if (engine.pendingCommandCount > 0) {
+      // Pause freezes the battle, not command acknowledgement. Orders are
+      // validated and queued now, then begin moving on the first resumed tick.
+      engine.flushQueuedCommands();
     }
 
     input.update();
@@ -116,7 +177,12 @@ async function bootstrap(): Promise<void> {
     alertFeed.push(queries.getAlerts('player', 6));
     commandBar.update();
 
-    requestAnimationFrame(frame);
+    if (state.objective.outcome !== 'ongoing' && speed !== 0) {
+      speed = 0;
+      topBar.syncSpeed(0);
+    }
+
+    if (!fatalShown) requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 
@@ -128,7 +194,12 @@ async function bootstrap(): Promise<void> {
     onMarshalAction: (summary) => toast.show(summary, true),
   });
 
-  const connection = await registerWebMcpTools(handlers);
+  // The tool schemas offer only the ground this battle is fought on.
+  const connection = await registerWebMcpTools(
+    handlers,
+    typeof document === 'undefined' ? undefined : document.modelContext,
+    activeZoneIds(),
+  );
   document.documentElement.dataset.webmcpStatus = connection.status;
 
   if (connection.status === 'connected') {
@@ -143,7 +214,7 @@ async function bootstrap(): Promise<void> {
   // Console access for verifying tools without a WebMCP client. Not a UI.
   if (new URLSearchParams(window.location.search).has('mcpdebug')) {
     Object.defineProperty(window, '__battle', {
-      value: { engine, queries, tools: handlers },
+      value: { engine, queries, tools: handlers, renderer, input },
       writable: false,
     });
     // eslint-disable-next-line no-console
@@ -151,4 +222,8 @@ async function bootstrap(): Promise<void> {
   }
 }
 
-void bootstrap();
+document.getElementById('fatal-reload')?.addEventListener('click', () => window.location.reload());
+window.addEventListener('error', (event) => showFatalError(event.error ?? event.message));
+window.addEventListener('unhandledrejection', (event) => showFatalError(event.reason));
+
+void bootstrap().catch(showFatalError);

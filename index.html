@@ -3,44 +3,114 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0f0b" />
+    <meta name="color-scheme" content="dark" />
     <title>Siege — WebMCP Battle Command</title>
     <meta
       name="description"
       content="A large-scale battle command game that exposes its live battlefield to an external AI Marshal through WebMCP."
     />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   </head>
   <body>
-    <div id="app">
+    <noscript>
+      <div class="fatal-screen"><div><strong>JavaScript is required</strong><p>Siege runs its deterministic battle simulation in your browser.</p></div></div>
+    </noscript>
+    <div class="viewport-warning" role="alert">
+      <div><strong>A larger battlefield is required</strong><p>Siege is a desktop command game. Use a window at least 1100 × 620 to deploy the army.</p></div>
+    </div>
+    <section class="lobby" id="lobby" data-scenario="riverwatch" data-map="river_vale" aria-label="Battle lobby">
+      <header class="lobby-header">
+        <div class="lobby-brand">
+          <span class="crown-mark">♛</span>
+          <div><strong>SIEGE</strong><small>WAR COUNCIL</small></div>
+        </div>
+        <p>THE ASHEN WAR <i></i> DAY 41</p>
+      </header>
+
+      <main class="campaign-table">
+        <nav class="mission-ledger" aria-label="Choose operation">
+          <h1>Choose operation</h1>
+          <div class="scenario-list" id="lobby-scenarios"></div>
+        </nav>
+
+        <section class="battle-preview">
+          <div class="battlefield-portrait" aria-label="Selected battlefield preview">
+            <div class="map-shade" aria-hidden="true"></div>
+            <div class="map-objective-ring" aria-hidden="true"><span>♚</span></div>
+            <div class="battle-standard crown-standard" aria-hidden="true"><i></i></div>
+            <div class="battle-standard ashen-standard" aria-hidden="true"><i></i></div>
+            <div class="map-host crown-host host-one" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <div class="map-host crown-host host-two" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="map-host ashen-host host-one" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <div class="map-host ashen-host host-two" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="march-arrow march-one" aria-hidden="true"></div>
+            <div class="march-arrow march-two" aria-hidden="true"></div>
+            <div class="map-key" aria-hidden="true">
+              <span><i class="key-swatch key-crown"></i>CROWN SPAWN</span>
+              <span><i class="key-swatch key-ashen"></i>ASHEN LINE</span>
+              <span><i class="key-ring"></i>OBJECTIVE</span>
+            </div>
+            <div class="map-caption" id="briefing-map-caption" aria-hidden="true">RIVER VALE · DAWN</div>
+          </div>
+
+          <div class="battle-order">
+            <div class="order-copy">
+              <h2 id="briefing-name">Riverwatch</h2>
+              <p id="briefing-description"></p>
+              <p class="ground-note" id="briefing-ground"></p>
+              <div class="primary-orders" id="briefing-orders"></div>
+              <div class="battle-facts" id="briefing-facts"></div>
+            </div>
+
+            <div class="commit-column">
+              <div class="commander-setting">
+                <span>Enemy commander</span>
+                <div class="difficulty-list" id="lobby-difficulties"></div>
+                <p id="difficulty-description"></p>
+              </div>
+              <button class="deploy-button" id="lobby-deploy" type="button">
+                <span>DEPLOY ARMY</span><i>→</i>
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <div id="app" aria-hidden="true" inert>
       <header class="top-bar">
         <div class="brand">
           <strong>SIEGE</strong>
-          <small>BATTLE COMMAND</small>
+          <small id="match-label">BATTLE COMMAND</small>
         </div>
 
-        <div class="stat" title="Total men under your command">
-          <small>STRENGTH</small>
-          <b id="stat-strength">0</b>
-        </div>
-        <div class="stat" title="Enemy strength you can currently see">
-          <small>ENEMY SEEN</small>
-          <b id="stat-enemy">0</b>
-        </div>
-        <div class="stat" title="Reinforcement waves ready to commit">
-          <small>REINFORCEMENTS</small>
-          <b id="stat-reinforcements">0</b>
-        </div>
-        <div class="stat" title="Time elapsed">
-          <small>ELAPSED</small>
-          <b id="stat-clock">0:00</b>
+        <div class="stat-cluster">
+          <div class="stat" data-tone="own" title="Total men under your command">
+            <small>STRENGTH</small>
+            <b id="stat-strength">0</b>
+          </div>
+          <div class="stat" data-tone="foe" title="Enemy strength you can currently see">
+            <small>ENEMY SEEN</small>
+            <b id="stat-enemy">0</b>
+          </div>
+          <div class="stat" title="Reinforcement waves ready to commit">
+            <small>REINFORCEMENTS</small>
+            <b id="stat-reinforcements">0</b>
+          </div>
+          <div class="stat" title="Time elapsed">
+            <small>ELAPSED</small>
+            <b id="stat-clock">0:00</b>
+          </div>
         </div>
 
         <div class="spacer"></div>
 
         <div class="speed-control" role="group" aria-label="Simulation speed">
-          <button type="button" data-speed="0" id="speed-pause" title="Pause [Space]">❚❚</button>
-          <button type="button" data-speed="1" class="active">1×</button>
-          <button type="button" data-speed="2">2×</button>
-          <button type="button" data-speed="4">4×</button>
+          <button type="button" data-speed="0" id="speed-pause" title="Pause [Space]" aria-pressed="false">❚❚</button>
+          <button type="button" data-speed="1" class="active" aria-pressed="true">1×</button>
+          <button type="button" data-speed="2" aria-pressed="false">2×</button>
+          <button type="button" data-speed="4" aria-pressed="false">4×</button>
         </div>
 
         <div class="webmcp-status" id="webmcp-status" title="WebMCP tool availability">
@@ -51,12 +121,13 @@
 
       <main class="stage">
         <aside class="army-list" aria-label="Army groups">
-          <h2>ARMY GROUPS</h2>
+          <h2>ARMY GROUPS<span id="army-list-count"></span></h2>
           <div id="army-list-body"></div>
         </aside>
 
         <div class="map-wrap">
-          <canvas id="battlefield" aria-label="Battlefield"></canvas>
+          <canvas id="battlefield" aria-label="Battlefield" aria-describedby="battlefield-help" tabindex="0"></canvas>
+          <p class="sr-only" id="battlefield-help">Select regiments from the army list, then use the command buttons or keyboard controls. Press Tab to cycle regiments, Control A to select all, and Space to pause.</p>
 
           <div class="objective-strip" id="objective-strip" aria-label="Objective">
             <div class="objective" id="objective-own" data-status="safe">
@@ -84,8 +155,8 @@
             <canvas id="minimap" aria-label="Battlefield minimap"></canvas>
           </div>
 
-          <div class="outcome" id="outcome" hidden>
-            <div class="outcome-card">
+          <div class="outcome" id="outcome" hidden role="dialog" aria-modal="true" aria-labelledby="outcome-title">
+            <div class="outcome-card" tabindex="-1">
               <small>THE FIELD IS DECIDED</small>
               <h1 id="outcome-title">VICTORY</h1>
               <p id="outcome-reason"></p>
@@ -93,9 +164,33 @@
             </div>
           </div>
 
-          <div class="hint">
-            <b>LMB</b> select · <b>DRAG</b> box · <b>RMB</b> move/attack · <b>WHEEL</b> zoom ·
-            <b>WASD</b> pan · <b>CTRL+1-9</b> group · <b>SPACE</b> pause
+          <details class="hint">
+            <summary>CONTROLS</summary>
+            <dl>
+              <dt>Select</dt>
+              <dd><b>LMB</b> regiment · <b>DRAG</b> box · <b>SHIFT</b> add · <b>CTRL+A</b> army · <b>TAB</b> next · <b>ESC</b> clear</dd>
+              <dt>Order</dt>
+              <dd><b>RMB</b> move or attack · <b>CTRL+RMB</b> attack-move · <b>SHIFT+RMB</b> queue waypoint</dd>
+              <dt>Camera</dt>
+              <dd><b>RMB DRAG</b> or <b>WASD</b> pan · <b>WHEEL</b> or <b>Z X</b> zoom · <b>F</b> selection · <b>H</b> your king</dd>
+              <dt>Groups</dt>
+              <dd><b>CTRL+1…9</b> assign · <b>1…9</b> recall</dd>
+              <dt>Time</dt>
+              <dd><b>SPACE</b> pause · <b>+ −</b> speed</dd>
+            </dl>
+          </details>
+
+          <div class="first-orders" id="first-orders">
+            <button type="button" class="dismiss" id="first-orders-dismiss" aria-label="Dismiss">
+              ×
+            </button>
+            <small>YOUR ORDERS</small>
+            <h3 id="first-orders-title">Hold the crossings</h3>
+            <p id="first-orders-body"></p>
+            <ul>
+              <li><b>Win:</b> break the enemy guard, then hold the ring around its king.</li>
+              <li><b>Command:</b> select a regiment, right-click to move, Ctrl+right-click to attack ground.</li>
+            </ul>
           </div>
         </div>
       </main>
@@ -107,34 +202,48 @@
         </div>
 
         <div class="commands" id="commands">
-          <button type="button" data-command="move" title="Move to the zone under the cursor">
-            <span>↑</span>MOVE
-          </button>
-          <button type="button" data-command="attack" title="Attack the nearest known enemy">
+          <button type="button" data-command="attack" title="Attack the nearest known enemy force" disabled>
             <span>⚔</span>ATTACK
           </button>
-          <button type="button" data-command="hold" title="Hold position">
+          <button type="button" data-command="hold" title="Hold position and do not advance" disabled>
             <span>⬣</span>HOLD
           </button>
-          <button type="button" data-command="defend" title="Defend the current zone">
+          <button type="button" data-command="defend" title="Dig in and defend the current zone" disabled>
             <span>⛨</span>DEFEND
           </button>
-          <button type="button" data-command="formation" title="Change formation">
+          <button type="button" data-command="retreat" title="Withdraw to the rear" disabled>
+            <span>↩</span>RETREAT
+          </button>
+          <span class="command-divider" aria-hidden="true"></span>
+          <button type="button" data-command="formation" title="Change formation" disabled>
             <span>▦</span>FORMATION
           </button>
-          <button type="button" data-command="split" title="Split the selected group in half">
+          <button type="button" data-command="stance" title="Change how far these men will leave the line" disabled>
+            <span>◈</span>STANCE
+          </button>
+          <span class="command-divider" aria-hidden="true"></span>
+          <button type="button" data-command="split" title="Split the selected group in half" disabled>
             <span>⇄</span>SPLIT
           </button>
-          <button type="button" data-command="merge" title="Merge the selected groups">
+          <button type="button" data-command="merge" title="Merge the selected groups" disabled>
             <span>⇉</span>MERGE
-          </button>
-          <button type="button" data-command="retreat" title="Withdraw to the rear">
-            <span>↩</span>RETREAT
           </button>
         </div>
 
+        <em id="selection-matchup" class="matchup-note"></em>
+
         <div class="formation-menu" id="formation-menu" hidden></div>
+        <div class="formation-menu stance-menu" id="stance-menu" hidden></div>
       </footer>
+    </div>
+
+    <div class="fatal-screen" id="fatal-screen" hidden role="alertdialog" aria-modal="true" aria-labelledby="fatal-title">
+      <div tabindex="-1">
+        <small>COMMAND LOST</small>
+        <strong id="fatal-title">Siege could not continue</strong>
+        <p id="fatal-message">The battle failed to initialize.</p>
+        <button type="button" id="fatal-reload">RELOAD BATTLE</button>
+      </div>
     </div>
 
     <script type="module" src="/src/app/main.ts"></script>

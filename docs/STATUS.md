@@ -1,12 +1,322 @@
 # Current Milestone
 
-Vertical slice complete — the full loop from the brief's first-milestone list
-works end to end.
+Interface pass complete. No simulation rule, command, tool or scenario changed;
+the work is entirely in what the screen says and where it says it.
+
+# Interface Pass
+
+## War Council
+
+- **The commitment is always on screen.** The briefing column sized its two rows
+  as fixed percentages of a height its own content overflowed, so on a 1044px
+  window DEPLOY ARMY sat 27px below the fold with nothing to scroll it into
+  view. The battle order now takes the height it needs and the portrait absorbs
+  the rest.
+- The operation ledger is a real scroll container — it may be shorter than its
+  seven entries instead of pushing the council off the bottom of the screen —
+  and no longer shows a horizontal scrollbar it never had anything to scroll.
+
+## The battle screen
+
+- **The status strip reads as one instrument.** Brand, then the four figures in
+  a ruled cluster with tabular numerals so a changing number does not shift the
+  row it sits in, then speed and WebMCP availability behind a divider. Your men
+  are counted in the player's blue and the enemy's in his red, which is the one
+  distinction the strip has to make instantly.
+- **The control legend folds.** It used to sit open over the top-left of the
+  field for the whole battle — the corner a flank march is watched from. It is
+  now a `<details>` tab that opens on click or keyboard, and what it opens into
+  is five labelled rows (select, order, camera, groups, time) rather than one
+  run-on line. It also documents controls that existed and were never written
+  down: SHIFT add, SHIFT+RMB queue, ESC clear, F selection, control groups.
+- **The roster says how big the army is.** The heading carries regiment and man
+  counts, it stays put while the list under it scrolls, names are left-aligned
+  behind the troop token instead of drifting to the middle of the row, counts
+  are tabular, and the selected regiment is marked on the edge of the row as
+  well as behind it. A regiment in contact and one coming apart use that same
+  edge, so the roster can be read down one column.
+- **An order that can be given no longer looks like one that cannot.** Enabled
+  command buttons carry a full border and a lit glyph and lift on hover; a
+  disabled one drops to a flat plate with no edge at all. Attack reads warm.
+- **The counter matrix is no longer truncated.** It was being cut in half inside
+  a 300px column — "Infantry: strong vs archers, siege, scouts · w…" teaches
+  nothing — and now sits after the command row, in the space to its right that
+  was empty at every window size.
+- **The field has an edge.** Outside the map the canvas carries the same colour
+  as unexplored ground, so on a wide window the ends of the country read as a
+  hole in the drawing. A one-pixel boundary is now stroked around the world.
+
+# Navigation, Physics and Combat Pass
+
+Regiments choose credible lines of march, move as bodies with momentum and local
+space, and physically gain or yield ground in a fight. The work stayed inside the
+existing scope: no new unit identities, commands, tools, maps or scenario rules
+were added.
+
+## Navigation
+
+- **Routes optimize marching cost, not hop count.** The zone search now weighs
+  distance, difficult terrain and authored roads. A road can win over a shorter
+  forest or hill route, while every candidate leg is still checked against the
+  actual passability geometry.
+- **A route fits the regiment using it.** Orders pass a capped formation
+  footprint into navigation. Three-lane clearance sampling rejects paths whose
+  centreline is dry but whose ranks would clip a mere, ridge or river bank.
+- **Paths are smoothed after they are proven legal.** The route keeps only the
+  obstacle and crossing corners it needs instead of marching through every zone
+  centre. Tests cover both whole-polyline passability and a tangent route whose
+  anchor clears a mere but whose formation does not.
+
+## Movement and physical contact
+
+- `UnitPool` now carries velocity in typed arrays. Infantry, cavalry, scouts and
+  engines have distinct acceleration, footprint, mass and charge traits; these
+  remain pool indices and never cross the regiment-only external boundary.
+- Soldiers accelerate, brake and retain momentum rather than teleporting one
+  speed step at a time. Formations wheel toward a new heading, lagging ranks
+  catch up, and forest, hill, village and crossing ground change pace by troop
+  role. Cavalry and siege are punished most by cramped ground.
+- A preallocated spatial-hash separation pass stops different friendly or enemy
+  regiments collapsing into one point. It is staggered across four deterministic
+  index cohorts, as target acquisition is, because velocity carries the response
+  between ticks. Formation slots already solve spacing inside one regiment.
+- Friendly regiment anchors steer apart when marching into the same space, so
+  crossings form queues and nearby columns flow instead of stacking exactly.
+
+## Combat
+
+- **Charges carry real momentum.** Melee damage reads the attacker's live speed,
+  mass and charge power. Cavalry arriving at full pace hits far harder than
+  cavalry already standing in a scrum; a defensive spear front or square braces
+  most of that shock when it arrives from the front.
+- **Lines move under pressure.** Every melee contact contributes a physical
+  impulse to the defending regiment. Numbers, mass and approach speed drive it;
+  formation, morale and stance resist it. Yield is capped per tick and cannot
+  push an anchor onto impassable ground.
+- **Ground and distance matter to missiles.** Ranged damage falls toward maximum
+  range, hill fire gains an advantage, forest breaks up missiles and cavalry,
+  and villages and hills offer distinct protection rather than one generic
+  defensive-terrain multiplier.
+- Damage receives small seeded variation, so ranks no longer resolve as
+  identical metronomes while replay determinism remains exact. Cosmetic combat
+  sampling is now derived from unit index and tick, removing its old
+  cross-engine module counter.
+- Pinning engages sooner and holds harder, while pursuit damage is slightly
+  stronger so routed formations remain vulnerable to cavalry sent after them.
+
+## Verification and measured result
+
+- 119 default tests pass, including deterministic checksums, interleaved engines
+  on different maps, command boundaries, fog safety, formations, charge and
+  bracing, pressure, collision separation, navigation clearance and all seven
+  operations reaching a decision. The seven long balance probes were also run
+  manually after the pass.
+- Full opening-army performance is **3.43 ms/tick for 7,950 living units** against
+  the 50 ms budget. The densest Long Causeway probe completes in 25.8 seconds
+  alone after collision staggering, down from 70.7 seconds in the first physical
+  solver iteration.
+
+| Operation | Ends | Result | Player | Enemy |
+| --- | ---: | --- | ---: | ---: |
+| Riverwatch | 402s | player | 3027/3950 | 2698/4000 |
+| Broken Bridgehead | 295s | player | 2169/3950 | 1359/4000 |
+| Last Light | 178s | enemy | 2323/3950 | 3493/4000 |
+| Cinder Road | 326s | player | 3424/3978 | 1424/4200 |
+| The Ashen Gate | 299s | enemy | 1275/3850 | 1870/4000 |
+| Goldmere Fields | 262s | enemy | 1346/3985 | 1882/4045 |
+| The Long Causeway | 392s | enemy | 1343/3970 | 2345/4000 |
+
+# Maps and Operations Pass
+
+- **A map is data.** `config/maps.ts` holds four `BattleMapDefinition`s: named
+  zones, the navigation graph, roads, the one dividing feature and the few places
+  it can be passed, standing water off it, and the colour of the earth.
+  `simulation/Zones.ts` no longer *is* a map; it reads the one being fought over.
+- **The dividing feature is generalised.** A barrier is a centreline of
+  `baseY + slope · x` plus a sum of sines, a half-width, and a kind. That is
+  enough for a level river, a level volcanic spine, and a tidal channel cut
+  corner to corner, and it never reads as a drawn straight line. Maps may also
+  carry meres — standing water away from the barrier, impassable, and belonging
+  to no zone — or no barrier at all.
+- **The active map is a cache, not a second source of truth.** It is
+  re-established from `GameState.mapId` before every tick, every dispatch and
+  every query, so two engines on two maps in one process cannot read each other's
+  ground. Proven: River Vale run alone for 400 ticks and River Vale interleaved
+  tick-for-tick with a Goldmere battle reach the same state checksum.
+- **The tool surface narrows to the ground in front of it.** `ZoneId` is still
+  one static literal union across every map — the command contracts need it —
+  but the WebMCP schemas are now built per battle, so `order_group` on Goldmere
+  offers Goldmere's thirteen names and nothing else. Runtime validation checks
+  the same list, so a location from another battlefield is refused rather than
+  marched to.
+- **The renderer follows the map.** Terrain rebuilds when the battle is
+  somewhere else, draws a ridge as rock rather than water, draws meres, and
+  merges an authored ground tint over the palette, so ash country is not the
+  colour of harvest country.
+
+# The Four Battlefields
+
+- **River Vale** — unchanged: a slow river with three crossings.
+- **Ashfall Pass** — a dead volcanic spine with two gaps four kilometres apart.
+  A gap is reachable only from the ground directly below and above it: a column
+  approaching at an angle meets the rock long before it meets the gap, which the
+  map tests caught and which is now the shape of the graph.
+- **Goldmere** — open harvest country with no barrier at all, two impassable
+  meres, and both flanks open the whole way round. The map where the
+  envelopment terms are the entire battle.
+- **Sunken Causeway** — a tidal channel on a diagonal, so its two crossings are
+  a near one and a far one rather than a left and a right.
+
+# The Seven Operations
+
+Riverwatch, Broken Bridgehead and Last Light are unchanged. New:
+
+- **Cinder Road** — assault Ashfall Pass. The defenders of one gap are too far
+  from the other to be recalled to it.
+- **The Ashen Gate** — the same ground from the far side, with the Crown across
+  the spine and one road home behind it.
+- **Goldmere Fields** — a cavalry-heavy pitched battle in the open.
+- **The Long Causeway** — one raised road, one ford, and a long march between.
+
+Measured with the same crude scripted commander on Captain — throw four
+regiments at the first crossing, then drive everything at the enemy command seat:
+
+| Operation | Ends | Result | Player | Enemy |
+| --- | --- | --- | --- | --- |
+| Riverwatch | 379s | enemy | 2641/3950 | 3220/4000 |
+| Broken Bridgehead | 362s | enemy | 1525/3950 | 2074/4000 |
+| Last Light | 210s | enemy | 2414/3950 | 3267/4000 |
+| Cinder Road | CINDER | player | CINDERP | CINDERE |
+| The Ashen Gate | 442s | player | 1390/3850 | 1354/4000 |
+| Goldmere Fields | 255s | enemy | 1354/3985 | 2134/4045 |
+| The Long Causeway | 285s | enemy | 1336/3970 | 2737/4000 |
+
+Every operation reaches a decision, and six of the seven punish a plan this
+blunt. Cinder Road is the exception and is deliberately the gentler introduction
+to a new map, but see *Not Yet Verified*.
+
+# Earlier: Contact
+
+Contact pass complete. Position now decides fights. Before it, a battle was two
+damage pools draining into each other: an enemy column walked straight through a
+blocking line without slowing, a regiment taken in the rear fought exactly as
+well as one facing its enemy, an army encircled and crushed from four sides died
+no faster than one fed into a single front, and men who had already broken
+strolled off the field untouched. Manoeuvre — the expensive thing a commander
+arranges — bought nothing over simply having more men. It does now.
+
+- **Formations in contact are pinned.** A body of men fighting to its front
+  keeps a twelfth of its march. It has to beat what is in front of it before it
+  can go past, which is what makes holding a crossing worth doing. Measured:
+  a five-hundred-man column crosses the map unopposed, and is stopped dead and
+  ground down by a five-hundred-man spear line that loses under a fifth of its
+  own strength. Troops already routing, and troops under an explicit order to
+  withdraw, are exempt — disengaging is a decision, not a bug.
+- **Encirclement is measured and it is decisive.** `Combat` buckets every man
+  in contact into one of eight arcs around the formation he is pressing, so a
+  regiment knows how far round it the attack has come. Beyond a plain frontal
+  fight this raises damage taken by up to ninety percent and triples the morale
+  penalty. Measured: six hundred attackers arriving from four quarters destroy a
+  six-hundred-man regiment roughly twice as fast as the same six hundred
+  arriving along one face.
+- **Blows land somewhere.** A strike arriving outside the defending formation's
+  frontal cone does thirty percent more damage, and one from behind fifty-five
+  percent more. Getting cavalry round a flank is now paid for in the ledger and
+  not only in morale.
+- **A rout is where an army is destroyed.** Broken men neither fight nor chase,
+  and take nearly double damage while they run.
+- **A melee no longer stalls when the enemy in front of you dies.** A man with
+  no target re-acquires on a three-tick stride rather than the ordinary eight.
+  In heavy fighting targets die every few seconds, and the old stride left a
+  third of the army's output on the floor exactly where the press was thickest —
+  which is the arithmetic reason overwhelming numbers never felt overwhelming.
+- **The commander can see it.** Every group reports `pinned` and `surrounded`
+  through `GameQueries`, so the roster marks them and `get_armies` tells the
+  Marshal; being surrounded raises a critical alert of its own.
+- Simulation cost is unchanged: 600 ticks at 7,950 units in 1.9s, 3.2 ms/tick
+  against a 50 ms budget.
+
+# Earlier: Playability and Battle Feel
+
+Playability and battle-feel pass complete. The systems were all present and
+correct but the battle was neither readable nor decidable: the map outside your
+own vision was an opaque black void, troop type — the thing the whole counter
+matrix turns on — appeared nowhere in the interface, stance had no control at
+all, and an untouched battle ran for twenty minutes and ended in nothing at
+all. All four are fixed, and battles now reach a decision.
+
+# This Pass
+
+## Readability and control
+
+- Fog hides forces, not ground. The veil is a translucent haze rather than an
+  opaque black, on both the battlefield and the minimap, so the valley can be
+  read and a plan can be drawn on it. Units and contacts are still gated by
+  `visibilityAt` exactly as before; the intelligence contract is untouched.
+- Troop type is visible everywhere it matters: a colour-coded three-letter
+  token on every roster row, on every friendly and every *seen enemy* map label,
+  and in the selection readout — which also spells the counter matrix out in
+  words ("Infantry: strong vs archers, siege, scouts · weak to heavy infantry").
+- Map labels no longer collide. Screen-space occupancy is claimed in priority
+  order — selected, then in contact, then largest — so a strategic zoom reads
+  instead of turning into overlapping mush.
+- A pulsing contact ring marks any regiment taking losses, at every zoom, which
+  is the one mark that answers "where is the battle" from across the map.
+- Stance has a control. It is the third pillar of the tactical model and was
+  previously reachable only over WebMCP.
+- Controls a strategy player expects: right-drag pans and right-click orders
+  (release-in-place, so a misclick can be taken back), Ctrl+right-click is
+  attack-move, Ctrl+A selects the army, Tab cycles regiments, Z/X zoom, H homes
+  on your king, alerts are buttons that fly the camera to the ground they name,
+  and double-clicking a roster row centres on it.
+- The opening frame is fitted to the player's own deployment rather than a fixed
+  centre and zoom, so no scenario opens with regiments off the edge.
+- A dismissible opening-orders card carries the objective and the three things
+  worth knowing across the cut from the War Council, and leaves on the first
+  order given.
+
+## Battle feel
+
+- Regiments break instead of dying. Casualty pressure was weighted so weakly
+  that a regiment cut from 900 men to 35 still reported 83% morale — the morale
+  layer was decoration and every engagement was mutual annihilation. A regiment
+  now gives way with roughly a third of its men still standing, and a bloodied
+  one can no longer recover to full confidence: what it lost, it lost.
+- Battles reach a decision. An enemy regiment that finished a scripted assault
+  kept `attack_zone` as its order forever and was never considered again, so
+  both armies ground to half strength and simply stopped. A group that has
+  arrived, has no waypoints, and is out of contact is now available for new
+  orders, and past the scripted escalation the enemy commander drives everything
+  he has at the player's king.
+- An army concedes below 34% of its strength rather than 15%, which no
+  engagement ever reached.
+- Measured over all three operations: an aggressive player wins Riverwatch
+  comfortably on Levy (79% surviving), hard on Captain (43%), and by a hair on
+  Warlord (37% against 34%); the same script loses Last Light outright.
 
 # Working
 
+- War Council map previews now call out Crown spawn, Ashen line, and the
+  objective with labeled tactical markers and a compact legend.
+- Navigation now validates every waypoint leg against passable terrain and
+  deterministically searches one-zone detours when a zone's broad footprint
+  hides a river obstruction, preventing same-zone orders from marching through
+  water.
+
 - Around 7,950 units in twenty regiments across two factions, simulating at
-  roughly 2.2 ms per tick against a 50 ms budget.
+  roughly 1.6 ms per tick against a 50 ms budget.
+- A cinematic pre-battle War Council composed as campaign ledger → battlefield
+  portrait → battle order → deploy. Three spare mission entries select a large
+  illustrated command map with army formations, standards, objectives, and
+  scenario-specific attack routes. Briefing is limited to two orders, three facts,
+  one compact enemy-commander control, and the deploy commitment.
+- Three materially different authored openings: Riverwatch's measured river
+  defense, Broken Bridgehead's exposed northern foothold, and Last Light's
+  compressed defense of the Crown. Each has its own deployment and enemy script.
+- Levy, Captain, and Warlord change deterministic assault timing, reaction
+  cadence, response radius, and royal relief radius without bypassing fog or the
+  command queue. The chosen operation and difficulty appear in both the battle
+  header and the WebMCP battle overview.
 - A win condition: take the enemy king by holding the ground around him, or
   break his army entirely. Kings ride with their Royal Guards, capture is rate
   capped, a besieged king costs his whole army morale, and a decided battle
@@ -20,48 +330,60 @@ works end to end.
   will leave the line, and a counter matrix covering seven troop types.
 - Regiment-level morale with confident/stable/shaken/breaking/routing states.
   Broken regiments refuse orders, stream to the rear, and rally when clear.
-- Three-state fog of war, contact memory with rounded strength estimates and
-  stale last-known positions, and refusal to attack a force never seen.
+- Three-state fog of war drawn as a translucent veil, contact memory with
+  rounded strength estimates and stale last-known positions, and refusal to
+  attack a force never seen.
 - Group-level navigation over a thirteen-node zone graph; the river is passable
   only at the three crossings, so the bridges are tactically binding.
 - Strategic alerts with dedupe and cooldown; zone control tracking per named zone.
 - Custom Canvas 2D renderer: procedural vector terrain, batched unit drawing
   (fourteen fills for the whole army), three levels of detail by zoom, fog blit,
   combat effects, minimap, and the plan overlay.
-- Full desktop controls: click and box selection, right-click context orders,
-  queued waypoints, zoom, pan, control groups, pause and speed.
-- Minimal UI: status strip, regiment roster, command row, transient alerts. No
-  Marshal panel of any kind.
+- Full desktop controls: click and box selection, right-click context orders and
+  attack-move, right-drag and WASD panning, queued waypoints, zoom, select-all,
+  regiment cycling, control groups, pause and speed.
+- Minimal UI: status strip, regiment roster, command row, transient alerts, and
+  a dismissible opening brief. No Marshal panel of any kind.
 - Twenty-one WebMCP tools with strict schemas and runtime validation, registered
   through `document.modelContext` with abort-signal cleanup.
 - Plan Mode: draft, revise, execute and cancel, drawn over the battlefield as
   numbered arrows. Drafting is proven inert by test.
 - Conditional orders over a closed nine-trigger vocabulary, armed either
   directly or as gated plan steps.
-- 58 tests passing across simulation, determinism, performance, tactics, fog,
-  the objective, the tool surface, and Plan Mode. Typecheck and production build
-  clean.
+- Tests passing across simulation, scenarios, difficulty, determinism,
+  performance, tactics, envelopment and pursuit, morale, battle tempo, fog, the
+  objective, the tool surface, and Plan Mode. Typecheck and production build clean.
 
 # Intentionally Limited
 
-- One scenario and one deterministic enemy; no campaign, multiplayer, base
-  building, technology tree, or procedural maps.
+- Three authored scenarios on one map and three deterministic enemy presets; no
+  campaign, multiplayer, base building, technology tree, or procedural maps.
 - Navigation is group-level steering. Soldiers do not avoid one another and
-  formations may interpenetrate in a melee.
+  formations may interpenetrate in a melee. Formations block each other at the
+  group level, through the pinning term, rather than by per-soldier collision.
 - Forest, hills and the village modify combat and morale but do not block movement.
 - Reinforcements are timed waves, not an economy.
 
 # Not Yet Verified
 
-- The end-to-end run inside a real WebMCP client. The tool surface is covered by
-  tests against the handlers, and registration is tested against a stub
-  `modelContext`, but no session in Chrome with the WebMCP flag or in ChatGPT's
-  in-app browser has been performed from this environment.
-- Visual QA in a browser. The renderer has not been seen running; there is no
-  browser automation available here.
+- Chrome reports all 21 WebMCP tools registered and the handler surface is
+  covered in node, but a complete external model-driven battle session has not
+  yet been performed.
+- Battle length and difficulty feel are now measured by a scripted aggressive
+  player across all three operations rather than by hand, but no human has
+  played a full battle at 1x since the retune.
 
 # Next Recommended Task
 
-- Open the page in Chrome with `chrome://flags/#enable-webmcp-testing` and walk
-  the acceptance list in the README, then tune the escalation timeline against
-  how the battle actually feels at 1x speed.
+- Play a full battle at 1x since the contact pass. Envelopment and pinning are
+  measured in isolation and the scripted battle-tempo tests still reach a
+  decision, but nobody has yet fought a battle where the plan is to surround
+  something, and the new terms are strong enough that the enemy AI may need to
+  learn to answer them.
+- Run one complete model-driven WebMCP session end to end. The tool surface is
+  covered in node and Chrome reports all 21 tools registered, but no external
+  model has fought a whole battle through it yet.
+- A player who issues no orders at all still does not reach a decision inside
+  thirty minutes: he holds his line, the enemy bleeds down to about half, and
+  nothing closes it out. That is a defensible reading of "you are a spectator if
+  you spectate", but it is worth a deliberate decision rather than a default.

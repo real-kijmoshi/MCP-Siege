@@ -1,0 +1,820 @@
+/*
+ * War Council composition.
+ *
+ * This file intentionally owns the lobby as a separate game screen. The battle
+ * UI remains in main.css; no dashboard grids or metric cards cross this boundary.
+ */
+
+.lobby {
+  --council-ink: #0d1510;
+  --council-ivory: #dedbca;
+  --council-muted: #9b9f8e;
+  --council-gold: #b99a50;
+  --council-blue: #567f9a;
+  --council-red: #8d4c43;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-rows: 78px 1fr;
+  overflow: hidden;
+  background: var(--council-ink);
+  color: var(--council-ivory);
+  font-family: Georgia, 'Times New Roman', serif;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.lobby[hidden] {
+  display: none;
+}
+
+.lobby.departing {
+  opacity: 0;
+  transform: scale(1.01);
+}
+
+.lobby::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image: url('/assets/river-vale-command-map.png');
+  background-size: cover;
+  filter: grayscale(1) contrast(1.2);
+}
+
+.lobby::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 190px 90px #080c09;
+}
+
+.lobby-header {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(1660px, calc(100% - 96px));
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+}
+
+.lobby-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: rgba(185, 154, 80, 0.24);
+}
+
+.lobby-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.lobby-brand .crown-mark {
+  color: var(--council-gold);
+  font-size: 27px;
+}
+
+.lobby-brand div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.lobby-brand strong {
+  color: #ece8d9;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 20px;
+  letter-spacing: 0.22em;
+}
+
+.lobby-brand small {
+  margin-top: 7px;
+  color: #8d917f;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+}
+
+.lobby-header > p {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  color: #a3a696;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+}
+
+.lobby-header > p i {
+  width: 22px;
+  height: 1px;
+  background: var(--council-gold);
+  opacity: 0.65;
+}
+
+.campaign-table {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(380px, 34%) minmax(0, 66%);
+  width: min(1660px, calc(100% - 96px));
+  min-height: 0;
+  margin: 0 auto;
+  padding: 34px 0 38px;
+  gap: clamp(42px, 4vw, 74px);
+}
+
+.mission-ledger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* The ledger is a scroll container, so it must be allowed to be shorter than
+     its seven operations rather than pushing the council off the screen. */
+  min-height: 0;
+  padding-bottom: 30px;
+}
+
+.mission-ledger h1 {
+  margin: 0 0 34px;
+  color: #e6e1d0;
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.scenario-list {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 11px;
+  min-height: 0;
+  margin: 0;
+  padding-right: 8px;
+  border: 0;
+  /* Seven operations no longer fit the column, so the ledger scrolls. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(150, 140, 110, 0.45) transparent;
+}
+
+.scenario-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scenario-list::-webkit-scrollbar-thumb {
+  background: rgba(150, 140, 110, 0.45);
+}
+
+.mission-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px 1fr auto 34px;
+  align-items: center;
+  min-height: 112px;
+  width: 100%;
+  padding: 16px 10px 16px 24px;
+  overflow: visible;
+  color: #a2a594;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.mission-entry::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 21px;
+  bottom: 21px;
+  width: 1px;
+  background: #4b4b3d;
+  transition: width 0.18s ease, background 0.18s ease;
+}
+
+.mission-entry::after {
+  content: '';
+  position: absolute;
+  inset: 4px -12px;
+  z-index: -1;
+  opacity: 0;
+  background: rgba(114, 97, 51, 0.12);
+  box-shadow: 0 0 55px 12px rgba(110, 91, 43, 0.07);
+  transition: opacity 0.18s ease;
+}
+
+.mission-entry:hover {
+  color: #c5c4b5;
+  transform: translateX(3px);
+}
+
+.mission-entry.selected::before {
+  width: 3px;
+  background: var(--council-gold);
+}
+
+.mission-entry.selected::after {
+  opacity: 1;
+}
+
+.mission-number {
+  align-self: start;
+  padding-top: 7px;
+  color: #747766;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+}
+
+.mission-name {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.mission-name strong {
+  color: #c9c8b8;
+  font-size: 19px;
+  font-weight: 400;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  transition: color 0.18s ease, font-size 0.18s ease;
+}
+
+.mission-name small {
+  color: #8e9281;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.mission-pressure {
+  color: #8e8f7d;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mission-seal {
+  color: #6e705e;
+  font-size: 19px;
+  font-style: normal;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.mission-entry.selected .mission-name strong {
+  color: #eee8d5;
+  font-size: 22px;
+}
+
+.mission-entry.selected .mission-number,
+.mission-entry.selected .mission-pressure,
+.mission-entry.selected .mission-seal {
+  color: #c7aa61;
+}
+
+.mission-entry.selected .mission-seal {
+  opacity: 0.9;
+  transform: scale(1);
+}
+
+.battle-preview {
+  display: grid;
+  /*
+   * The battle order takes the height it needs and the portrait absorbs what is
+   * left. Fixed percentage tracks pushed DEPLOY ARMY — the one commitment on
+   * this screen — below the fold on a short window.
+   */
+  grid-template-rows: minmax(220px, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.battlefield-portrait {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background-image: url('/assets/river-vale-command-map.png');
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.35);
+}
+
+.map-shade {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 13, 8, 0.12);
+  box-shadow: inset 0 0 90px 22px rgba(3, 8, 4, 0.52);
+}
+
+.map-caption {
+  position: absolute;
+  left: 24px;
+  top: 20px;
+  color: rgba(228, 220, 190, 0.74);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-shadow: 0 1px 3px #000;
+}
+
+.map-host {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  gap: 7px;
+  transform-origin: center;
+  padding: 10px 12px 8px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: rgba(7, 12, 9, 0.48);
+  box-shadow: 0 0 0 1px rgba(7, 12, 9, 0.5), 0 8px 18px rgba(0, 0, 0, 0.28);
+}
+
+.map-host::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border: 1px dashed currentColor;
+  border-radius: 50%;
+  opacity: 0.42;
+}
+
+.map-host::after {
+  position: absolute;
+  left: 0;
+  top: -23px;
+  color: currentColor;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px #000;
+}
+
+.crown-host::after { content: 'CROWN SPAWN'; }
+.ashen-host::after { content: 'ASHEN LINE'; }
+
+.map-host i {
+  display: block;
+  width: 34px;
+  height: 9px;
+  background: currentColor;
+  border: 1px solid rgba(238, 231, 207, 0.3);
+  box-shadow: 0 8px 0 -3px currentColor, 0 15px 0 -5px currentColor;
+}
+
+.crown-host {
+  color: var(--council-blue);
+}
+
+.ashen-host {
+  color: var(--council-red);
+}
+
+.crown-host.host-one { left: 27%; top: 74%; transform: rotate(-4deg); }
+.crown-host.host-two { left: 58%; top: 78%; transform: rotate(3deg); }
+.ashen-host.host-one { left: 31%; top: 20%; transform: rotate(3deg); }
+.ashen-host.host-two { left: 65%; top: 24%; transform: rotate(-4deg); }
+
+.battle-standard {
+  position: absolute;
+  z-index: 5;
+  width: 2px;
+  height: 36px;
+  background: #766f54;
+}
+
+.battle-standard i {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 24px;
+  height: 14px;
+  clip-path: polygon(0 0, 100% 15%, 72% 50%, 100% 88%, 0 100%);
+}
+
+.crown-standard { left: 22%; top: 68%; }
+.crown-standard i { background: #6d97b2; }
+.ashen-standard { right: 20%; top: 16%; }
+.ashen-standard i { background: #9b5147; }
+
+.map-objective-ring {
+  position: absolute;
+  z-index: 4;
+  left: 46%;
+  top: 7%;
+  display: grid;
+  place-items: center;
+  width: 82px;
+  height: 58px;
+  color: #d1b25d;
+  border: 1px dashed rgba(209, 178, 93, 0.7);
+  border-radius: 50%;
+  font-size: 20px;
+  text-shadow: 0 1px 4px #000;
+  background: rgba(18, 15, 7, 0.32);
+  box-shadow: 0 0 0 7px rgba(209, 178, 93, 0.06), 0 0 24px rgba(209, 178, 93, 0.22);
+  animation: objective-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes objective-pulse {
+  0%, 100% { box-shadow: 0 0 0 7px rgba(209, 178, 93, 0.06), 0 0 24px rgba(209, 178, 93, 0.18); }
+  50% { box-shadow: 0 0 0 13px rgba(209, 178, 93, 0.02), 0 0 34px rgba(209, 178, 93, 0.34); }
+}
+
+.map-key {
+  position: absolute;
+  z-index: 6;
+  left: 24px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 10px;
+  color: rgba(224, 220, 198, 0.78);
+  background: rgba(5, 10, 7, 0.62);
+  border: 1px solid rgba(218, 204, 158, 0.2);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.map-key span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.key-swatch { width: 14px; height: 5px; display: inline-block; }
+.key-crown { background: var(--council-blue); }
+.key-ashen { background: var(--council-red); }
+.key-ring { width: 10px; height: 10px; border: 1px dashed var(--council-gold); border-radius: 50%; }
+
+.march-arrow {
+  position: absolute;
+  z-index: 4;
+  width: 170px;
+  border-top: 3px solid rgba(146, 72, 63, 0.78);
+  transform-origin: left center;
+  filter: drop-shadow(0 1px 2px #000);
+}
+
+.march-arrow::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: -8px;
+  border-left: 14px solid rgba(146, 72, 63, 0.9);
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+}
+
+.march-one { left: 39%; top: 30%; transform: rotate(65deg); }
+.march-two { left: 70%; top: 34%; transform: rotate(116deg); }
+
+.lobby[data-scenario='broken_bridgehead'] .crown-host.host-one { left: 31%; top: 46%; }
+.lobby[data-scenario='broken_bridgehead'] .crown-host.host-two { left: 56%; top: 48%; }
+.lobby[data-scenario='broken_bridgehead'] .march-one { left: 32%; top: 35%; transform: rotate(35deg); }
+.lobby[data-scenario='broken_bridgehead'] .march-two { left: 69%; top: 38%; transform: rotate(145deg); }
+
+.lobby[data-scenario='last_light'] .crown-host.host-one { left: 37%; top: 78%; transform: rotate(0); }
+.lobby[data-scenario='last_light'] .crown-host.host-two { left: 55%; top: 80%; transform: rotate(0); }
+.lobby[data-scenario='last_light'] .ashen-host.host-one { left: 24%; top: 43%; transform: rotate(12deg); }
+.lobby[data-scenario='last_light'] .ashen-host.host-two { left: 67%; top: 46%; transform: rotate(-12deg); }
+.lobby[data-scenario='last_light'] .march-one { left: 30%; top: 51%; transform: rotate(35deg); }
+.lobby[data-scenario='last_light'] .march-two { left: 72%; top: 53%; transform: rotate(145deg); }
+.lobby[data-scenario='last_light'] .map-objective-ring { left: 47%; top: 73%; }
+.lobby[data-scenario='last_light'] .crown-standard { left: 50%; top: 71%; }
+
+/*
+ * One command-map plate, four battlefields.
+ *
+ * There is a single illustrated portrait, so each ground is separated by
+ * treatment rather than by new art: ash country runs hot and desaturated, the
+ * harvest plain runs gold, the drowned coast runs cold and blue. It reads as a
+ * different place at a glance, which is all the ledger needs it to do.
+ */
+.lobby[data-map='ashfall_pass'] .battlefield-portrait {
+  filter: saturate(0.42) sepia(0.35) hue-rotate(-18deg) brightness(0.82) contrast(1.12);
+}
+
+.lobby[data-map='ashfall_pass'] .map-shade {
+  background: rgba(28, 12, 6, 0.32);
+}
+
+.lobby[data-map='goldmere'] .battlefield-portrait {
+  filter: saturate(1.15) sepia(0.22) hue-rotate(-12deg) brightness(1.04);
+}
+
+.lobby[data-map='goldmere'] .map-shade {
+  background: rgba(26, 20, 5, 0.2);
+}
+
+.lobby[data-map='sunken_causeway'] .battlefield-portrait {
+  filter: saturate(0.72) hue-rotate(22deg) brightness(0.92) contrast(1.06);
+}
+
+.lobby[data-map='sunken_causeway'] .map-shade {
+  background: rgba(4, 14, 20, 0.34);
+}
+
+/* Cinder Road: the army is below the spine, in two columns aimed at two gaps. */
+.lobby[data-scenario='cinder_road'] .crown-host.host-one { left: 21%; top: 76%; transform: rotate(0); }
+.lobby[data-scenario='cinder_road'] .crown-host.host-two { left: 63%; top: 78%; transform: rotate(0); }
+.lobby[data-scenario='cinder_road'] .ashen-host.host-one { left: 22%; top: 34%; transform: rotate(0); }
+.lobby[data-scenario='cinder_road'] .ashen-host.host-two { left: 63%; top: 36%; transform: rotate(0); }
+.lobby[data-scenario='cinder_road'] .march-one { left: 26%; top: 70%; transform: rotate(-104deg); }
+.lobby[data-scenario='cinder_road'] .march-two { left: 68%; top: 72%; transform: rotate(-100deg); }
+.lobby[data-scenario='cinder_road'] .crown-standard { left: 46%; top: 84%; }
+
+/* The Ashen Gate: everything is across, and the counterattack comes downhill. */
+.lobby[data-scenario='ashen_gate'] .crown-host.host-one { left: 61%; top: 36%; transform: rotate(0); }
+.lobby[data-scenario='ashen_gate'] .crown-host.host-two { left: 68%; top: 28%; transform: rotate(0); }
+.lobby[data-scenario='ashen_gate'] .ashen-host.host-one { left: 34%; top: 16%; transform: rotate(6deg); }
+.lobby[data-scenario='ashen_gate'] .ashen-host.host-two { left: 52%; top: 12%; transform: rotate(-6deg); }
+.lobby[data-scenario='ashen_gate'] .march-one { left: 40%; top: 22%; transform: rotate(20deg); }
+.lobby[data-scenario='ashen_gate'] .march-two { left: 58%; top: 18%; transform: rotate(58deg); }
+.lobby[data-scenario='ashen_gate'] .map-objective-ring { left: 60%; top: 30%; }
+.lobby[data-scenario='ashen_gate'] .crown-standard { left: 64%; top: 24%; }
+
+/* Goldmere: two lines facing each other, and two wide rides round the outside. */
+.lobby[data-scenario='goldmere_fields'] .crown-host.host-one { left: 30%; top: 70%; transform: rotate(0); }
+.lobby[data-scenario='goldmere_fields'] .crown-host.host-two { left: 56%; top: 70%; transform: rotate(0); }
+.lobby[data-scenario='goldmere_fields'] .ashen-host.host-one { left: 30%; top: 30%; transform: rotate(0); }
+.lobby[data-scenario='goldmere_fields'] .ashen-host.host-two { left: 56%; top: 30%; transform: rotate(0); }
+.lobby[data-scenario='goldmere_fields'] .march-one { left: 18%; top: 38%; transform: rotate(72deg); }
+.lobby[data-scenario='goldmere_fields'] .march-two { left: 84%; top: 40%; transform: rotate(108deg); }
+
+/* The Long Causeway: the channel runs corner to corner, so the armies do too. */
+.lobby[data-scenario='the_long_causeway'] .crown-host.host-one { left: 22%; top: 78%; transform: rotate(-14deg); }
+.lobby[data-scenario='the_long_causeway'] .crown-host.host-two { left: 62%; top: 62%; transform: rotate(-14deg); }
+.lobby[data-scenario='the_long_causeway'] .ashen-host.host-one { left: 24%; top: 36%; transform: rotate(-14deg); }
+.lobby[data-scenario='the_long_causeway'] .ashen-host.host-two { left: 66%; top: 20%; transform: rotate(-14deg); }
+.lobby[data-scenario='the_long_causeway'] .march-one { left: 30%; top: 68%; transform: rotate(-72deg); }
+.lobby[data-scenario='the_long_causeway'] .march-two { left: 72%; top: 54%; transform: rotate(-76deg); }
+.lobby[data-scenario='the_long_causeway'] .map-objective-ring { left: 62%; top: 10%; }
+.lobby[data-scenario='the_long_causeway'] .ashen-standard { right: 28%; top: 12%; }
+
+.battle-order {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: clamp(34px, 4vw, 68px);
+  padding: 28px 12px 0 0;
+}
+
+.order-copy h2 {
+  margin: 0;
+  color: #e9e4d3;
+  font-size: 38px;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+.order-copy > p {
+  max-width: 700px;
+  margin-top: 10px;
+  color: #b0b2a3;
+  font-family: system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.ground-note {
+  max-width: 700px;
+  margin-top: 12px;
+  color: #8f9a86;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  line-height: 1.6;
+}
+
+.primary-orders {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 18px;
+  padding-left: 15px;
+  border-left: 2px solid var(--council-gold);
+}
+
+.primary-orders strong {
+  color: #d7d1bd;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.battle-facts {
+  display: flex;
+  gap: 17px;
+  margin-top: 16px;
+  color: #aaa994;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.battle-facts span + span::before {
+  content: '·';
+  margin-right: 17px;
+  color: #706b55;
+}
+
+.commit-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 18px;
+  min-width: 0;
+}
+
+.commander-setting {
+  width: 100%;
+  color: #a3a595;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.commander-setting > span {
+  display: block;
+  margin-bottom: 10px;
+  color: #b7b8a7;
+}
+
+.difficulty-list {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  border: 0;
+}
+
+.commander-choice {
+  position: relative;
+  padding: 6px 10px;
+  color: #898c7d;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.commander-choice + .commander-choice::before {
+  content: '·';
+  position: absolute;
+  left: -4px;
+  color: #555648;
+}
+
+.commander-choice:hover {
+  color: #d0cebc;
+}
+
+.commander-choice.selected {
+  color: #e0d4ad;
+}
+
+.commander-choice.selected::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  bottom: 1px;
+  height: 1px;
+  background: var(--council-gold);
+}
+
+.commander-setting p {
+  min-height: 38px;
+  margin-top: 9px;
+  color: #858879;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.deploy-button {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: auto;
+  min-height: 0;
+  padding: 14px 4px 10px 18px;
+  color: #dfcc91;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid var(--council-gold);
+  cursor: pointer;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  transition: color 0.18s ease, padding-right 0.18s ease;
+  margin-top: 4px;
+}
+
+.deploy-button:hover {
+  padding-right: 10px;
+  color: #f2e2ac;
+  background: transparent;
+  filter: none;
+}
+
+.deploy-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.deploy-button span {
+  color: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+}
+
+.deploy-button i {
+  color: inherit;
+  font-family: inherit;
+  font-size: 22px;
+  font-style: normal;
+  opacity: 1;
+}
+
+@media (max-width: 1400px), (max-height: 820px) {
+  .lobby { grid-template-rows: 66px 1fr; }
+  .lobby-header, .campaign-table { width: calc(100% - 64px); }
+  .campaign-table { grid-template-columns: minmax(330px, 34%) minmax(0, 66%); padding: 22px 0 26px; gap: 40px; }
+  .mission-ledger h1 { margin-bottom: 18px; font-size: 26px; }
+  .scenario-list { gap: 8px; }
+  .mission-entry { min-height: 88px; }
+  .mission-name strong { font-size: 17px; }
+  .mission-entry.selected .mission-name strong { font-size: 20px; }
+  .battle-preview { grid-template-rows: minmax(350px, 60%) minmax(225px, 40%); }
+  .battle-order { grid-template-columns: minmax(0, 1fr) 285px; gap: 30px; padding-top: 20px; }
+  .order-copy h2 { font-size: 32px; }
+  .order-copy > p { font-size: 14px; }
+  .primary-orders { margin-top: 12px; }
+  .primary-orders strong { font-size: 12px; }
+  .battle-facts { margin-top: 12px; font-size: 11px; }
+  .commander-setting p { font-size: 12px; }
+  .deploy-button span { font-size: 14px; }
+}
+
+/* A 1366×768 laptop is still a desktop battlefield. Keep the commitment and
+ * all seven operations reachable instead of clipping them below a fixed page. */
+@media (max-height: 820px) {
+  .lobby { grid-template-rows: 58px minmax(0, 1fr); }
+  .lobby-header, .campaign-table { width: calc(100% - 48px); }
+  .campaign-table {
+    height: calc(100vh - 58px);
+    min-height: 0;
+    padding: 12px 0 14px;
+    gap: 28px;
+  }
+  .mission-ledger {
+    align-self: stretch;
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    padding-bottom: 0;
+  }
+  .mission-ledger h1 { flex: 0 0 auto; margin-bottom: 8px; font-size: 23px; }
+  .scenario-list { flex: 1 1 auto; min-height: 0; gap: 1px; }
+  .mission-entry { min-height: 68px; padding: 8px 8px 8px 18px; }
+  .mission-entry::before { top: 10px; bottom: 10px; }
+  .mission-name { gap: 4px; }
+  .mission-name strong,
+  .mission-entry.selected .mission-name strong { font-size: 16px; }
+  .mission-name small { font-size: 12px; }
+  .battle-preview { grid-template-rows: minmax(285px, 1fr) 210px; }
+  .battle-order { grid-template-columns: minmax(0, 1fr) 260px; gap: 24px; padding-top: 12px; }
+  .order-copy h2 { font-size: 27px; }
+  .order-copy > p { margin-top: 5px; font-size: 12px; line-height: 1.35; }
+  .ground-note { margin-top: 5px; font-size: 10px; line-height: 1.35; }
+  .primary-orders { gap: 2px; margin-top: 8px; }
+  .primary-orders strong { font-size: 10px; }
+  .battle-facts { gap: 10px; margin-top: 8px; font-size: 9px; }
+  .battle-facts span + span::before { margin-right: 10px; }
+  .commander-setting > span { margin-bottom: 5px; }
+  .commander-setting p { min-height: 28px; margin-top: 5px; font-size: 10px; }
+  .commander-choice { padding: 5px 8px; font-size: 10px; }
+  .deploy-button { padding-top: 8px; padding-bottom: 7px; }
+  .deploy-button span { font-size: 12px; }
+}

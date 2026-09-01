@@ -20,6 +20,9 @@ export class UnitPool {
   public readonly category: Uint8Array;
   public readonly x: Float32Array;
   public readonly y: Float32Array;
+  /** Persistent velocity gives charges momentum and makes steering physical. */
+  public readonly velocityX: Float32Array;
+  public readonly velocityY: Float32Array;
   /** Assigned formation slot in world space. */
   public readonly slotX: Float32Array;
   public readonly slotY: Float32Array;
@@ -39,6 +42,8 @@ export class UnitPool {
     this.category = new Uint8Array(capacity);
     this.x = new Float32Array(capacity);
     this.y = new Float32Array(capacity);
+    this.velocityX = new Float32Array(capacity);
+    this.velocityY = new Float32Array(capacity);
     this.slotX = new Float32Array(capacity);
     this.slotY = new Float32Array(capacity);
     this.hp = new Float32Array(capacity);
@@ -63,11 +68,15 @@ export class UnitPool {
     this.category[index] = categoryIndex(category);
     this.x[index] = x;
     this.y[index] = y;
+    this.velocityX[index] = 0;
+    this.velocityY[index] = 0;
     this.slotX[index] = x;
     this.slotY[index] = y;
     this.hp[index] = UNIT_STATS[category].maxHitPoints;
     this.cooldown[index] = 0;
     this.targetIdx[index] = -1;
+    this.velocityX[index] = 0;
+    this.velocityY[index] = 0;
     this.alive[index] = 1;
     return index;
   }
@@ -116,6 +125,8 @@ export class UnitPool {
       mix(this.category[index] ?? 0);
       mix(Math.round((this.x[index] ?? 0) * 16));
       mix(Math.round((this.y[index] ?? 0) * 16));
+      mix(Math.round((this.velocityX[index] ?? 0) * 64));
+      mix(Math.round((this.velocityY[index] ?? 0) * 64));
       mix(Math.round((this.hp[index] ?? 0) * 16));
       mix(Math.round(this.cooldown[index] ?? 0));
     }

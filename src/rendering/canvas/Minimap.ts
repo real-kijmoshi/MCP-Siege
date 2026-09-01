@@ -1,7 +1,15 @@
 import { FOG_COLUMNS, FOG_ROWS, MAP_HEIGHT, MAP_WIDTH } from '../../game/config/battle';
 import { activeGroups, type GameState } from '../../game/simulation/GameState';
 import { visibilityAt } from '../../game/simulation/Visibility';
-import { CROSSINGS, RIVER_HALF_WIDTH, riverCenterY } from '../../game/simulation/Zones';
+import {
+  activeBattleMap,
+  activeCrossings,
+  activeZones,
+  barrierCenterAt,
+  barrierHalfWidth,
+  useBattleMap,
+  type TerrainKind,
+} from '../../game/simulation/Zones';
 import type { Camera } from './Camera';
 import { PALETTE } from './palette';
 
@@ -11,6 +19,13 @@ import { PALETTE } from './palette';
  * Draws groups as blobs rather than units, refreshes at a low rate, and doubles
  * as the fastest way to move the camera across a battlefield this large.
  */
+
+/** Ground worth marking at this size. Open country is the background already. */
+const MINIMAP_TERRAIN: Partial<Record<TerrainKind, string>> = {
+  forest: PALETTE.forest,
+  hill: PALETTE.hill,
+  village: PALETTE.village,
+};
 export class Minimap {
   private readonly context: CanvasRenderingContext2D;
   private readonly fogBuffer: HTMLCanvasElement;
@@ -53,6 +68,7 @@ export class Minimap {
     // Five refreshes a second is plenty for an overview at this size.
     if (state.currentTick - this.lastDrawTick < 4) return;
     this.lastDrawTick = state.currentTick;
+    useBattleMap(state.mapId);
 
     const context = this.context;
     const width = this.canvas.width;
@@ -64,28 +80,68 @@ export class Minimap {
     context.fillStyle = PALETTE.grass;
     context.fillRect(0, 0, width, height);
 
-    // River.
-    context.fillStyle = PALETTE.river;
-    context.beginPath();
-    context.moveTo(0, (riverCenterY(0) - RIVER_HALF_WIDTH) * scaleY);
-    for (let x = 0; x <= MAP_WIDTH; x += 200) {
-      context.lineTo(x * scaleX, (riverCenterY(x) - RIVER_HALF_WIDTH) * scaleY);
-    }
-    for (let x = MAP_WIDTH; x >= 0; x -= 200) {
-      context.lineTo(x * scaleX, (riverCenterY(x) + RIVER_HALF_WIDTH) * scaleY);
-    }
-    context.closePath();
-    context.fill();
-
-    context.fillStyle = PALETTE.crossing;
-    for (const crossing of CROSSINGS) {
-      const centerY = riverCenterY(crossing.center.x);
-      context.fillRect(
-        (crossing.center.x - crossing.radius * 0.62) * scaleX,
-        (centerY - RIVER_HALF_WIDTH) * scaleY,
-        crossing.radius * 1.24 * scaleX,
-        RIVER_HALF_WIDTH * 2 * scaleY,
+    // Terrain. Now that the veil is translucent the minimap is something a
+    // plan can be read off, so the ground that actually changes a fight —
+    // woods, high ground, the village — has to be on it.
+    for (const zone of activeZones()) {
+      const fill = MINIMAP_TERRAIN[zone.terrain];
+      if (fill === undefined) continue;
+      context.fillStyle = fill;
+      context.beginPath();
+      context.ellipse(
+        zone.center.x * scaleX,
+        zone.center.y * scaleY,
+        zone.radius * scaleX,
+        zone.radius * scaleY,
+        0,
+        0,
+        Math.PI * 2,
       );
+      context.fill();
+    }
+
+    // Standing water off the barrier.
+    context.fillStyle = PALETTE.river;
+    for (const mere of activeBattleMap().meres) {
+      context.beginPath();
+      context.ellipse(
+        mere.center.x * scaleX,
+        mere.center.y * scaleY,
+        mere.radius * scaleX,
+        mere.radius * scaleY,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
+
+    // The dividing feature, and the few places it can be passed.
+    const half = barrierHalfWidth();
+    if (half > 0) {
+      const barrierFill = activeBattleMap().barrier?.kind === 'ridge' ? PALETTE.hill : PALETTE.river;
+      context.fillStyle = barrierFill;
+      context.beginPath();
+      context.moveTo(0, (barrierCenterAt(0) - half) * scaleY);
+      for (let x = 0; x <= MAP_WIDTH; x += 200) {
+        context.lineTo(x * scaleX, (barrierCenterAt(x) - half) * scaleY);
+      }
+      for (let x = MAP_WIDTH; x >= 0; x -= 200) {
+        context.lineTo(x * scaleX, (barrierCenterAt(x) + half) * scaleY);
+      }
+      context.closePath();
+      context.fill();
+
+      context.fillStyle = PALETTE.crossing;
+      for (const crossing of activeCrossings()) {
+        const centerY = barrierCenterAt(crossing.center.x);
+        context.fillRect(
+          (crossing.center.x - crossing.radius * 0.62) * scaleX,
+          (centerY - half) * scaleY,
+          crossing.radius * 1.24 * scaleX,
+          half * 2 * scaleY,
+        );
+      }
     }
 
     // Fog.
@@ -94,10 +150,12 @@ export class Minimap {
     for (let index = 0; index < cells.length; index += 1) {
       const offset = index * 4;
       const value = cells[index] ?? 0;
-      data[offset] = 4;
-      data[offset + 1] = 7;
-      data[offset + 2] = 5;
-      data[offset + 3] = value === 0 ? 230 : value === 1 ? 110 : 0;
+      data[offset] = 9;
+      data[offset + 1] = 13;
+      data[offset + 2] = 16;
+      // Matches the battlefield veil: the minimap is for planning, and a plan
+      // needs the ground it will be executed on to be visible.
+      data[offset + 3] = value === 0 ? 150 : value === 1 ? 72 : 0;
     }
     this.fogContext.putImageData(this.fogImage, 0, 0);
     context.imageSmoothingEnabled = true;

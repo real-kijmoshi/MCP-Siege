@@ -1,3 +1,10 @@
 /*
   Origin-Agent-Cluster: ?1
-  Permissions-Policy: tools=(self)
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), tools=(self)
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+
+/assets/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800

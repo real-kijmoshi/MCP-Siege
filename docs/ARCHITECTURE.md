@@ -90,8 +90,12 @@ and is bound by its own fog.
 
 ## Known boundaries
 
-- Navigation is group-level over a thirteen-node zone graph. Soldiers steer
-  toward slots and do not path individually or avoid each other.
-- The river is the only hard obstacle; forests and hills modify combat and
-  morale but do not block movement.
+- Navigation is group-level over the active map's thirteen-node zone graph.
+  Soldiers steer toward slots and do not path individually or avoid each other.
+- A map's barrier — river, ridge or channel — and its standing water are the
+  only hard obstacles; forests, hills and villages modify combat and morale but
+  do not block movement.
+- Geography is read from the map a battle is being fought on, cached in
+  `simulation/Zones.ts` and re-established from `GameState.mapId` before every
+  tick, every dispatch and every query. Nothing else may write it.
 - Reinforcements are a manpower counter and timed waves, not an economy.

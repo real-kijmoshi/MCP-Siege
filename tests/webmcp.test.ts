@@ -72,6 +72,15 @@ describe('reads', () => {
     const data = unwrap(tools.getBattleOverview());
     expect(data.playerUnits).toBeGreaterThan(3000);
     expect(data.fronts).toBeTruthy();
+    expect(data.operation).toEqual({
+      id: 'riverwatch',
+      name: 'Riverwatch',
+      briefing: 'Break the northern line, then take the Ashen King.',
+      difficulty: 'Captain',
+    });
+    expect(data.attention).toEqual(expect.arrayContaining([expect.stringContaining('No enemy')]));
+    expect(data.nextActions).toEqual(expect.arrayContaining([expect.stringContaining('get_armies')]));
+    expect(Object.values(data.fronts as Record<string, string>)).not.toContain('player_advantage');
     expect(JSON.stringify(data).length).toBeLessThan(2000);
   });
 
@@ -142,6 +151,28 @@ describe('commands', () => {
     const group = activeGroups(engine.getState(), 'player').find((g) => g.id === 'cavalry_i');
     expect(group?.order.kind).toBe('move');
     expect(group?.path.length).toBeGreaterThan(0);
+  });
+
+  it('rejects an incomplete order before it reaches the command queue', async () => {
+    expectFailure(
+      await tools.orderGroup({ groupIds: ['legion_i'], order: 'move' }),
+      'INVALID_INPUT',
+    );
+    expect(engine.pendingCommandCount).toBe(0);
+  });
+
+  it('defaults simple plan steps to immediate execution with a readable note', async () => {
+    const started = tools.createPlan({
+      name: 'Open the centre',
+      steps: [{ groupId: 'legion_i', action: 'move', targetZone: 'central_bridge' }],
+    });
+    const data = unwrap(await call(started));
+    expect(data.planId).toBeTruthy();
+    const plan = unwrap(tools.getPlan()).plan as {
+      steps: Array<{ trigger: string; note: string }>;
+    };
+    expect(plan.steps[0]?.trigger.toLowerCase()).toContain('immediate');
+    expect(plan.steps[0]?.note).toBe('move');
   });
 
   it('rejects an unknown zone name', async () => {

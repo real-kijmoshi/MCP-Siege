@@ -1,10 +1,19 @@
-import { FORMATION_PROFILES, OBJECTIVE, TICKS_PER_SECOND, UNIT_STATS } from '../config/battle';
+import {
+  CONTACT,
+  FORMATION_PROFILES,
+  OBJECTIVE,
+  TICKS_PER_SECOND,
+  UNIT_STATS,
+} from '../config/battle';
+import { DIFFICULTIES } from '../config/matches';
+import { SCENARIOS } from '../config/scenario';
 import { describeCondition } from '../simulation/Conditions';
 import { activeGroups, findGroup, type GameState } from '../simulation/GameState';
-import { ORDERED_ZONES, ZONES, zoneAt } from '../simulation/Zones';
+import { ZONES, activeZones, useBattleMap, zoneAt } from '../simulation/Zones';
 import { visibilityAt } from '../simulation/Visibility';
 import {
   FRONTS,
+  UNIT_CATEGORIES,
   opponentOf,
   type ArmyGroup,
   type BattleOutcome,
@@ -41,6 +50,8 @@ export type FrontStatus =
   | 'enemy_advantage'
   | 'heavy_engagement'
   | 'contested'
+  | 'no_contact'
+  | 'unobserved'
   | 'quiet';
 
 export interface ArmySummary {
@@ -53,10 +64,36 @@ export interface ArmySummary {
   morale: number;
   moraleState: MoraleState;
   activity: string;
+  orderKind: string;
+  targetZone?: ZoneId;
+  targetGroupId?: string;
   zone: ZoneId;
   zoneName: string;
   front: Front;
   composition: Record<string, number>;
+  /**
+   * The troop type most of these men carry.
+   *
+   * The counter matrix decides most fights, so "is that regiment spears or
+   * bows" is the single most load-bearing fact about it. Reporting it up front
+   * lets the roster label it and the Marshal weigh a matchup without having to
+   * unpick the composition map first.
+   */
+  primaryRole: UnitCategory;
+  /** True while this group has taken casualties in the last few seconds. */
+  engaged: boolean;
+  /**
+   * True when the attack is coming from more quarters than a formation can
+   * face at once. Being surrounded is now the fastest way a regiment is
+   * destroyed, so a commander who cannot see it happening cannot answer it.
+   */
+  surrounded: boolean;
+  /**
+   * True when the group is held in contact and can no longer march off. Read
+   * one way it is a warning; read the other it is confirmation that a blocking
+   * position is doing its job.
+   */
+  pinned: boolean;
 }
 
 export interface ArmyDetails extends ArmySummary {
@@ -99,6 +136,19 @@ export interface BattleOverview {
   reinforcementsReady: number;
   planStatus: string;
   objective: ObjectiveSummary;
+  intelligence: {
+    visibleEnemyGroups: number;
+    rememberedEnemyGroups: number;
+    note: string;
+  };
+  attention: string[];
+  nextActions: string[];
+  operation: {
+    id: string;
+    name: string;
+    briefing: string;
+    difficulty: string;
+  };
 }
 
 export type KingStatus = 'safe' | 'threatened' | 'besieged' | 'captured';
@@ -170,7 +220,15 @@ export interface ZoneReport {
 }
 
 export interface ActiveOrdersReport {
-  groups: Array<{ groupId: string; name: string; order: string; secondsAgo: number }>;
+  groups: Array<{
+    groupId: string;
+    name: string;
+    order: string;
+    orderKind: string;
+    targetZone?: ZoneId;
+    targetGroupId?: string;
+    secondsAgo: number;
+  }>;
   conditionalOrders: Array<{
     id: string;
     groupId: string;
@@ -200,12 +258,35 @@ export interface PlanReport {
 
 /* -------------------------------------------------------------------- utils */
 
+/** How long after a casualty a group still reads as "in contact". */
+const ENGAGED_TICKS = TICKS_PER_SECOND * 3;
+
 function strengthOf(state: GameState, group: ArmyGroup): number {
   let total = 0;
   for (const index of group.members) {
     total += UNIT_STATS[state.units.categoryOf(index)].strengthValue;
   }
   return Math.round(total);
+}
+
+/** The category the largest share of a group's men belong to. */
+function primaryRoleOf(state: GameState, group: ArmyGroup): UnitCategory {
+  const counts = new Map<UnitCategory, number>();
+  for (const index of group.members) {
+    const category = state.units.categoryOf(index);
+    counts.set(category, (counts.get(category) ?? 0) + 1);
+  }
+  // Canonical order, not map order, so a tie always resolves the same way.
+  let best: UnitCategory = 'infantry';
+  let bestCount = -1;
+  for (const category of UNIT_CATEGORIES) {
+    const count = counts.get(category) ?? 0;
+    if (count > bestCount) {
+      bestCount = count;
+      best = category;
+    }
+  }
+  return best;
 }
 
 function compositionOf(state: GameState, group: ArmyGroup): Record<string, number> {
@@ -250,8 +331,15 @@ function frontOf(group: ArmyGroup): Front {
 export class GameQueries {
   public constructor(private readonly stateProvider: () => GameState) {}
 
+  /**
+   * Every read starts here, and every read starts by pointing the geography at
+   * the map this battle is actually being fought on. Without it a second engine
+   * on a second map could answer a question with the wrong ground.
+   */
   private state(): GameState {
-    return this.stateProvider();
+    const state = this.stateProvider();
+    useBattleMap(state.mapId);
+    return state;
   }
 
   private seconds(ticks: number): number {
@@ -267,7 +355,7 @@ export class GameQueries {
 
   private summarise(state: GameState, group: ArmyGroup): ArmySummary {
     const zone = zoneAt(group.anchor.x, group.anchor.y);
-    return {
+    const summary: ArmySummary = {
       id: group.id,
       name: group.name,
       strength: group.members.length,
@@ -277,11 +365,21 @@ export class GameQueries {
       morale: Math.round(group.morale),
       moraleState: group.moraleState,
       activity: activityOf(group),
+      orderKind: group.order.kind,
       zone,
       zoneName: ZONES[zone].name,
       front: ZONES[zone].front,
       composition: compositionOf(state, group),
+      primaryRole: primaryRoleOf(state, group),
+      engaged:
+        group.lastCasualtyTick >= 0 &&
+        state.currentTick - group.lastCasualtyTick < ENGAGED_TICKS,
+      surrounded: group.encirclement > 0,
+      pinned: !group.routing && group.engagement >= CONTACT.pinEngagement,
     };
+    if (group.order.targetZone !== undefined) summary.targetZone = group.order.targetZone;
+    if (group.order.targetGroupId !== undefined) summary.targetGroupId = group.order.targetGroupId;
+    return summary;
   }
 
   public getArmyDetails(playerId: PlayerId, groupId: string): ArmyDetails {
@@ -378,10 +476,18 @@ export class GameQueries {
         (group) => state.currentTick - group.lastCasualtyTick < TICKS_PER_SECOND * 8,
       );
 
+      const frontZones = activeZones().filter((zone) => zone.front === front);
+      const observed = frontZones.some(
+        (zone) => visibilityAt(state, playerId, zone.center.x, zone.center.y) > 0,
+      );
+
       let status: FrontStatus;
-      if (playerStrength === 0 && enemyKnownStrength === 0) status = 'quiet';
+      if (!observed && frontContacts.length === 0) status = 'unobserved';
+      else if (playerStrength === 0 && enemyKnownStrength === 0) status = 'quiet';
       else if (engaged) status = 'heavy_engagement';
-      else if (enemyKnownStrength === 0) status = 'player_advantage';
+      // No contact is not an advantage. Calling an unseen enemy absent made the
+      // opening overview confidently tell a Marshal that every front was won.
+      else if (enemyKnownStrength === 0) status = 'no_contact';
       else if (playerStrength > enemyKnownStrength * 1.35) status = 'player_advantage';
       else if (enemyKnownStrength > playerStrength * 1.35) status = 'enemy_advantage';
       else status = 'contested';
@@ -395,11 +501,13 @@ export class GameQueries {
         enemyContacts: frontContacts.map(
           (contact) => `${contact.name} (~${contact.estimatedStrength})`,
         ),
-        zones: ORDERED_ZONES.filter((zone) => zone.front === front).map((zone) => ({
-          zone: zone.id,
-          name: zone.name,
-          control: this.describeControl(state, playerId, zone.id),
-        })),
+        zones: activeZones()
+          .filter((zone) => zone.front === front)
+          .map((zone) => ({
+            zone: zone.id,
+            name: zone.name,
+            control: this.describeControl(state, playerId, zone.id),
+          })),
       };
     });
   }
@@ -419,7 +527,7 @@ export class GameQueries {
 
   public getStrategicZones(playerId: PlayerId): ZoneReport[] {
     const state = this.state();
-    return ORDERED_ZONES.map((zone) => ({
+    return activeZones().map((zone) => ({
       id: zone.id,
       name: zone.name,
       terrain: zone.terrain,
@@ -523,14 +631,40 @@ export class GameQueries {
     const playerStrength = groups.reduce((sum, group) => sum + strengthOf(state, group), 0);
     const playerUnits = groups.reduce((sum, group) => sum + group.members.length, 0);
 
-    const enemyVisibleStrength = [...state.contacts[playerId].values()]
-      .filter((contact) => contact.visibleNow)
-      .reduce((sum, contact) => sum + contact.estimatedStrength, 0);
+    const contacts = [...state.contacts[playerId].values()];
+    const visibleContacts = contacts.filter((contact) => contact.visibleNow);
+    const enemyVisibleStrength = visibleContacts.reduce(
+      (sum, contact) => sum + contact.estimatedStrength,
+      0,
+    );
 
     const fronts = {} as Record<Front, FrontStatus>;
     for (const report of this.getFrontStatus(playerId)) fronts[report.front] = report.status;
 
     const plan = this.currentPlan(state);
+
+    const attention: string[] = [];
+    const ownKing = state.objective.kings[playerId];
+    if (ownKing.besieged) attention.push(`${ownKing.name} is under capture pressure.`);
+    for (const group of groups) {
+      if (group.routing) attention.push(`${group.name} is routing.`);
+      else if (group.encirclement > 0) attention.push(`${group.name} is being surrounded.`);
+      else if (group.morale < 35) attention.push(`${group.name} is close to breaking.`);
+    }
+    if (visibleContacts.length === 0) {
+      attention.push('No enemy formation is in sight; do not treat an empty report as an empty front.');
+    }
+
+    const nextActions =
+      visibleContacts.length === 0
+        ? [
+            'Call get_armies for commandable group ids.',
+            'Call get_strategic_zones, then order scouts toward decisive ground.',
+          ]
+        : [
+            'Call get_front_status to compare committed strength by front.',
+            'Call get_armies before issuing or revising orders.',
+          ];
 
     return {
       tick: state.currentTick,
@@ -545,6 +679,22 @@ export class GameQueries {
       planStatus:
         plan === undefined ? 'no active plan' : `${plan.name} (${plan.status})`,
       objective: this.summariseObjective(this.getObjective(playerId)),
+      intelligence: {
+        visibleEnemyGroups: visibleContacts.length,
+        rememberedEnemyGroups: contacts.length - visibleContacts.length,
+        note:
+          contacts.length === 0
+            ? 'No enemy has been sighted yet. Unknown forces are omitted by fog of war.'
+            : 'Remembered contacts are last-known positions and may have moved.',
+      },
+      attention: attention.slice(0, 6),
+      nextActions,
+      operation: {
+        id: state.scenarioId,
+        name: SCENARIOS[state.scenarioId].name,
+        briefing: SCENARIOS[state.scenarioId].objective,
+        difficulty: DIFFICULTIES[state.difficultyId].name,
+      },
     };
   }
 
@@ -553,12 +703,18 @@ export class GameQueries {
   public getActiveOrders(playerId: PlayerId): ActiveOrdersReport {
     const state = this.state();
     return {
-      groups: activeGroups(state, playerId).map((group) => ({
-        groupId: group.id,
-        name: group.name,
-        order: activityOf(group),
-        secondsAgo: this.seconds(state.currentTick - group.order.issuedAtTick),
-      })),
+      groups: activeGroups(state, playerId).map((group) => {
+        const order: ActiveOrdersReport['groups'][number] = {
+          groupId: group.id,
+          name: group.name,
+          order: activityOf(group),
+          orderKind: group.order.kind,
+          secondsAgo: this.seconds(state.currentTick - group.order.issuedAtTick),
+        };
+        if (group.order.targetZone !== undefined) order.targetZone = group.order.targetZone;
+        if (group.order.targetGroupId !== undefined) order.targetGroupId = group.order.targetGroupId;
+        return order;
+      }),
       conditionalOrders: state.conditionals
         .filter((pending) => findGroup(state, pending.groupId)?.ownerId === playerId)
         .map((pending) => ({

@@ -2,7 +2,7 @@ import { REINFORCEMENTS } from '../config/battle';
 import { PLAYER_IDS, factionOf, type ArmyGroup, type PlayerId, type UnitCategory } from '../types/domain';
 import { fillFormationSlots } from './Formations';
 import { registerGroup, type GameState } from './GameState';
-import { ZONES, zoneAt } from './Zones';
+import { homeZoneOf, zoneAt } from './Zones';
 
 /**
  * Reinforcements.
@@ -37,7 +37,7 @@ export function deployWave(state: GameState, playerId: PlayerId, name: string): 
   player.availableWaves -= 1;
   player.wavesDeployed += 1;
 
-  const home = ZONES[playerId === 'player' ? 'player_base' : 'enemy_base'];
+  const home = homeZoneOf(playerId);
   const facing = playerId === 'player' ? -Math.PI / 2 : Math.PI / 2;
   // Offset each wave so successive arrivals do not spawn on top of each other.
   const anchor = {
@@ -66,6 +66,8 @@ export function deployWave(state: GameState, playerId: PlayerId, name: string): 
     lastCasualtyTick: -1,
     recentCasualties: 0,
     routing: false,
+    engagement: 0,
+    encirclement: 0,
   };
 
   const xs = new Float32Array(total);

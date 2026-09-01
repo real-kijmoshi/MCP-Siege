@@ -1,4 +1,4 @@
-import { MAP_HEIGHT, MAP_WIDTH, SPATIAL_CELL_SIZE } from '../config/battle';
+import { MAP_HEIGHT, MAP_WIDTH, PHYSICS, SPATIAL_CELL_SIZE, UNIT_STATS } from '../config/battle';
 import type { UnitPool } from './UnitPool';
 
 /**
@@ -124,6 +124,57 @@ export class SpatialHash {
           const dx = (pool.x[candidate] ?? 0) - x;
           const dy = (pool.y[candidate] ?? 0) - y;
           if (dx * dx + dy * dy <= radiusSquared) visit(candidate);
+        }
+      }
+    }
+  }
+
+  /**
+   * Adds a deterministic separation vector for bodies overlapping `self`.
+   * The caller owns `out`, so local avoidance adds no per-unit allocations.
+   */
+  public accumulateSeparation(
+    x: number,
+    y: number,
+    selfRadius: number,
+    pool: UnitPool,
+    self: number,
+    out: Float32Array,
+  ): void {
+    const radius = selfRadius + PHYSICS.maximumBodyRadius;
+    const minColumn = Math.max(0, Math.floor((x - radius) / SPATIAL_CELL_SIZE));
+    const maxColumn = Math.min(this.columns - 1, Math.floor((x + radius) / SPATIAL_CELL_SIZE));
+    const minRow = Math.max(0, Math.floor((y - radius) / SPATIAL_CELL_SIZE));
+    const maxRow = Math.min(this.rows - 1, Math.floor((y + radius) / SPATIAL_CELL_SIZE));
+
+    for (let row = minRow; row <= maxRow; row += 1) {
+      const rowOffset = row * this.columns;
+      for (let column = minColumn; column <= maxColumn; column += 1) {
+        const cell = rowOffset + column;
+        const end = this.starts[cell + 1] ?? 0;
+        for (let slot = this.starts[cell] ?? 0; slot < end; slot += 1) {
+          const candidate = this.items[slot] ?? -1;
+          if (candidate < 0 || candidate === self || pool.alive[candidate] !== 1) continue;
+          // Formation slots already provide cohesion inside a regiment. Only
+          // different bodies of troops need the expensive collision response.
+          if (pool.group[candidate] === pool.group[self]) continue;
+          let dx = x - (pool.x[candidate] ?? 0);
+          let dy = y - (pool.y[candidate] ?? 0);
+          let distanceSquared = dx * dx + dy * dy;
+          const minimum = selfRadius + UNIT_STATS[pool.categoryOf(candidate)].bodyRadius;
+          if (distanceSquared >= minimum * minimum) continue;
+
+          if (distanceSquared < 0.0001) {
+            // Stable index-derived direction when two bodies occupy one point.
+            const angle = ((self * 37 + candidate * 17) % 360) * (Math.PI / 180);
+            dx = Math.cos(angle);
+            dy = Math.sin(angle);
+            distanceSquared = 1;
+          }
+          const distance = Math.sqrt(distanceSquared);
+          const overlap = (minimum - distance) / minimum;
+          out[0] = (out[0] ?? 0) + (dx / distance) * overlap;
+          out[1] = (out[1] ?? 0) + (dy / distance) * overlap;
         }
       }
     }

@@ -1,6 +1,7 @@
 import { FACTION_PLAYER, type Vector2D } from '../../game/types/domain';
 import { activeGroups, type GameState } from '../../game/simulation/GameState';
 import { visibilityAt } from '../../game/simulation/Visibility';
+import { zoneAt } from '../../game/simulation/Zones';
 import type { SimulationEngine } from '../../game/simulation/Engine';
 import type { Renderer } from './Renderer';
 import type { Minimap } from './Minimap';
@@ -22,6 +23,9 @@ export interface InputCallbacks {
 
 const PAN_SPEED = 26;
 const CLICK_RADIUS = 90;
+/** Pointer travel below which a button release still counts as a click. */
+const CLICK_SLOP = 5;
+const ZOOM_STEP = 1.35;
 
 export class Input {
   private readonly pressedKeys = new Set<string>();
@@ -31,6 +35,11 @@ export class Input {
   private dragStart: Vector2D | undefined;
   private dragging = false;
   private minimapDragging = false;
+  /** Right button held: it pans, and only orders if it never moved. */
+  private orderPointerId: number | undefined;
+  private orderStart: Vector2D | undefined;
+  private orderPanned = false;
+  private cycleIndex = -1;
 
   public constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -88,15 +97,41 @@ export class Input {
     }
 
     if (event.button === 2) {
-      this.issueContextOrder(point, event.shiftKey);
+      // Held and dragged, the right button pans; released in place, it orders.
+      // Ordering on press meant there was no way to take back a misclick and
+      // no second way to move the camera.
+      this.orderPointerId = event.pointerId;
+      this.orderStart = point;
+      this.orderPanned = false;
+      event.preventDefault();
     }
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
     const point = this.localPoint(event);
+    const rect = this.canvas.getBoundingClientRect();
+    if (
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom
+    ) {
+      const world = this.renderer.camera.screenToWorld(point.x, point.y);
+      this.renderer.hoveredZone = zoneAt(world.x, world.y);
+    } else {
+      this.renderer.hoveredZone = undefined;
+    }
 
-    if (this.panPointerId === event.pointerId) {
+    if (this.panPointerId === event.pointerId || this.orderPointerId === event.pointerId) {
       const camera = this.renderer.camera;
+      if (this.orderPointerId === event.pointerId && this.orderStart !== undefined) {
+        const travelled = Math.hypot(point.x - this.orderStart.x, point.y - this.orderStart.y);
+        if (travelled > CLICK_SLOP) this.orderPanned = true;
+        if (!this.orderPanned) {
+          this.lastPointer = point;
+          return;
+        }
+      }
       camera.panBy(
         (this.lastPointer.x - point.x) / camera.zoom,
         (this.lastPointer.y - point.y) / camera.zoom,
@@ -125,6 +160,18 @@ export class Input {
       this.panPointerId = undefined;
       return;
     }
+
+    if (this.orderPointerId === event.pointerId) {
+      const start = this.orderStart;
+      this.orderPointerId = undefined;
+      this.orderStart = undefined;
+      if (!this.orderPanned && start !== undefined) {
+        this.issueContextOrder(this.localPoint(event), event.shiftKey, event.ctrlKey);
+      }
+      this.orderPanned = false;
+      return;
+    }
+
     if (this.dragStart === undefined) return;
 
     const point = this.localPoint(event);
@@ -236,11 +283,30 @@ export class Input {
 
   /* -------------------------------------------------------------- orders */
 
-  private issueContextOrder(point: Vector2D, queue: boolean): void {
+  private issueContextOrder(point: Vector2D, queue: boolean, assault: boolean): void {
     const selected = [...this.renderer.selection];
-    if (selected.length === 0) return;
+    if (selected.length === 0) {
+      // Silence here read as a broken right-click. Say what is missing.
+      this.callbacks.onOrderIssued('Select a regiment first, then right-click to order it.');
+      return;
+    }
 
     const world = this.renderer.camera.screenToWorld(point.x, point.y);
+
+    if (assault) {
+      // Attack-move: advance onto the ground and fight for it, rather than
+      // marching past a defended crossing to reach an empty coordinate.
+      const command = this.engine.dispatch('human', {
+        type: 'order_groups',
+        playerId: 'player',
+        groupIds: selected,
+        order: 'attack_zone',
+        targetZone: zoneAt(world.x, world.y),
+      });
+      this.reportWhenApplied(command.id);
+      return;
+    }
+
     const enemyGroupId = this.visibleEnemyNear(world);
 
     if (enemyGroupId !== undefined) {
@@ -256,12 +322,15 @@ export class Input {
     }
 
     if (queue) {
-      // Shift appends a waypoint rather than replacing the march.
-      for (const groupId of selected) {
-        const group = activeGroups(this.state, 'player').find((entry) => entry.id === groupId);
-        if (group !== undefined) group.path.push({ x: world.x, y: world.y });
-      }
-      this.callbacks.onOrderIssued(`Waypoint queued for ${selected.length} group(s).`);
+      const command = this.engine.dispatch('human', {
+        type: 'order_groups',
+        playerId: 'player',
+        groupIds: selected,
+        order: 'move',
+        destination: { x: world.x, y: world.y },
+        append: true,
+      });
+      this.reportWhenApplied(command.id);
       return;
     }
 
@@ -315,6 +384,21 @@ export class Input {
 
     this.pressedKeys.add(event.key.toLowerCase());
 
+    if (event.key.toLowerCase() === 'a' && (event.ctrlKey || event.metaKey)) {
+      // 'a' is also pan-left, and it was just recorded as held. Drop it, or the
+      // camera slides west for as long as the chord is down.
+      this.pressedKeys.delete('a');
+      this.selectAll();
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key === 'Tab') {
+      this.cycleSelection(event.shiftKey ? -1 : 1);
+      event.preventDefault();
+      return;
+    }
+
     if (event.key >= '1' && event.key <= '9') {
       if (event.ctrlKey || event.metaKey) {
         this.controlGroups.set(event.key, [...this.renderer.selection]);
@@ -344,6 +428,18 @@ export class Input {
         this.renderer.selection.clear();
         this.callbacks.onSelectionChange();
         break;
+      case 'z':
+        this.zoomAtCentre(1 / ZOOM_STEP);
+        break;
+      case 'x':
+        this.zoomAtCentre(ZOOM_STEP);
+        break;
+      case 'h': {
+        // Home on the thing the whole battle is about.
+        const king = this.state.objective.kings.player.position;
+        this.renderer.camera.centerOn(king.x, king.y);
+        break;
+      }
       case '+':
       case '=':
         this.callbacks.onSpeedChange(1);
@@ -357,6 +453,49 @@ export class Input {
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     this.pressedKeys.delete(event.key.toLowerCase());
   };
+
+  /** Every regiment still standing. The fastest way to move a whole army. */
+  private selectAll(): void {
+    this.renderer.selection.clear();
+    for (const group of activeGroups(this.state, 'player')) this.renderer.selection.add(group.id);
+    this.callbacks.onSelectionChange();
+    this.callbacks.onOrderIssued(`${this.renderer.selection.size} regiments selected.`);
+  }
+
+  /**
+   * Steps through the roster, centring on each in turn.
+   *
+   * On a battlefield several screens wide, hunting for a regiment by dragging
+   * the minimap is the slowest thing a commander has to do.
+   */
+  private cycleSelection(direction: number): void {
+    const groups = activeGroups(this.state, 'player');
+    if (groups.length === 0) return;
+    this.cycleIndex = (this.cycleIndex + direction + groups.length) % groups.length;
+    const group = groups[this.cycleIndex];
+    if (group === undefined) return;
+    this.renderer.selection.clear();
+    this.renderer.selection.add(group.id);
+    this.callbacks.onSelectionChange();
+    this.renderer.camera.centerOn(group.anchor.x, group.anchor.y);
+  }
+
+  private zoomAtCentre(factor: number): void {
+    const camera = this.renderer.camera;
+    camera.zoomAt(camera.viewportWidth / 2, camera.viewportHeight / 2, factor);
+  }
+
+  /** Centres on a named regiment. Used by the roster and the alert feed. */
+  public focusGroup(groupId: string): void {
+    const group = activeGroups(this.state, 'player').find((entry) => entry.id === groupId);
+    if (group === undefined) return;
+    this.renderer.camera.centerOn(group.anchor.x, group.anchor.y);
+  }
+
+  /** Centres on a world position. Used when an alert names a place. */
+  public focusPoint(x: number, y: number): void {
+    this.renderer.camera.centerOn(x, y);
+  }
 
   public focusSelection(): void {
     const groups = activeGroups(this.state, 'player').filter((group) =>

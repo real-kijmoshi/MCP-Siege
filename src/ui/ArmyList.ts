@@ -1,3 +1,4 @@
+import { CATEGORY_TOKEN, UNIT_STATS } from '../game/config/battle';
 import type { ArmySummary } from '../game/queries/GameQueries';
 import { moraleColor } from '../rendering/canvas/palette';
 
@@ -6,12 +7,19 @@ import { moraleColor } from '../rendering/canvas/palette';
  *
  * Rebuilt only when something a commander would notice has changed, because
  * replacing this DOM every frame would be both wasteful and visibly janky.
+ *
+ * Every row leads with the troop type. "Legion I" tells a commander nothing he
+ * can act on; "HVY Legion I" tells him not to send it after cavalry.
  */
 export class ArmyList {
   private readonly body = document.getElementById('army-list-body');
+  private readonly count = document.getElementById('army-list-count');
   private signature = '';
 
-  public constructor(private readonly onSelect: (groupId: string, additive: boolean) => void) {}
+  public constructor(
+    private readonly onSelect: (groupId: string, additive: boolean) => void,
+    private readonly onFocus: (groupId: string) => void = () => {},
+  ) {}
 
   public render(armies: readonly ArmySummary[], selection: ReadonlySet<string>): void {
     if (this.body === null) return;
@@ -20,6 +28,8 @@ export class ArmyList {
       .map(
         (army) =>
           `${army.id}:${army.strength}:${army.activity}:${Math.round(army.morale / 3)}:${
+            army.engaged ? 'e' : '-'
+          }:${army.surrounded ? 's' : '-'}:${army.pinned ? 'p' : '-'}:${
             selection.has(army.id) ? 1 : 0
           }`,
       )
@@ -27,9 +37,15 @@ export class ArmyList {
     if (signature === this.signature) return;
     this.signature = signature;
 
-    this.body.replaceChildren(
-      ...armies.map((army) => this.row(army, selection.has(army.id))),
-    );
+    this.body.replaceChildren(...armies.map((army) => this.row(army, selection.has(army.id))));
+
+    // How much of the army is still standing, next to the heading, so the size of
+    // the roster is not something the commander has to count.
+    if (this.count !== null) {
+      const men = armies.reduce((total, army) => total + army.strength, 0);
+      this.count.textContent = `${armies.length} · ${men.toLocaleString()}`;
+      this.count.title = `${armies.length} regiments, ${men.toLocaleString()} men`;
+    }
   }
 
   private row(army: ArmySummary, selected: boolean): HTMLButtonElement {
@@ -37,10 +53,16 @@ export class ArmyList {
     button.type = 'button';
     button.className = `army-row${selected ? ' selected' : ''}${
       army.moraleState === 'routing' ? ' routing' : ''
-    }`;
+    }${army.engaged ? ' engaged' : ''}`;
+    button.dataset.role = army.primaryRole;
+    button.title = `${UNIT_STATS[army.primaryRole].label} · ${army.zoneName}\nDouble-click to centre the camera.`;
 
     const head = document.createElement('div');
     head.className = 'row-head';
+
+    const role = document.createElement('span');
+    role.className = 'role';
+    role.textContent = CATEGORY_TOKEN[army.primaryRole];
 
     const name = document.createElement('span');
     name.className = 'name';
@@ -50,11 +72,25 @@ export class ArmyList {
     count.className = 'count';
     count.textContent = army.strength.toLocaleString();
 
-    head.append(name, count);
+    head.append(role, name, count);
 
     const activity = document.createElement('div');
     activity.className = 'activity';
-    activity.textContent = `${army.activity} · ${army.formation}`;
+    activity.textContent = `${army.activity} · ${army.formation.replace('_', ' ')}`;
+
+    // What is happening to the formation right now, which the activity line —
+    // it reports the order it was given — cannot say. Being surrounded kills a
+    // regiment faster than anything else on the field, and a commander reading
+    // a roster of a dozen names needs to find that one at a glance.
+    if (army.surrounded || army.pinned) {
+      const contact = document.createElement('span');
+      contact.className = army.surrounded ? 'contact surrounded' : 'contact pinned';
+      contact.textContent = army.surrounded ? 'SURROUNDED' : 'IN CONTACT';
+      contact.title = army.surrounded
+        ? 'Attacked from more quarters than the formation can face. It will come apart quickly.'
+        : 'Held in melee. This formation cannot march away until the fight is settled.';
+      activity.append(' ', contact);
+    }
 
     const bars = document.createElement('div');
     bars.className = 'bars';
@@ -65,6 +101,7 @@ export class ArmyList {
 
     button.append(head, activity, bars);
     button.addEventListener('click', (event) => this.onSelect(army.id, event.shiftKey));
+    button.addEventListener('dblclick', () => this.onFocus(army.id));
     return button;
   }
 

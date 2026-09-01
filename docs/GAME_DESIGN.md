@@ -18,8 +18,8 @@ with a name and a morale bar.
 
 **Take the enemy king.** Each side fields a sovereign who rides with his Royal
 Guard. Holding the ground around the other one long enough takes him, and that
-ends the battle outright. A side that loses under 85% of its strength concedes
-instead, so a field can also simply be lost.
+ends the battle outright. An army cut below a third of its strength concedes
+the field instead, so a battle can also simply be won or lost on the line.
 
 This is the rule that gives every other system a purpose. A flank is worth
 turning because it opens a road to a king; a bridge is worth holding because it
@@ -49,38 +49,78 @@ Three things follow from it:
 - **Formations.** Line for frontage, column for crossings, wedge to charge,
   square against cavalry, loose to survive bombardment. Each trades something.
 - **Morale.** Most engagements are decided by regiments breaking, not by being
-  annihilated. A broken regiment refuses orders and streams for the rear, and
-  rallies if it gets clear — so committing a reserve at the right moment matters
-  more than arithmetic.
-- **Terrain.** The river is impassable except at three crossings, which makes
-  the bridges genuinely decisive. Forest, hills and the village favour defenders.
+  annihilated. A regiment gives way with roughly a third of its men still
+  standing, refuses orders, and streams for the rear; it rallies if it gets
+  clear, but never back to the confidence it started with — what it lost, it
+  lost. Committing a reserve at the right moment therefore matters more than
+  arithmetic, and an army that has broken twice is finished even while it still
+  has men on the field.
+- **Terrain.** Every battlefield is built around one dividing feature and the
+  few places it can be passed, which is what makes those places worth dying on:
+  a river with three bridges, a volcanic spine with two gaps, a tidal channel
+  with one causeway and one ford. Goldmere is the deliberate exception — nothing
+  divides it at all, so both flanks are open the whole way round and the ground
+  gives the commander no help. Forest, hills and villages favour defenders
+  everywhere.
 - **Fog.** You fight on estimates. So does the Marshal. This binds the objective
   too: the enemy king is reported at his last *sighting*, never his position,
-  and until he has been seen once he is simply unknown.
+  and until he has been seen once he is simply unknown. Fog hides *forces*, not
+  *ground*: the valley itself is always drawn, because a plan has to be drawn on
+  something.
 
 ## Intentionally limited scope
 
-One scenario, one enemy, one battle. Non-goals: multiplayer, accounts,
-persistence, campaigns, base building, technology trees, heroes, diplomacy,
-procedural maps, mobile controls, per-soldier animation, and any embedded LLM
-infrastructure.
+Seven authored operations across four authored battlefields, three deterministic
+enemy command presets, one battle at a time. Maps and scenarios are *written*,
+never generated: each one is hand-placed ground with a hand-written enemy script,
+and the four maps all share one size, one fog grid and one camera. Non-goals:
+multiplayer, accounts, persistence, campaigns, base building, technology trees,
+heroes, diplomacy, procedural maps, mobile controls, per-soldier animation, and
+any embedded LLM infrastructure.
 
 Reinforcements are a manpower counter and timed waves — enough to give the top
 bar something true to show and to supply the "reinforcements arrive" beat. They
 are not an economy and should not become one.
 
-## The scenario arc
+## The scenario arcs
 
-The opening is quiet, so the controls can be learned by hand. Then, on a fixed
-timeline: the enemy centre storms the bridge, cavalry sweeps the eastern
-crossing, more cavalry pressures the western ford, the siege train comes into
-range, and the enemy reserve follows the centre.
+**Riverwatch** is the original measured escalation. The opening is quiet, then
+the centre storms the bridge, cavalry sweeps both crossings, the siege train
+comes into range, and the reserve follows.
 
-By roughly the four-minute mark there are more simultaneous decisions than one
-person can drive. That is the designed moment: hold one front yourself and give
-another to the Marshal.
+**Broken Bridgehead** begins with the Crown vanguard already north of the river.
+The enemy counterattacks quickly, forcing a choice between reinforcing the
+foothold and withdrawing across a route that must remain open.
 
-Then the enemy goes for the king — cavalry at around 400 seconds, a legion
-behind it. A player who has committed everything northward finds the road to
-his own sovereign open behind him, which is the bill for winning the field and
-forgetting what it was for.
+**Last Light** begins after the crossings have been lost. The army is compressed
+around King Aldric and must absorb a close three-front assault before it can
+create a road north.
+
+**Cinder Road** is the first operation fought off the Vale. Ashfall Pass is a
+dead volcanic spine with two gaps four kilometres apart, and the defenders in
+one are too far from the other to be recalled to it. The commander's real
+decision is which gap he means and which one he is only pretending to mean.
+
+**The Ashen Gate** is the same ground from the far side: the army is already
+through and above the spine, with the Crown itself standing on the wrong side of
+a four-hundred-yard gap the enemy only has to reach to close.
+
+**Goldmere Fields** removes the terrain argument entirely. Two armies form up in
+open harvest country with nothing between them, both sides deliberately
+cavalry-heavy. It is the operation where the envelopment rules are the whole
+battle, because nothing on the map protects a flank but the men standing on it.
+
+**The Long Causeway** cuts a tidal channel corner to corner, so its two
+crossings are not a left and a right but a near one and a far one. A wing
+committed to the ford is a long march from the wing on the causeway, and nothing
+else on any map punishes a divided attack this plainly.
+
+Every arc ends the same way. Once the scripted escalation is spent the enemy
+commander stops trading blows along the line and drives everything he has left
+at the player's sovereign, so a battle closes on a crisis rather than trailing
+off into a stalemate neither side can break.
+
+Levy, Captain, and Warlord preserve those authored arcs while changing when the
+enemy commits, how often it reacts to visible contacts, how far it coordinates,
+how broadly it recalls relief for its king, and how soon it makes that final
+drive. Difficulty never grants hidden information or bypasses the command queue.

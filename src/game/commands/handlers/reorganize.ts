@@ -98,6 +98,8 @@ export function handleSplitGroup(
     lastCasualtyTick: source.lastCasualtyTick,
     recentCasualties: 0,
     routing: source.routing,
+    engagement: 0,
+    encirclement: 0,
   };
 
   for (const index of taken) state.units.group[index] = slot;

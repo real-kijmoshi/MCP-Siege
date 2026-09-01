@@ -1,5 +1,6 @@
 import { findGroup, nextEntityId, type GameState } from '../../simulation/GameState';
 import { describeCondition } from '../../simulation/Conditions';
+import { isActiveZone } from '../../simulation/Zones';
 import { isZoneId, type BattlePlan, type OrderKind, type PlanStep } from '../../types/domain';
 import type {
   CancelPlanPayload,
@@ -10,7 +11,11 @@ import type {
   ModifyPlanPayload,
 } from '../types';
 import { failure, success } from '../types';
-import { applyOrderToGroup } from './shared';
+import {
+  commitPreparedOrder,
+  prepareOrderToGroup,
+  type PreparedOrder,
+} from './shared';
 
 /**
  * Plan Mode.
@@ -35,6 +40,7 @@ function validateStep(
   const group = findGroup(state, step.groupId);
   if (group === undefined) return `${where}: no group named "${step.groupId}".`;
   if (group.ownerId !== playerId) return `${where}: "${step.groupId}" is not under your command.`;
+  if (group.members.length === 0) return `${where}: "${step.groupId}" has been destroyed.`;
 
   const needsZone =
     step.action === 'move' ||
@@ -42,7 +48,9 @@ function validateStep(
     step.action === 'defend_zone';
   if (needsZone) {
     if (step.targetZone === undefined) return `${where}: ${step.action} requires a targetZone.`;
-    if (!isZoneId(step.targetZone)) return `${where}: "${step.targetZone}" is not a known zone.`;
+    if (!isZoneId(step.targetZone) || !isActiveZone(step.targetZone)) {
+      return `${where}: "${step.targetZone}" is not on this battlefield.`;
+    }
   }
 
   if (step.action === 'attack_group' || step.action === 'support') {
@@ -50,9 +58,17 @@ function validateStep(
       return `${where}: ${step.action} requires a targetGroupId.`;
     }
     const target = findGroup(state, step.targetGroupId);
-    if (target === undefined) return `${where}: no group named "${step.targetGroupId}".`;
-    if (target.ownerId !== playerId && !state.contacts[playerId].has(step.targetGroupId)) {
-      return `${where}: you have no intelligence on "${step.targetGroupId}".`;
+    if (step.action === 'support') {
+      if (target === undefined || target.ownerId !== playerId || target.members.length === 0) {
+        return `${where}: that friendly support target is unavailable.`;
+      }
+    } else if (
+      target === undefined ||
+      target.ownerId === playerId ||
+      target.members.length === 0 ||
+      !state.contacts[playerId].has(step.targetGroupId)
+    ) {
+      return `${where}: no actionable intelligence is available for that target.`;
     }
   }
 
@@ -63,11 +79,13 @@ function validateStep(
   const condition = step.startCondition;
   if (condition.kind === 'morale_below' || condition.kind === 'strength_below') {
     const subject = findGroup(state, condition.groupId);
-    if (subject === undefined) return `${where}: condition names unknown group "${condition.groupId}".`;
+    if (subject === undefined || subject.ownerId !== playerId) {
+      return `${where}: condition names a group outside your command.`;
+    }
   }
   if (
     (condition.kind === 'enemy_enters_zone' || condition.kind === 'friendly_zone_lost') &&
-    !isZoneId(condition.zoneId)
+    (!isZoneId(condition.zoneId) || !isActiveZone(condition.zoneId))
   ) {
     return `${where}: condition names unknown zone "${condition.zoneId}".`;
   }
@@ -157,6 +175,7 @@ export function handleModifyPlan(
 
   // Validate against a copy so a bad modification cannot leave a mangled plan.
   const draft: BattlePlan = { ...plan, steps: [...plan.steps] };
+  let nextSequence = state.entitySequence;
 
   for (const modification of command.modifications) {
     switch (modification.operation) {
@@ -169,10 +188,10 @@ export function handleModifyPlan(
         if (problem !== undefined) return failure(command, tick, 'INVALID_PLAN', problem, []);
         const step: PlanStep = {
           ...modification.step,
-          id: `${plan.id}_s${state.entitySequence}`,
+          id: `${plan.id}_s${nextSequence}`,
           index: 0,
         };
-        state.entitySequence += 1;
+        nextSequence += 1;
         const at = modification.atIndex ?? draft.steps.length;
         draft.steps.splice(Math.max(0, Math.min(at, draft.steps.length)), 0, step);
         break;
@@ -223,6 +242,7 @@ export function handleModifyPlan(
 
   plan.name = draft.name;
   plan.steps = draft.steps;
+  state.entitySequence = nextSequence;
   reindex(plan);
 
   return success(
@@ -249,61 +269,78 @@ export function handleExecutePlan(
     return failure(command, tick, 'PLAN_NOT_EDITABLE', `Plan "${plan.name}" is already ${plan.status}.`, []);
   }
 
-  const immediate: string[] = [];
-  const armed: string[] = [];
-  const warnings: string[] = [];
+  const prepared = new Map<string, PreparedOrder>();
+  const immediateSteps: PlanStep[] = [];
+  const conditionalSteps: PlanStep[] = [];
 
-  for (const step of plan.steps) {
-    const group = findGroup(state, step.groupId);
-    if (group === undefined || group.members.length === 0) {
-      warnings.push(`Step ${step.index}: ${step.groupId} is no longer available.`);
-      continue;
+  // Revalidate the complete plan against the live battlefield before changing
+  // anything. A lost regiment or stale target fails the command atomically.
+  for (const [position, step] of plan.steps.entries()) {
+    const problem = validateStep(state, command.playerId, step, position);
+    if (problem !== undefined) {
+      return failure(command, tick, 'PLAN_FAILED', problem, [
+        'Revise the draft against the current armies and intelligence.',
+      ]);
     }
-
     if (step.startCondition.kind !== 'immediate') {
-      state.conditionals.push({
-        id: nextEntityId(state, 'cond'),
-        planId: plan.id,
-        stepId: step.id,
-        groupId: step.groupId,
-        action: step.action,
-        ...(step.targetZone !== undefined ? { targetZone: step.targetZone } : {}),
-        ...(step.targetGroupId !== undefined ? { targetGroupId: step.targetGroupId } : {}),
-        ...(step.formation !== undefined ? { formation: step.formation } : {}),
-        ...(step.stance !== undefined ? { stance: step.stance } : {}),
-        condition: step.startCondition,
-        createdAtTick: tick,
-        note: step.note,
-      });
-      armed.push(`Step ${step.index} waits ${describeCondition(step.startCondition)}`);
+      conditionalSteps.push(step);
       continue;
     }
+    immediateSteps.push(step);
+    if (step.action === 'change_formation') continue;
 
-    if (step.action === 'change_formation') {
-      if (step.formation !== undefined) group.formation = step.formation;
-      if (step.stance !== undefined) group.stance = step.stance;
-      state.completedSteps.add(step.id);
-      immediate.push(`${group.name} reforms`);
-      continue;
-    }
-
-    const outcome = applyOrderToGroup(state, group, step.action as OrderKind, {
+    const group = findGroup(state, step.groupId) as NonNullable<ReturnType<typeof findGroup>>;
+    const order = prepareOrderToGroup(state, group, step.action as OrderKind, {
       ...(step.targetZone !== undefined ? { targetZone: step.targetZone } : {}),
       ...(step.targetGroupId !== undefined ? { targetGroupId: step.targetGroupId } : {}),
       ...(step.formation !== undefined ? { formation: step.formation } : {}),
       ...(step.stance !== undefined ? { stance: step.stance } : {}),
     });
-
-    if (outcome.ok) {
-      state.completedSteps.add(step.id);
-      immediate.push(outcome.summary);
-    } else {
-      warnings.push(`Step ${step.index}: ${outcome.summary}`);
+    if ('ok' in order) {
+      return failure(command, tick, 'PLAN_FAILED', `Step ${step.index}: ${order.summary}`, [
+        'Revise the draft against the current armies and intelligence.',
+      ]);
     }
+    prepared.set(step.id, order);
   }
 
-  if (immediate.length === 0 && armed.length === 0) {
-    return failure(command, tick, 'PLAN_FAILED', 'No step of the plan could be executed.', warnings);
+  if (state.conditionals.length + conditionalSteps.length > 40) {
+    return failure(command, tick, 'TOO_MANY_CONDITIONALS', 'The plan would arm too many standing orders.', [
+      'Cancel an active conditional or shorten the plan.',
+    ]);
+  }
+
+  const immediate: string[] = [];
+  const armed: string[] = [];
+  for (const step of conditionalSteps) {
+    state.conditionals.push({
+      id: nextEntityId(state, 'cond'),
+      planId: plan.id,
+      stepId: step.id,
+      groupId: step.groupId,
+      action: step.action,
+      ...(step.targetZone !== undefined ? { targetZone: step.targetZone } : {}),
+      ...(step.targetGroupId !== undefined ? { targetGroupId: step.targetGroupId } : {}),
+      ...(step.formation !== undefined ? { formation: step.formation } : {}),
+      ...(step.stance !== undefined ? { stance: step.stance } : {}),
+      condition: step.startCondition,
+      createdAtTick: tick,
+      note: step.note,
+    });
+    armed.push(`Step ${step.index} waits ${describeCondition(step.startCondition)}`);
+  }
+
+  for (const step of immediateSteps) {
+    const group = findGroup(state, step.groupId) as NonNullable<ReturnType<typeof findGroup>>;
+    if (step.action === 'change_formation') {
+      if (step.formation !== undefined) group.formation = step.formation;
+      if (step.stance !== undefined) group.stance = step.stance;
+      immediate.push(`${group.name} reforms`);
+    } else {
+      const order = prepared.get(step.id);
+      if (order !== undefined) immediate.push(commitPreparedOrder(state, order).summary);
+    }
+    state.completedSteps.add(step.id);
   }
 
   plan.status = 'executing';
@@ -315,7 +352,6 @@ export function handleExecutePlan(
   return success(command, tick, parts.join(' '), {
     planId: plan.id,
     steps: plan.steps.length,
-    warnings,
   });
 }
 

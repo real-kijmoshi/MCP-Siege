@@ -80,7 +80,18 @@ export type MoraleState = (typeof MORALE_STATES)[number];
 
 /* ------------------------------------------------------------------ zones */
 
+/**
+ * Every named location on every battlefield.
+ *
+ * The list is the union across all maps, because `ZoneId` must be a static
+ * literal union for the WebMCP schemas and the command contracts to be typed at
+ * all. A single battle only ever uses one map's zones: `config/maps.ts` claims
+ * each id for exactly one map, and the tool surface narrows its enum to the map
+ * actually being fought over, so the Marshal is never offered a location that
+ * is not on the field in front of it.
+ */
 export const ZONE_IDS = [
+  // River Vale
   'player_base',
   'west_forest',
   'west_crossing',
@@ -94,6 +105,48 @@ export const ZONE_IDS = [
   'northern_ridge',
   'enemy_outer_defense',
   'enemy_base',
+  // Ashfall Pass
+  'crown_camp',
+  'south_orchard',
+  'smoke_road',
+  'slag_flats',
+  'broken_scree',
+  'east_scarp',
+  'cinder_gap',
+  'ashfall_gate',
+  'upper_terrace',
+  'obsidian_wood',
+  'emberhold',
+  'smelters_hill',
+  'ash_citadel',
+  // Goldmere
+  'harvest_camp',
+  'millbrook',
+  'south_downs',
+  'hollow_wood',
+  'west_pasture',
+  'goldmere_town',
+  'east_pasture',
+  'long_barrow',
+  'crowsfoot_wood',
+  'beacon_hill',
+  'hartfell',
+  'stone_row',
+  'ashen_camp',
+  // Sunken Causeway
+  'tidewatch',
+  'drowned_wood',
+  'causeway_approach',
+  'oyster_town',
+  'gull_hill',
+  'reed_flats',
+  'long_causeway',
+  'salt_ford',
+  'north_strand',
+  'black_pines',
+  'beacon_tower',
+  'herring_quay',
+  'ashen_anchorage',
 ] as const;
 export type ZoneId = (typeof ZONE_IDS)[number];
 
@@ -159,6 +212,18 @@ export interface ArmyGroup {
   recentCasualties: number;
   /** Set while a group is retreating under its own morale, not by order. */
   routing: boolean;
+  /**
+   * Share of the group's men in contact with an enemy last tick, 0..1.
+   * Written by `Combat`; read by `Movement` to decide whether the formation is
+   * pinned and can no longer simply march past what is in front of it.
+   */
+  engagement: number;
+  /**
+   * How far round the formation the attack has come, 0 for a plain frontal
+   * fight and 1 for a body of men completely ringed. Written by `Combat` from
+   * the arcs blows actually arrived on, and read by both damage and morale.
+   */
+  encirclement: number;
 }
 
 /* ------------------------------------------------------------- conditions */

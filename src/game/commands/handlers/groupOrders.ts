@@ -1,7 +1,7 @@
 import { FORMATION_PROFILES } from '../../config/battle';
-import { type GameState } from '../../simulation/GameState';
+import { findGroup, type GameState } from '../../simulation/GameState';
 import { deployWave } from '../../simulation/Reinforcements';
-import { ZONES } from '../../simulation/Zones';
+import { ZONES, isActiveZone } from '../../simulation/Zones';
 import type {
   ChangeFormationPayload,
   CommandResult,
@@ -11,13 +11,24 @@ import type {
   OrderGroupsPayload,
 } from '../types';
 import { failure, success } from '../types';
-import { applyOrderToGroup, resolveOwnedGroups } from './shared';
+import {
+  applyOrderToGroup,
+  commitPreparedOrder,
+  prepareOrderToGroup,
+  resolveOwnedGroups,
+  type PreparedOrder,
+} from './shared';
 
 export function handleOrderGroups(
   command: GameCommand & OrderGroupsPayload,
   state: GameState,
 ): CommandResult {
   const tick = state.currentTick;
+  if (command.groupIds.length === 0) {
+    return failure(command, tick, 'INVALID_INPUT', 'Select at least one group.', [
+      'Call get_armies for the current order of battle.',
+    ]);
+  }
   const resolved = resolveOwnedGroups(state, command.playerId, command.groupIds);
   if ('missing' in resolved) {
     return failure(
@@ -29,9 +40,7 @@ export function handleOrderGroups(
     );
   }
 
-  const summaries: string[] = [];
-  const warnings: string[] = [];
-  const affected: string[] = [];
+  const preparedOrders: PreparedOrder[] = [];
 
   for (const group of resolved.groups) {
     const options = {
@@ -40,27 +49,30 @@ export function handleOrderGroups(
       ...(command.destination !== undefined ? { destination: command.destination } : {}),
       ...(command.formation !== undefined ? { formation: command.formation } : {}),
       ...(command.stance !== undefined ? { stance: command.stance } : {}),
+      ...(command.append !== undefined ? { append: command.append } : {}),
     };
-    const outcome = applyOrderToGroup(state, group, command.order, options);
-    if (outcome.ok) {
-      summaries.push(outcome.summary);
-      affected.push(group.id);
-    } else {
-      warnings.push(outcome.summary);
+    const prepared = prepareOrderToGroup(state, group, command.order, options);
+    if ('ok' in prepared) {
+      return failure(
+        command,
+        tick,
+        prepared.code ?? 'ORDER_REJECTED',
+        prepared.summary,
+        prepared.suggestions ?? ['Check the selected groups and target.'],
+      );
     }
+    preparedOrders.push(prepared);
   }
 
-  if (affected.length === 0) {
-    return failure(
-      command,
-      tick,
-      'ORDER_REJECTED',
-      warnings[0] ?? 'No group accepted the order.',
-      ['Check group morale; routing groups refuse orders until they rally.'],
-    );
+  const summaries: string[] = [];
+  const affected: string[] = [];
+  for (const prepared of preparedOrders) {
+    const outcome = commitPreparedOrder(state, prepared);
+    summaries.push(outcome.summary);
+    affected.push(prepared.group.id);
   }
 
-  return success(command, tick, summaries.join(' '), { groupIds: affected, warnings });
+  return success(command, tick, summaries.join(' '), { groupIds: affected });
 }
 
 export function handleChangeFormation(
@@ -162,6 +174,22 @@ export function handleDirectReinforcements(
   state: GameState,
 ): CommandResult {
   const tick = state.currentTick;
+  if (command.targetGroupId !== undefined && command.targetZone !== undefined) {
+    return failure(command, tick, 'INVALID_INPUT', 'Choose a target group or a target zone, not both.', []);
+  }
+  if (command.targetGroupId !== undefined) {
+    const target = findGroup(state, command.targetGroupId);
+    if (target === undefined || target.ownerId !== command.playerId || target.members.length === 0) {
+      return failure(command, tick, 'INVALID_TARGET', 'The reinforcement target is unavailable.', [
+        'Call get_armies for groups under your command.',
+      ]);
+    }
+  }
+  if (command.targetZone !== undefined && !isActiveZone(command.targetZone)) {
+    return failure(command, tick, 'INVALID_TARGET', 'That location is not on this battlefield.', [
+      'Call get_strategic_zones for valid names.',
+    ]);
+  }
   const player = state.players[command.playerId];
 
   if (player.availableWaves <= 0) {

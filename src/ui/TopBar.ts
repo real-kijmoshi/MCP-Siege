@@ -14,7 +14,11 @@ export class TopBar {
     for (const button of buttons) {
       button.addEventListener('click', () => {
         const speed = Number(button.dataset.speed ?? '1');
-        for (const other of buttons) other.classList.toggle('active', other === button);
+        for (const other of buttons) {
+          const selected = other === button;
+          other.classList.toggle('active', selected);
+          other.setAttribute('aria-pressed', String(selected));
+        }
         onSpeed(speed);
       });
     }
@@ -23,7 +27,9 @@ export class TopBar {
   /** Reflects speed changes that came from the keyboard rather than a click. */
   public syncSpeed(speed: number): void {
     for (const button of document.querySelectorAll<HTMLButtonElement>('.speed-control button')) {
-      button.classList.toggle('active', Number(button.dataset.speed ?? '1') === speed);
+      const selected = Number(button.dataset.speed ?? '1') === speed;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-pressed', String(selected));
     }
   }
 

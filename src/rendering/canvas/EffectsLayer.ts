@@ -20,10 +20,6 @@ export class EffectsLayer {
     context.save();
     context.lineCap = 'round';
 
-    context.strokeStyle = PALETTE.melee;
-    context.lineWidth = 1.6 / camera.zoom;
-    context.beginPath();
-
     for (const event of events) {
       if (
         event.x < bounds.left ||
@@ -35,32 +31,61 @@ export class EffectsLayer {
       }
       if (visibilityAt(state, 'player', event.x, event.y) !== 2) continue;
 
+      const age = Math.max(0, state.currentTick - event.tick);
+      const life = Math.max(0, 1 - age / 13);
+
       if (event.kind === 'arrow') {
-        context.moveTo(event.x, event.y);
-        context.lineTo(event.targetX, event.targetY);
-      } else if (event.kind === 'melee') {
-        // A short spark at the point of contact rather than a full line.
+        const progress = Math.min(1, (age + 2) / 8);
+        const tail = Math.max(0, progress - 0.24);
         const dx = event.targetX - event.x;
         const dy = event.targetY - event.y;
-        const length = Math.hypot(dx, dy) || 1;
-        context.moveTo(event.x + (dx / length) * 4, event.y + (dy / length) * 4);
-        context.lineTo(event.targetX, event.targetY);
+        context.globalAlpha = life * 0.9;
+        context.strokeStyle = PALETTE.arrow;
+        context.lineWidth = 1.8 / camera.zoom;
+        context.beginPath();
+        context.moveTo(event.x + dx * tail, event.y + dy * tail);
+        context.lineTo(event.x + dx * progress, event.y + dy * progress);
+        context.stroke();
+      } else if (event.kind === 'melee') {
+        const cx = (event.x + event.targetX) / 2;
+        const cy = (event.y + event.targetY) / 2;
+        const spark = 8 + age * 2.4;
+        context.globalAlpha = life;
+        context.strokeStyle = PALETTE.melee;
+        context.lineWidth = 2.2 / camera.zoom;
+        context.beginPath();
+        context.moveTo(cx - spark, cy);
+        context.lineTo(cx + spark, cy);
+        context.moveTo(cx, cy - spark);
+        context.lineTo(cx, cy + spark);
+        context.moveTo(cx - spark * 0.65, cy - spark * 0.65);
+        context.lineTo(cx + spark * 0.65, cy + spark * 0.65);
+        context.stroke();
       }
     }
-    context.stroke();
 
-    // Siege impacts read as expanding rings, which makes bombardment obvious.
-    context.strokeStyle = PALETTE.siegeBlast;
-    context.lineWidth = 3 / camera.zoom;
+    // Siege impacts get a hot core and smoke halo as well as the shock ring.
     for (const event of events) {
       if (event.kind !== 'siege') continue;
       if (visibilityAt(state, 'player', event.targetX, event.targetY) !== 2) continue;
       const age = Math.max(0, state.currentTick - event.tick);
-      const radius = 20 + age * 9;
-      context.globalAlpha = Math.max(0, 1 - age / 6);
+      const life = Math.max(0, 1 - age / 13);
+      const radius = 18 + age * 11;
+      context.globalAlpha = life * 0.85;
+      context.fillStyle = PALETTE.siegeBlast;
+      context.beginPath();
+      context.arc(event.targetX, event.targetY, Math.max(3, 16 - age), 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = PALETTE.siegeBlast;
+      context.lineWidth = 3 / camera.zoom;
       context.beginPath();
       context.arc(event.targetX, event.targetY, radius, 0, Math.PI * 2);
       context.stroke();
+      context.globalAlpha = life * 0.28;
+      context.fillStyle = '#d8cec0';
+      context.beginPath();
+      context.arc(event.targetX - age * 2, event.targetY - radius * 0.22, radius * 0.48, 0, Math.PI * 2);
+      context.fill();
     }
 
     context.restore();

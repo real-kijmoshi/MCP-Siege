@@ -1,4 +1,8 @@
 import { buildScenario } from '../config/scenario';
+import {
+  resolveSimulationOptions,
+  type SimulationOptions,
+} from '../config/matches';
 import { CommandQueue } from '../commands/CommandQueue';
 import {
   handleCancelConditionalOrder,
@@ -38,6 +42,7 @@ import { advanceObjective } from './Objective';
 import { advanceReinforcements } from './Reinforcements';
 import { advanceVisibility, seedInitialVisibility } from './Visibility';
 import { advanceZoneControl, seedZoneControl } from './ZoneControl';
+import { useBattleMap } from './Zones';
 import { enemyAiCommands } from './EnemyAi';
 
 export type CommandResultListener = (command: GameCommand, result: CommandResult) => void;
@@ -56,15 +61,17 @@ export class SimulationEngine {
   private readonly resultListeners = new Set<CommandResultListener>();
   private readonly results = new Map<string, CommandResult>();
 
-  public constructor(seed = 20_260_829) {
-    this.state = createEmptyState(seed);
-    buildScenario(this.state);
+  public constructor(options?: number | Partial<SimulationOptions>) {
+    const resolved = resolveSimulationOptions(options);
+    this.state = createEmptyState(resolved.seed, resolved.scenarioId, resolved.difficultyId);
+    buildScenario(this.state, resolved.scenarioId);
     seedInitialVisibility(this.state);
     seedZoneControl(this.state);
     resetAlertTracking(this.state);
   }
 
   public dispatch(source: CommandSource, payload: GameCommandPayload): GameCommand {
+    useBattleMap(this.state.mapId);
     const sequence = this.state.commandSequence;
     this.state.commandSequence += 1;
     const command: GameCommand = {
@@ -79,6 +86,9 @@ export class SimulationEngine {
   }
 
   public step(): CommandResult[] {
+    // The geography is a cache of `mapId`, re-established from this engine's own
+    // state every tick so two engines on two maps cannot read each other's ground.
+    useBattleMap(this.state.mapId);
     this.state.currentTick += 1;
 
     // A taken king ends the battle. The clock keeps running so the page can
@@ -92,17 +102,7 @@ export class SimulationEngine {
     for (const payload of enemyAiCommands(this.state)) this.dispatch('enemy_ai', payload);
     for (const payload of collectTriggeredOrders(this.state)) this.dispatch('conditional', payload);
 
-    const tickResults: CommandResult[] = [];
-    for (const command of this.queue.drainReady(this.state.currentTick)) {
-      const result = this.applyCommand(command);
-      this.results.set(command.id, result);
-      if (this.results.size > 400) {
-        const oldest = this.results.keys().next().value;
-        if (oldest !== undefined) this.results.delete(oldest);
-      }
-      tickResults.push(result);
-      for (const listener of this.resultListeners) listener(command, result);
-    }
+    const tickResults = this.flushQueuedCommands();
 
     advanceMovement(this.state);
     advanceCombat(this.state);
@@ -114,6 +114,32 @@ export class SimulationEngine {
     advanceAlerts(this.state);
     this.pruneCombatEvents();
 
+    return tickResults;
+  }
+
+  /**
+   * Applies commands without advancing battle time or running a system.
+   *
+   * The UI uses this only while paused. A pause should freeze men, missiles and
+   * triggers, not the commander's ability to arrange orders; WebMCP must also
+   * never time out merely because the human paused to think. Commands still
+   * cross the same deterministic queue and the same handlers.
+   */
+  public flushQueuedCommands(): CommandResult[] {
+    useBattleMap(this.state.mapId);
+    if (this.state.objective.outcome !== 'ongoing') return this.rejectQueuedCommands();
+
+    const tickResults: CommandResult[] = [];
+    for (const command of this.queue.drainReady(this.state.currentTick)) {
+      const result = this.applyCommand(command);
+      this.results.set(command.id, result);
+      if (this.results.size > 400) {
+        const oldest = this.results.keys().next().value;
+        if (oldest !== undefined) this.results.delete(oldest);
+      }
+      tickResults.push(result);
+      for (const listener of this.resultListeners) listener(command, result);
+    }
     return tickResults;
   }
 
@@ -162,7 +188,9 @@ export class SimulationEngine {
 
   private pruneCombatEvents(): void {
     const events = this.state.combatEvents;
-    const cutoff = this.state.currentTick - 6;
+    // Half a second is long enough for a volley or impact to be read at command
+    // zoom. Six ticks made even large clashes look eerily motionless.
+    const cutoff = this.state.currentTick - 12;
     let index = 0;
     while (index < events.length && (events[index]?.tick ?? 0) < cutoff) index += 1;
     if (index > 0) events.splice(0, index);

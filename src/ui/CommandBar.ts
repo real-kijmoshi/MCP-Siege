@@ -1,8 +1,43 @@
-import { FORMATION_PROFILES } from '../game/config/battle';
+import {
+  CATEGORY_TOKEN,
+  FORMATION_PROFILES,
+  STANCE_PROFILES,
+  UNIT_STATS,
+  describeMatchups,
+} from '../game/config/battle';
 import type { SimulationEngine } from '../game/simulation/Engine';
-import { activeGroups, findGroup } from '../game/simulation/GameState';
+import { activeGroups, findGroup, type GameState } from '../game/simulation/GameState';
 import { zoneAt } from '../game/simulation/Zones';
-import { FORMATIONS, type Formation } from '../game/types/domain';
+import {
+  FORMATIONS,
+  STANCES,
+  UNIT_CATEGORIES,
+  type ArmyGroup,
+  type Formation,
+  type Stance,
+  type UnitCategory,
+} from '../game/types/domain';
+
+/**
+ * The troop type most of a group's men carry.
+ *
+ * Read straight off the pool rather than through the query layer, because this
+ * runs every animation frame and the projections allocate.
+ */
+const roleTally = new Int32Array(UNIT_CATEGORIES.length);
+
+function primaryRoleOf(state: GameState, group: ArmyGroup): UnitCategory {
+  roleTally.fill(0);
+  for (const index of group.members) {
+    const ordinal = state.units.category[index] ?? 0;
+    roleTally[ordinal] = (roleTally[ordinal] ?? 0) + 1;
+  }
+  let best = 0;
+  for (let ordinal = 1; ordinal < roleTally.length; ordinal += 1) {
+    if ((roleTally[ordinal] ?? 0) > (roleTally[best] ?? 0)) best = ordinal;
+  }
+  return UNIT_CATEGORIES[best] as UnitCategory;
+}
 
 /**
  * The command row.
@@ -12,7 +47,9 @@ import { FORMATIONS, type Formation } from '../game/types/domain';
  */
 export class CommandBar {
   private readonly readout = document.getElementById('selection-readout');
+  private readonly matchup = document.getElementById('selection-matchup');
   private readonly menu = document.getElementById('formation-menu');
+  private readonly stanceMenu = document.getElementById('stance-menu');
   private readonly buttons = new Map<string, HTMLButtonElement>();
 
   public constructor(
@@ -28,20 +65,30 @@ export class CommandBar {
     }
 
     this.buildFormationMenu();
+    this.buildStanceMenu();
 
-    // Any click outside the menu dismisses it.
+    // Any click outside a menu dismisses it.
     document.addEventListener('click', (event) => {
-      if (this.menu === null || this.menu.hidden) return;
       const target = event.target;
-      if (target instanceof Node && (this.menu.contains(target) || this.isFormationButton(target))) {
-        return;
-      }
-      this.menu.hidden = true;
+      this.dismissUnlessInside(this.menu, 'formation', target);
+      this.dismissUnlessInside(this.stanceMenu, 'stance', target);
     });
   }
 
-  private isFormationButton(node: Node): boolean {
-    return node instanceof HTMLElement && node.closest('[data-command="formation"]') !== null;
+  private dismissUnlessInside(
+    menu: HTMLElement | null,
+    command: string,
+    target: EventTarget | null,
+  ): void {
+    if (menu === null || menu.hidden) return;
+    if (
+      target instanceof Node &&
+      (menu.contains(target) ||
+        (target instanceof HTMLElement && target.closest(`[data-command="${command}"]`) !== null))
+    ) {
+      return;
+    }
+    menu.hidden = true;
   }
 
   private buildFormationMenu(): void {
@@ -65,6 +112,38 @@ export class CommandBar {
     );
   }
 
+  /**
+   * Stance is the third pillar of the tactical model — how far a regiment will
+   * leave its ground to chase a fight — and it had no control at all until now,
+   * so the only way to change it was through WebMCP.
+   */
+  private buildStanceMenu(): void {
+    if (this.stanceMenu === null) return;
+    this.stanceMenu.replaceChildren(
+      ...STANCES.map((stance) => {
+        const profile = STANCE_PROFILES[stance];
+        const button = document.createElement('button');
+        button.type = 'button';
+        const label = document.createElement('strong');
+        label.textContent = profile.label;
+        const description = document.createElement('small');
+        description.textContent = profile.description;
+        button.append(label, description);
+        button.addEventListener('click', () => {
+          this.applyStance(stance);
+          this.stanceMenu!.hidden = true;
+        });
+        return button;
+      }),
+    );
+  }
+
+  private applyStance(stance: Stance): void {
+    const groupIds = this.selected();
+    if (groupIds.length === 0) return;
+    this.dispatch({ type: 'change_formation', playerId: 'player', groupIds, stance });
+  }
+
   private selected(): string[] {
     return [...this.selection];
   }
@@ -82,11 +161,19 @@ export class CommandBar {
 
   private run(command: string): void {
     const groupIds = this.selected();
-    if (groupIds.length === 0 && command !== 'formation') return;
+    if (groupIds.length === 0 && command !== 'formation' && command !== 'stance') return;
 
     switch (command) {
       case 'formation':
+        if (this.stanceMenu !== null) this.stanceMenu.hidden = true;
         if (this.menu !== null && groupIds.length > 0) this.menu.hidden = !this.menu.hidden;
+        return;
+
+      case 'stance':
+        if (this.menu !== null) this.menu.hidden = true;
+        if (this.stanceMenu !== null && groupIds.length > 0) {
+          this.stanceMenu.hidden = !this.stanceMenu.hidden;
+        }
         return;
 
       case 'hold':
@@ -108,11 +195,6 @@ export class CommandBar {
           order: 'defend_zone',
           targetZone: zoneAt(first.anchor.x, first.anchor.y),
         });
-        return;
-      }
-
-      case 'move': {
-        this.onResult('Right-click the battlefield to set a destination.');
         return;
       }
 
@@ -206,7 +288,9 @@ export class CommandBar {
     if (groupIds.length === 0) {
       label.textContent = 'NO SELECTION';
       detail.textContent = 'Select a group on the map or in the list';
+      this.setMatchup('');
       if (this.menu !== null) this.menu.hidden = true;
+      if (this.stanceMenu !== null) this.stanceMenu.hidden = true;
       return;
     }
 
@@ -215,15 +299,27 @@ export class CommandBar {
 
     if (groups.length === 1 && groups[0] !== undefined) {
       const group = groups[0];
+      const role = primaryRoleOf(state, group);
+
       label.textContent = `${group.formation.toUpperCase().replace('_', ' ')} · ${group.stance
         .toUpperCase()
         .replace('_', ' ')}`;
-      detail.textContent = `${group.name} — ${men.toLocaleString()} men, ${Math.round(
+      detail.textContent = `${CATEGORY_TOKEN[role]} ${group.name} — ${men.toLocaleString()} men, ${Math.round(
         group.morale,
       )}% morale`;
+
+      // The one place the counter matrix is spelled out in words. Without it a
+      // player can lose a cavalry wing to a spear wall and never learn why.
+      this.setMatchup(`${UNIT_STATS[role].label}: ${describeMatchups(role)}`);
     } else {
       label.textContent = `${groups.length} GROUPS SELECTED`;
       detail.textContent = `${men.toLocaleString()} men under orders`;
+      this.setMatchup('');
     }
+  }
+
+  private setMatchup(text: string): void {
+    if (this.matchup === null || this.matchup.textContent === text) return;
+    this.matchup.textContent = text;
   }
 }

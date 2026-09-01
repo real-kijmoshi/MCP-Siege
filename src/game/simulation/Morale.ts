@@ -19,7 +19,14 @@ export function moraleStateOf(morale: number): MoraleState {
   return 'routing';
 }
 
-/** Enemies bearing on the group from widely separated angles count as a flank. */
+/**
+ * Enemy formations closing from widely separated angles.
+ *
+ * This is the threat of being flanked rather than the fact of it: it reads
+ * anchors, so it fires while the enveloping regiments are still on their way.
+ * What actually happens once they arrive is `group.encirclement`, measured by
+ * `Combat` from the arcs blows arrive on, and that carries the heavier penalty.
+ */
 function isFlanked(group: ArmyGroup, others: readonly ArmyGroup[]): boolean {
   const bearings: number[] = [];
   for (const other of others) {
@@ -81,9 +88,18 @@ export function advanceMorale(state: GameState): void {
     // it means nothing to men who are already running.
     if (routingNeighbour && !group.routing) delta -= MORALE.nearbyRoutPenalty;
 
-    // Men in flight are not holding a flank, so neither penalty applies.
+    // Men in flight are not holding a flank, so none of these apply.
     if (!group.routing) {
-      if (isFlanked(group, groups)) delta -= MORALE.flankedPenalty;
+      // Being surrounded is the fastest way a formation comes apart, and it
+      // has to be: cutting an enemy off is the most expensive thing a
+      // commander can arrange, so it must beat simply feeding men into his
+      // front. A fully ringed regiment loses morale roughly three times as
+      // fast as one merely threatened from a flank.
+      if (group.encirclement > 0) {
+        delta -= MORALE.flankedPenalty * (1 + 2 * group.encirclement);
+      } else if (isFlanked(group, groups)) {
+        delta -= MORALE.flankedPenalty * 0.5;
+      }
       if (isDefensiveTerrain(group.anchor.x, group.anchor.y)) delta += MORALE.terrainBonus;
     }
 
@@ -100,7 +116,13 @@ export function advanceMorale(state: GameState): void {
     }
     if (king.besieged) delta -= OBJECTIVE.besiegedPenalty;
 
-    group.morale = Math.max(0, Math.min(100, group.morale + delta));
+    // What is left of the regiment caps what it can recover to. Men who have
+    // seen most of their formation die do not become confident again just
+    // because the shooting stopped.
+    const survival = group.members.length / Math.max(1, group.initialStrength);
+    const ceiling = MORALE.bloodiedFloor + (100 - MORALE.bloodiedFloor) * survival;
+
+    group.morale = Math.max(0, Math.min(ceiling, group.morale + delta));
     group.moraleState = moraleStateOf(group.morale);
 
     if (!group.routing && group.moraleState === 'routing') {

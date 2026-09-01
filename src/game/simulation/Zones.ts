@@ -1,202 +1,185 @@
 import { MAP_HEIGHT, MAP_WIDTH } from '../config/battle';
-import { ZONE_IDS, type Front, type Vector2D, type ZoneId } from '../types/domain';
+import {
+  BATTLE_MAPS,
+  BATTLE_MAP_IDS,
+  ZONE_CATALOGUE,
+  barrierCenterY,
+  type BattleMapDefinition,
+  type BattleMapId,
+  type TerrainKind,
+  type ZoneDefinition,
+} from '../config/maps';
+import type { PlayerId, Vector2D, ZoneId } from '../types/domain';
 
 /**
  * The battlefield's semantic geography.
  *
  * WebMCP addresses locations by these names rather than by pixels, so the
- * Marshal reasons about "the central bridge" instead of coordinates. The river
- * splits the map; it is impassable except at the three crossings, which is what
- * makes the terrain tactically binding.
+ * Marshal reasons about "the central bridge" instead of coordinates. Which
+ * ground those names describe depends on the map being fought over, which is
+ * why every geographic answer here is taken from the *active* map.
+ *
+ * The active map is a cache of `GameState.mapId`, not a second source of truth.
+ * `SimulationEngine` re-establishes it from its own state before every tick and
+ * every dispatch, and `GameQueries` does the same before every read, so two
+ * engines on two different maps in one process cannot read each other's ground.
+ * Nothing here is ever written by a system.
  */
 
-export type TerrainKind = 'open' | 'forest' | 'hill' | 'river' | 'village' | 'crossing';
+export type { TerrainKind, ZoneDefinition } from '../config/maps';
 
-export interface ZoneDefinition {
-  id: ZoneId;
-  name: string;
-  center: Vector2D;
-  radius: number;
-  front: Front;
-  terrain: TerrainKind;
-  /** True for the three points where the river can be crossed. */
-  crossing: boolean;
-  description: string;
+/* -------------------------------------------------------------- map runtime */
+
+interface MapRuntime {
+  map: BattleMapDefinition;
+  zoneIds: readonly ZoneId[];
+  crossings: readonly ZoneDefinition[];
+  neighbours: Record<ZoneId, ZoneId[]>;
+  roadEdges: Set<string>;
 }
 
-const ZONE_LIST: ZoneDefinition[] = [
-  {
-    id: 'player_base',
-    name: 'Player Base',
-    center: { x: 4000, y: 4550 },
-    radius: 760,
-    front: 'rear',
-    terrain: 'open',
-    crossing: false,
-    description: 'Staging ground and muster point. Reinforcements arrive here.',
-  },
-  {
-    id: 'west_forest',
-    name: 'West Forest',
-    center: { x: 1250, y: 3250 },
-    radius: 660,
-    front: 'west',
-    terrain: 'forest',
-    crossing: false,
-    description: 'Dense woodland. Conceals movement toward the western ford.',
-  },
-  {
-    id: 'west_crossing',
-    name: 'West Crossing',
-    center: { x: 1500, y: 2500 },
-    radius: 380,
-    front: 'west',
-    terrain: 'crossing',
-    crossing: true,
-    description: 'A shallow ford. Narrow, and the only western route north.',
-  },
-  {
-    id: 'village',
-    name: 'Village',
-    center: { x: 2750, y: 3550 },
-    radius: 430,
-    front: 'west',
-    terrain: 'village',
-    crossing: false,
-    description: 'Abandoned village. Buildings break up cavalry charges.',
-  },
-  {
-    id: 'central_field',
-    name: 'Central Field',
-    center: { x: 4000, y: 3200 },
-    radius: 820,
-    front: 'center',
-    terrain: 'open',
-    crossing: false,
-    description: 'Open ground south of the bridge. The main line forms here.',
-  },
-  {
-    id: 'central_bridge',
-    name: 'Central Bridge',
-    center: { x: 4000, y: 2500 },
-    radius: 340,
-    front: 'center',
-    terrain: 'crossing',
-    crossing: true,
-    description: 'The main stone bridge. The decisive point of the battle.',
-  },
-  {
-    id: 'central_hill',
-    name: 'Central Hill',
-    center: { x: 4950, y: 3050 },
-    radius: 470,
-    front: 'center',
-    terrain: 'hill',
-    crossing: false,
-    description: 'High ground overlooking the bridge. Ideal for archers and siege.',
-  },
-  {
-    id: 'east_field',
-    name: 'East Field',
-    center: { x: 6600, y: 3350 },
-    radius: 780,
-    front: 'east',
-    terrain: 'open',
-    crossing: false,
-    description: 'Wide open ground. Excellent cavalry country, hard to hold.',
-  },
-  {
-    id: 'east_crossing',
-    name: 'East Crossing',
-    center: { x: 6600, y: 2500 },
-    radius: 360,
-    front: 'east',
-    terrain: 'crossing',
-    crossing: true,
-    description: 'A smaller bridge on the eastern flank.',
-  },
-  {
-    id: 'east_forest',
-    name: 'East Forest',
-    center: { x: 7450, y: 3150 },
-    radius: 570,
-    front: 'east',
-    terrain: 'forest',
-    crossing: false,
-    description: 'Woodland anchoring the eastern flank.',
-  },
-  {
-    id: 'northern_ridge',
-    name: 'Northern Ridge',
-    center: { x: 2500, y: 1500 },
-    radius: 720,
-    front: 'west',
-    terrain: 'hill',
-    crossing: false,
-    description: 'Enemy-held high ground north of the ford.',
-  },
-  {
-    id: 'enemy_outer_defense',
-    name: 'Enemy Outer Defense',
-    center: { x: 4200, y: 1500 },
-    radius: 860,
-    front: 'center',
-    terrain: 'open',
-    crossing: false,
-    description: 'Prepared enemy positions covering the northern bridgehead.',
-  },
-  {
-    id: 'enemy_base',
-    name: 'Enemy Base',
-    center: { x: 4000, y: 620 },
-    radius: 820,
-    front: 'rear',
-    terrain: 'open',
-    crossing: false,
-    description: 'Fortified enemy command position.',
-  },
-];
-
-export const ZONES: Record<ZoneId, ZoneDefinition> = Object.fromEntries(
-  ZONE_LIST.map((zone) => [zone.id, zone]),
-) as Record<ZoneId, ZoneDefinition>;
-
-export const ORDERED_ZONES: readonly ZoneDefinition[] = ZONE_IDS.map((id) => ZONES[id]);
-
-/* -------------------------------------------------------------------- river */
-
-/** The river meanders gently so the map does not read as a drawn straight line. */
-export function riverCenterY(x: number): number {
-  return 2500 + Math.sin(x / 1350) * 135 + Math.sin(x / 480) * 32;
+function edgeKey(first: ZoneId, second: ZoneId): string {
+  return first < second ? `${first}|${second}` : `${second}|${first}`;
 }
 
-export const RIVER_HALF_WIDTH = 135;
+function buildRuntime(map: BattleMapDefinition): MapRuntime {
+  const zoneIds = map.zones.map((zone) => zone.id);
+  const neighbours = Object.fromEntries(zoneIds.map((id) => [id, [] as ZoneId[]])) as Record<
+    ZoneId,
+    ZoneId[]
+  >;
 
-/** Crossings are ordered west to east; passage is allowed only within these. */
-export const CROSSINGS: readonly ZoneDefinition[] = ZONE_LIST.filter((zone) => zone.crossing);
+  for (const [from, to] of map.edges) {
+    const forward = neighbours[from];
+    const backward = neighbours[to];
+    if (forward === undefined || backward === undefined) {
+      throw new Error(`Map "${map.id}" has an edge to a zone it does not contain.`);
+    }
+    forward.push(to);
+    backward.push(from);
+  }
+  // Sorted so graph traversal order never depends on declaration order.
+  for (const id of zoneIds) neighbours[id].sort();
 
-export function isInRiver(x: number, y: number): boolean {
-  return Math.abs(y - riverCenterY(x)) < RIVER_HALF_WIDTH;
+  const roadEdges = new Set<string>();
+  for (const road of map.roads) {
+    for (let index = 1; index < road.length; index += 1) {
+      const previous = road[index - 1];
+      const current = road[index];
+      if (previous !== undefined && current !== undefined) roadEdges.add(edgeKey(previous, current));
+    }
+  }
+
+  return {
+    map,
+    zoneIds,
+    crossings: map.zones.filter((zone) => zone.crossing),
+    neighbours,
+    roadEdges,
+  };
 }
 
-/** True where the river may actually be crossed. */
+const RUNTIMES: Record<BattleMapId, MapRuntime> = Object.fromEntries(
+  BATTLE_MAP_IDS.map((id) => [id, buildRuntime(BATTLE_MAPS[id])]),
+) as Record<BattleMapId, MapRuntime>;
+
+let runtime: MapRuntime = RUNTIMES.river_vale;
+
+/** Points every geographic answer at one map. Cheap, and safe to call per tick. */
+export function useBattleMap(id: BattleMapId): void {
+  if (runtime.map.id !== id) runtime = RUNTIMES[id];
+}
+
+export function activeBattleMap(): BattleMapDefinition {
+  return runtime.map;
+}
+
+export function activeBattleMapId(): BattleMapId {
+  return runtime.map.id;
+}
+
+/* ---------------------------------------------------------------- lookups */
+
+/**
+ * Every zone on every map, by id.
+ *
+ * Naming a location is map-independent — a report can spell out "Cinder Gap"
+ * without the reader first knowing which battle it came from — so this stays a
+ * flat catalogue. Anything that asks about *ground* goes through the active map.
+ */
+export const ZONES = ZONE_CATALOGUE;
+
+/** The zones of the active map, in authored order. */
+export function activeZones(): readonly ZoneDefinition[] {
+  return runtime.map.zones;
+}
+
+export function activeZoneIds(): readonly ZoneId[] {
+  return runtime.zoneIds;
+}
+
+export function isActiveZone(id: ZoneId): boolean {
+  return runtime.neighbours[id] !== undefined;
+}
+
+/** Where a side musters, routs to, and receives reinforcements. */
+export function homeZoneOf(playerId: PlayerId): ZoneDefinition {
+  const id = playerId === 'player' ? runtime.map.playerHomeZone : runtime.map.enemyHomeZone;
+  return ZONES[id];
+}
+
+/* ---------------------------------------------------------------- barrier */
+
+/** The centreline of the dividing feature, or the map's midline if it has none. */
+export function barrierCenterAt(x: number): number {
+  const barrier = runtime.map.barrier;
+  return barrier === undefined ? MAP_HEIGHT / 2 : barrierCenterY(barrier, x);
+}
+
+export function barrierHalfWidth(): number {
+  return runtime.map.barrier?.halfWidth ?? 0;
+}
+
+/** Crossings, in authored order (west to east). */
+export function activeCrossings(): readonly ZoneDefinition[] {
+  return runtime.crossings;
+}
+
+export function isInBarrier(x: number, y: number): boolean {
+  const barrier = runtime.map.barrier;
+  if (barrier === undefined) return false;
+  return Math.abs(y - barrierCenterY(barrier, x)) < barrier.halfWidth;
+}
+
+/** True where the barrier may actually be passed. */
 export function isOnCrossing(x: number, y: number): boolean {
-  for (const crossing of CROSSINGS) {
+  for (const crossing of runtime.crossings) {
     const width = crossing.radius * 0.62;
     if (Math.abs(x - crossing.center.x) < width) return true;
   }
   return false;
 }
 
-/** The river is passable only on a crossing. */
+function isInMere(x: number, y: number): boolean {
+  for (const mere of runtime.map.meres) {
+    const dx = x - mere.center.x;
+    const dy = y - mere.center.y;
+    if (dx * dx + dy * dy < mere.radius * mere.radius) return true;
+  }
+  return false;
+}
+
+/** The barrier is passable only on a crossing; standing water never is. */
 export function isPassable(x: number, y: number): boolean {
   if (x < 0 || y < 0 || x > MAP_WIDTH || y > MAP_HEIGHT) return false;
-  if (!isInRiver(x, y)) return true;
+  if (isInMere(x, y)) return false;
+  if (!isInBarrier(x, y)) return true;
   return isOnCrossing(x, y);
 }
 
-export function isNorthOfRiver(y: number, x: number): boolean {
-  return y < riverCenterY(x);
+/** True on the enemy's side of the dividing feature. */
+export function isBeyondBarrier(y: number, x: number): boolean {
+  return y < barrierCenterAt(x);
 }
 
 /* ------------------------------------------------------------------- lookup */
@@ -212,10 +195,10 @@ export function distanceSquared(a: Vector2D, b: Vector2D): number {
  * point on the map has a name the Marshal can refer to.
  */
 export function zoneAt(x: number, y: number): ZoneId {
-  let bestId: ZoneId = 'central_field';
+  let bestId: ZoneId = runtime.map.zones[0]?.id ?? runtime.map.playerHomeZone;
   let bestScore = Number.POSITIVE_INFINITY;
 
-  for (const zone of ORDERED_ZONES) {
+  for (const zone of runtime.map.zones) {
     const dx = x - zone.center.x;
     const dy = y - zone.center.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -236,7 +219,10 @@ export function zoneAt(x: number, y: number): ZoneId {
 }
 
 export function terrainAt(x: number, y: number): TerrainKind {
-  if (isInRiver(x, y)) return isOnCrossing(x, y) ? 'crossing' : 'river';
+  if (isInMere(x, y)) return 'river';
+  if (isInBarrier(x, y)) {
+    return isOnCrossing(x, y) ? 'crossing' : (runtime.map.barrier?.kind ?? 'river');
+  }
   const zone = ZONES[zoneAt(x, y)];
   const dx = x - zone.center.x;
   const dy = y - zone.center.y;
@@ -252,42 +238,15 @@ export function isDefensiveTerrain(x: number, y: number): boolean {
 /* --------------------------------------------------------- navigation graph */
 
 /**
- * Adjacency for group-level pathfinding. Every edge that changes bank passes
- * through a crossing, so ordering a group north forces it onto a bridge or ford.
+ * Adjacency for group-level pathfinding. On a divided map every edge that
+ * changes bank passes through a crossing, so ordering a group across forces it
+ * onto a bridge, a ford or a gap.
  */
-export const ZONE_EDGES: ReadonlyArray<readonly [ZoneId, ZoneId]> = [
-  ['player_base', 'central_field'],
-  ['player_base', 'village'],
-  ['player_base', 'east_field'],
-  ['village', 'west_forest'],
-  ['village', 'central_field'],
-  ['west_forest', 'west_crossing'],
-  ['central_field', 'central_bridge'],
-  ['central_field', 'central_hill'],
-  ['central_hill', 'east_field'],
-  ['east_field', 'east_crossing'],
-  ['east_field', 'east_forest'],
-  ['east_forest', 'east_crossing'],
-  // River crossings: the only edges that change bank.
-  ['west_crossing', 'northern_ridge'],
-  ['central_bridge', 'enemy_outer_defense'],
-  ['east_crossing', 'enemy_outer_defense'],
-  // Northern bank.
-  ['northern_ridge', 'enemy_outer_defense'],
-  ['northern_ridge', 'enemy_base'],
-  ['enemy_outer_defense', 'enemy_base'],
-];
+export function neighboursOf(zoneId: ZoneId): readonly ZoneId[] {
+  return runtime.neighbours[zoneId] ?? [];
+}
 
-export const ZONE_NEIGHBOURS: Record<ZoneId, ZoneId[]> = (() => {
-  const map = Object.fromEntries(ZONE_IDS.map((id) => [id, [] as ZoneId[]])) as Record<
-    ZoneId,
-    ZoneId[]
-  >;
-  for (const [from, to] of ZONE_EDGES) {
-    map[from].push(to);
-    map[to].push(from);
-  }
-  // Sorted so graph traversal order never depends on declaration order.
-  for (const id of ZONE_IDS) map[id].sort();
-  return map;
-})();
+/** True when two adjacent zones are joined by an authored marching road. */
+export function isRoadConnection(first: ZoneId, second: ZoneId): boolean {
+  return runtime.roadEdges.has(edgeKey(first, second));
+}

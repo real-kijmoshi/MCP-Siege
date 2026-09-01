@@ -1,15 +1,21 @@
 {
   "name": "webmcp-siege",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "A deterministic large-scale browser strategy game with a WebMCP command surface.",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:balance": "vitest run --config vitest.balance.config.ts",
     "test:watch": "vitest",
     "build": "tsc --noEmit && vite build",
+    "check": "npm run typecheck && npm run test && npm run build",
     "preview": "vite preview"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

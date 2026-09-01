@@ -1,5 +1,6 @@
 import { TICKS_PER_SECOND } from '../../game/config/battle';
 import type { SimulationEngine } from '../../game/simulation/Engine';
+import { activeZoneIds, useBattleMap } from '../../game/simulation/Zones';
 import { GameQueries, QueryError } from '../../game/queries/GameQueries';
 import type { CommandResult, GameCommandPayload, PlanModification } from '../../game/commands/types';
 import {
@@ -8,7 +9,6 @@ import {
   PLAN_ACTIONS,
   STANCES,
   UNIT_CATEGORIES,
-  ZONE_IDS,
   type Formation,
   type OrderKind,
   type PlanAction,
@@ -124,13 +124,13 @@ function parseCondition(raw: unknown): PlanCondition {
       };
     case 'enemy_enters_zone':
       rejectUnknown(input, ['kind', 'zoneId']);
-      return { kind, zoneId: requireEnum(input, 'zoneId', ZONE_IDS) };
+      return { kind, zoneId: requireEnum(input, 'zoneId', activeZoneIds()) };
     case 'friendly_zone_lost':
       rejectUnknown(input, ['kind', 'zoneId']);
-      return { kind, zoneId: requireEnum(input, 'zoneId', ZONE_IDS) };
+      return { kind, zoneId: requireEnum(input, 'zoneId', activeZoneIds()) };
     case 'enemy_unit_type_visible': {
       rejectUnknown(input, ['kind', 'category', 'zoneId']);
-      const zoneId = optionalEnum(input, 'zoneId', ZONE_IDS);
+      const zoneId = optionalEnum(input, 'zoneId', activeZoneIds());
       return {
         kind,
         category: requireEnum(input, 'category', UNIT_CATEGORIES),
@@ -161,26 +161,23 @@ function parseStep(raw: unknown): Omit<PlanStep, 'id' | 'index'> {
   const input = asObject(raw);
   rejectUnknown(input, STEP_KEYS);
 
-  const targetZone = optionalEnum<ZoneId>(input, 'targetZone', ZONE_IDS);
+  const targetZone = optionalEnum<ZoneId>(input, 'targetZone', activeZoneIds());
   const targetGroupId = optionalString(input, 'targetGroupId', 64);
   const formation = optionalEnum<Formation>(input, 'formation', FORMATIONS);
   const stance = optionalEnum<Stance>(input, 'stance', STANCES);
 
-  if (input.startCondition === undefined) {
-    throw new InputError('Each step needs a startCondition.', [
-      'Use {"kind":"immediate"} for steps that begin at once.',
-    ]);
-  }
+  const action = requireEnum<PlanAction>(input, 'action', PLAN_ACTIONS);
 
   return {
     groupId: requireString(input, 'groupId', 64),
-    action: requireEnum<PlanAction>(input, 'action', PLAN_ACTIONS),
+    action,
     ...(targetZone !== undefined ? { targetZone } : {}),
     ...(targetGroupId !== undefined ? { targetGroupId } : {}),
     ...(formation !== undefined ? { formation } : {}),
     ...(stance !== undefined ? { stance } : {}),
-    startCondition: parseCondition(input.startCondition),
-    note: requireString(input, 'note', 200),
+    startCondition:
+      input.startCondition === undefined ? { kind: 'immediate' } : parseCondition(input.startCondition),
+    note: optionalString(input, 'note', 200) ?? action.replace('_', ' '),
   };
 }
 
@@ -230,6 +227,9 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
   ): ((input: unknown) => Promise<ToolResult<unknown>>) => {
     return async (input: unknown) => {
       try {
+        // Named locations are validated against the map this battle is on, so a
+        // zone from a different battlefield is refused rather than marched to.
+        useBattleMap(engine.getState().mapId);
         return await run(input);
       } catch (error) {
         if (error instanceof InputError) {
@@ -308,10 +308,32 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
         'order',
         ORDER_KINDS.filter((kind) => kind !== 'idle') as OrderKind[],
       );
-      const targetZone = optionalEnum<ZoneId>(input, 'targetZone', ZONE_IDS);
+      const targetZone = optionalEnum<ZoneId>(input, 'targetZone', activeZoneIds());
       const targetGroupId = optionalString(input, 'targetGroupId', 64);
       const formation = optionalEnum<Formation>(input, 'formation', FORMATIONS);
       const stance = optionalEnum<Stance>(input, 'stance', STANCES);
+
+      const zoneOrders: readonly OrderKind[] = ['move', 'attack_zone', 'defend_zone', 'scout'];
+      const groupOrders: readonly OrderKind[] = ['attack_group', 'support'];
+      if (zoneOrders.includes(order)) {
+        if (targetZone === undefined || targetGroupId !== undefined) {
+          throw new InputError(`Order "${order}" requires targetZone and no targetGroupId.`, [
+            'Call get_strategic_zones for valid targetZone values.',
+          ]);
+        }
+      } else if (groupOrders.includes(order)) {
+        if (targetGroupId === undefined || targetZone !== undefined) {
+          throw new InputError(`Order "${order}" requires targetGroupId and no targetZone.`, [
+            order === 'support'
+              ? 'Call get_armies for friendly group ids.'
+              : 'Call get_intelligence for known enemy group ids.',
+          ]);
+        }
+      } else if (targetZone !== undefined || targetGroupId !== undefined) {
+        throw new InputError(`Order "${order}" does not take a target.`, [
+          'Use hold or retreat with only groupIds, plus optional formation or stance.',
+        ]);
+      }
 
       return submit({
         type: 'order_groups',
@@ -371,7 +393,7 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
         'note',
       ]);
 
-      const targetZone = optionalEnum<ZoneId>(input, 'targetZone', ZONE_IDS);
+      const targetZone = optionalEnum<ZoneId>(input, 'targetZone', activeZoneIds());
       const targetGroupId = optionalString(input, 'targetGroupId', 64);
       const formation = optionalEnum<Formation>(input, 'formation', FORMATIONS);
       const stance = optionalEnum<Stance>(input, 'stance', STANCES);
@@ -409,14 +431,14 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
         type: 'focus_siege',
         playerId: PLAYER,
         siegeGroupId: requireString(input, 'siegeGroupId', 64),
-        targetZone: requireEnum<ZoneId>(input, 'targetZone', ZONE_IDS),
+        targetZone: requireEnum<ZoneId>(input, 'targetZone', activeZoneIds()),
       });
     }),
 
     directReinforcements: guarded(async (raw) => {
       const input = asObject(raw);
       rejectUnknown(input, ['targetZone', 'targetGroupId']);
-      const targetZone = optionalEnum<ZoneId>(input, 'targetZone', ZONE_IDS);
+      const targetZone = optionalEnum<ZoneId>(input, 'targetZone', activeZoneIds());
       const targetGroupId = optionalString(input, 'targetGroupId', 64);
       return submit({
         type: 'direct_reinforcements',

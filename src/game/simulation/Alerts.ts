@@ -1,7 +1,7 @@
 import { TICKS_PER_SECOND } from '../config/battle';
-import { ZONE_IDS, type AlertSeverity, type BattleAlert, type ZoneId } from '../types/domain';
+import type { AlertSeverity, BattleAlert, ZoneId } from '../types/domain';
 import { activeGroups, nextEntityId, type GameState } from './GameState';
-import { ZONES, zoneAt } from './Zones';
+import { ZONES, activeZoneIds, zoneAt } from './Zones';
 
 /**
  * Strategic event generation.
@@ -88,6 +88,30 @@ export function advanceAlerts(state: GameState): void {
       );
     }
 
+    // Being taken from several quarters at once. This is now the fastest way a
+    // regiment is destroyed, and the answer to it — turning, giving ground, or
+    // sending someone to break the ring — has to be given before the men are
+    // gone, so it is raised ahead of ordinary casualty reporting.
+    if (group.encirclement >= 0.5) {
+      raise(
+        state,
+        `attack:${group.id}:surrounded`,
+        'attack',
+        'critical',
+        `${group.name} is surrounded and being cut apart.`,
+        { groupId: group.id },
+      );
+    } else if (group.encirclement > 0) {
+      raise(
+        state,
+        `attack:${group.id}:flanked`,
+        'attack',
+        'warning',
+        `${group.name} is being taken in the flank.`,
+        { groupId: group.id },
+      );
+    }
+
     // Sustained casualties rather than a single skirmish.
     if (group.recentCasualties > Math.max(6, group.members.length * 0.02)) {
       raise(
@@ -122,7 +146,7 @@ export function advanceAlerts(state: GameState): void {
     }
   }
 
-  for (const zoneId of ZONE_IDS) {
+  for (const zoneId of activeZoneIds()) {
     const controller = state.zoneControl.get(zoneId);
     const previous = state.zoneControlPrevious.get(zoneId);
     if (previous !== controller) {
@@ -240,7 +264,7 @@ function objectiveAlerts(state: GameState): void {
 /** Baselines zone control at startup so the opening deployment reads as normal. */
 export function resetAlertTracking(state: GameState): void {
   state.zoneControlPrevious.clear();
-  for (const zoneId of ZONE_IDS) {
+  for (const zoneId of activeZoneIds()) {
     state.zoneControlPrevious.set(zoneId, state.zoneControl.get(zoneId));
   }
 }

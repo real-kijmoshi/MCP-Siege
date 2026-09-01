@@ -1,16 +1,5 @@
-import {
-  ARMY_DETAILS_SCHEMA,
-  CANCEL_CONDITIONAL_SCHEMA,
-  CREATE_PLAN_SCHEMA,
-  DIRECT_REINFORCEMENTS_SCHEMA,
-  EMPTY_INPUT_SCHEMA,
-  FOCUS_SIEGE_SCHEMA,
-  MODIFY_PLAN_SCHEMA,
-  ORDER_GROUP_SCHEMA,
-  PLAN_ID_SCHEMA,
-  REORGANIZE_SCHEMA,
-  SET_CONDITIONAL_SCHEMA,
-} from './schemas';
+import { ZONE_IDS, type ZoneId } from '../../game/types/domain';
+import { EMPTY_INPUT_SCHEMA, createToolSchemas } from './schemas';
 import type { WebMcpToolHandlers } from './tools';
 
 /**
@@ -34,10 +23,14 @@ export async function registerWebMcpTools(
   modelContext: WebMCP.ModelContext | undefined = typeof document === 'undefined'
     ? undefined
     : document.modelContext,
+  /** The zones of the map this battle is on. The schemas offer nothing else. */
+  zoneIds: readonly ZoneId[] = ZONE_IDS,
 ): Promise<WebMcpConnectionResult> {
   if (typeof modelContext?.registerTool !== 'function') {
     return { status: 'unavailable', code: 'API_UNAVAILABLE' };
   }
+
+  const schemas = createToolSchemas(zoneIds);
 
   // Abort any previous registration so a reload cannot leave a partial tool set.
   registrationController?.abort();
@@ -72,7 +65,11 @@ export async function registerWebMcpTools(
       title: 'Get armies',
       description:
         'Order of battle for every group under your command: strength, formation, stance, ' +
-        'morale, what it is doing and where it stands. Read-only.',
+        'morale, what it is doing and where it stands. Each group also reports whether it is ' +
+        'pinned — held in melee, and unable to march away until the fight is settled — and ' +
+        'whether it is surrounded, meaning the attack is coming from more quarters than the ' +
+        'formation can face. A surrounded group takes far heavier casualties and breaks fast, ' +
+        'so it is the first thing worth answering. Read-only.',
       inputSchema: EMPTY_INPUT_SCHEMA,
       annotations: { readOnlyHint: true },
       execute: () => handlers.getArmies(),
@@ -83,7 +80,7 @@ export async function registerWebMcpTools(
       description:
         'Detailed report on one group: composition, casualties, active order, the effect of its ' +
         'current formation, nearby friendly groups and known threats. Read-only.',
-      inputSchema: ARMY_DETAILS_SCHEMA,
+      inputSchema: schemas.ARMY_DETAILS_SCHEMA,
       annotations: { readOnlyHint: true },
       execute: (input) => handlers.getArmyDetails(input),
     },
@@ -165,7 +162,7 @@ export async function registerWebMcpTools(
         'Give one or more groups a real order: move, attack_zone, attack_group, defend_zone, ' +
         'hold, retreat, scout or support, with an optional formation and stance. Takes effect ' +
         'immediately through the same command queue the human commander uses.',
-      inputSchema: ORDER_GROUP_SCHEMA,
+      inputSchema: schemas.ORDER_GROUP_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.orderGroup(input),
     },
@@ -175,7 +172,7 @@ export async function registerWebMcpTools(
       description:
         'Split a group into a detachment, merge several groups into one, or rename a group. ' +
         'Splitting preserves the mix of troop types.',
-      inputSchema: REORGANIZE_SCHEMA,
+      inputSchema: schemas.REORGANIZE_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.reorganizeArmies(input),
     },
@@ -186,7 +183,7 @@ export async function registerWebMcpTools(
         'Arm an order that fires later when a condition is met, for example retreating a group ' +
         'if its morale falls below a threshold, or committing a reserve if a zone is lost. ' +
         'Fires once. List armed orders with get_active_orders.',
-      inputSchema: SET_CONDITIONAL_SCHEMA,
+      inputSchema: schemas.SET_CONDITIONAL_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.setConditionalOrder(input),
     },
@@ -194,7 +191,7 @@ export async function registerWebMcpTools(
       name: 'cancel_conditional_order',
       title: 'Cancel a standing order',
       description: 'Disarm a standing conditional order before it fires.',
-      inputSchema: CANCEL_CONDITIONAL_SCHEMA,
+      inputSchema: schemas.CANCEL_CONDITIONAL_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.cancelConditionalOrder(input),
     },
@@ -204,7 +201,7 @@ export async function registerWebMcpTools(
       description:
         'Commit a siege group to bombard a zone. Siege outranges everything but is slow and ' +
         'helpless in close combat, so it is deployed loose and holding ground.',
-      inputSchema: FOCUS_SIEGE_SCHEMA,
+      inputSchema: schemas.FOCUS_SIEGE_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.focusSiege(input),
     },
@@ -214,7 +211,7 @@ export async function registerWebMcpTools(
       description:
         'Commit a banked reinforcement wave as a new group and send it to a zone or to support ' +
         'an existing group. Check availability with get_battle_overview.',
-      inputSchema: DIRECT_REINFORCEMENTS_SCHEMA,
+      inputSchema: schemas.DIRECT_REINFORCEMENTS_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.directReinforcements(input),
     },
@@ -226,7 +223,7 @@ export async function registerWebMcpTools(
         'Draft a multi-step operation WITHOUT executing it. Nothing moves. The plan is drawn ' +
         'over the battlefield as numbered arrows so the commander can review it, and steps may ' +
         'be gated on conditions. Call execute_plan only once the commander approves.',
-      inputSchema: CREATE_PLAN_SCHEMA,
+      inputSchema: schemas.CREATE_PLAN_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.createPlan(input),
     },
@@ -236,7 +233,7 @@ export async function registerWebMcpTools(
       description:
         'Revise a drafted plan: add, remove, replace or reorder steps, or rename the operation. ' +
         'The battlefield preview updates. Still nothing moves.',
-      inputSchema: MODIFY_PLAN_SCHEMA,
+      inputSchema: schemas.MODIFY_PLAN_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.modifyPlan(input),
     },
@@ -246,7 +243,7 @@ export async function registerWebMcpTools(
       description:
         'Commit a drafted plan. Steps with an immediate condition become orders at once; the ' +
         'rest are armed and fire when their trigger is met.',
-      inputSchema: PLAN_ID_SCHEMA,
+      inputSchema: schemas.PLAN_ID_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.executePlan(input),
     },
@@ -256,7 +253,7 @@ export async function registerWebMcpTools(
       description:
         'Cancel a plan and disarm any steps still waiting. Orders already issued still stand; ' +
         'this is not a recall of troops already marching.',
-      inputSchema: PLAN_ID_SCHEMA,
+      inputSchema: schemas.PLAN_ID_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.cancelPlan(input),
     },

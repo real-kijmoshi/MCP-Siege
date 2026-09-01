@@ -4,8 +4,9 @@ A browser strategy game about commanding **more army than one person can drive b
 hand**, built so that an external AI agent can fight alongside you through
 [WebMCP](https://github.com/webmachinelearning/webmcp).
 
-Roughly 7,950 soldiers in twenty regiments hold a river line, and each side has
-a king to lose. You are the Commander. An agent in a WebMCP-capable browser —
+Roughly 7,950 soldiers in twenty regiments fight over a river crossing, a
+volcanic pass, an open harvest plain or a tidal causeway, and each side has a
+king to lose. You are the Commander. An agent in a WebMCP-capable browser —
 ChatGPT's in-app browser, or Chrome with the WebMCP flag — is your **Marshal**.
 It reads the same fog-limited intelligence you do, drafts operations you can see
 drawn over the battlefield before anything moves, and issues orders through
@@ -58,12 +59,21 @@ The game is fully playable with no agent at all.
 | Left click | Select the regiment under the cursor |
 | Drag | Box-select regiments |
 | Shift + click | Add to or remove from the selection |
+| Ctrl + A | Select the whole army |
+| Tab / Shift + Tab | Step through regiments, centring on each |
 | Right click | Move there, or attack the enemy under the cursor |
+| Ctrl + right click | Attack-move: take that ground and fight for it |
 | Shift + right click | Queue a waypoint |
-| Wheel | Zoom at the cursor |
-| WASD / arrows / middle-drag | Pan |
+| Wheel · Z · X | Zoom |
+| Right-drag / WASD / arrows / middle-drag | Pan |
 | Ctrl + 1–9 / 1–9 | Assign / recall a control group |
-| F · Space · +/- · Esc | Focus selection · pause · speed · clear |
+| F · H · Space · +/- · Esc | Focus selection · your king · pause · speed · clear |
+| Double-click a roster row | Centre on that regiment |
+| Click an alert | Fly to the ground it names |
+
+The three letters in front of a regiment's name are its troop type, and the
+readout at bottom-left names what that type beats and what beats it. Most fights
+are decided by that matchup and by regiments losing heart, not by arithmetic.
 
 Zoom out far enough and regiments collapse into density blobs with names and
 morale bars, which is the view you actually want when three fronts are moving.
@@ -83,8 +93,10 @@ Twenty-one tools. Reads are fog-limited; every write goes through the same
 
 **Plan Mode** — `create_plan`, `modify_plan`, `execute_plan`, `cancel_plan`
 
-Locations are named zones (`central_bridge`, `west_crossing`, `east_field`, …),
-never pixels, so the Marshal reasons in the same terms you do.
+Locations are named zones (`central_bridge`, `cinder_gap`, `goldmere_town`, …),
+never pixels, so the Marshal reasons in the same terms you do. The zone enum is
+built per battle from the map actually being fought over, so the Marshal is
+never offered ground that is not in front of it.
 
 ### Plan Mode
 
@@ -123,8 +135,9 @@ once he is reported as unknown.
 **Take the Ashen King.** He rides with his Royal Guard in the enemy base, and he
 is taken by holding the ground around him — which means breaking or drawing off
 that guard first. Capture is rate capped, so any attempt gives the defender time
-to answer; while a king is beset, his whole army loses heart. A side reduced
-below 15% of its strength concedes the field instead.
+to answer; while a king is beset, his whole army loses heart. An army cut below
+a third of its strength concedes the field instead — regiments give way with
+men still standing, and an army that has broken twice is finished.
 
 King Aldric is behind your own lines under the same rules, and at around the
 seven-minute mark the enemy sends cavalry for him. Winning the field and
@@ -137,17 +150,36 @@ A king is not a hero unit. He has no abilities, no health bar and no slot in the
 unit pool, and no tool can target him — you act on him by ordering regiments to
 where he stands.
 
-## The scenario
+## Operations and difficulty
 
-A river with three crossings splits an 8,000 × 5,000 battlefield. You hold the
-south with nine regiments and a Royal Guard; the Ashen Host holds the north with
-nine of its own and a guard of theirs.
+The War Council lobby offers seven authored starts across four hand-built
+8,000 × 5,000 battlefields. Each map is shaped around one dividing feature and
+the few places it can be passed:
 
-The opening is quiet enough to command by hand. Then the enemy centre storms the
-bridge, cavalry sweeps the east, more cavalry threatens the western ford, and the
-siege train comes into range — several fronts at once, which is the point. That
-is when handing a front to the Marshal stops being a demo and starts being how
-you keep up.
+**River Vale** — a slow river with three crossings.
+
+- **Riverwatch** — hold the southern bank through a measured three-front assault.
+- **Broken Bridgehead** — command an exposed vanguard already north of the river.
+- **Last Light** — reform around King Aldric after the crossings have been lost.
+
+**Ashfall Pass** — a dead volcanic spine, broken open in two places.
+
+- **Cinder Road** — force one of two gaps four kilometres apart.
+- **The Ashen Gate** — hold the far side with one road home behind you.
+
+**Goldmere** — open harvest country with nothing dividing it at all.
+
+- **Goldmere Fields** — a cavalry-heavy battle where both flanks are your problem.
+
+**Sunken Causeway** — a tidal channel cut corner to corner.
+
+- **The Long Causeway** — one raised road, one ford, and a long march between them.
+
+Levy, Captain, and Warlord change enemy commitment timing, reaction cadence,
+threat radius, and royal relief behavior. They do not change fog-of-war rules or
+give the enemy a privileged command path. The selected operation and commander
+are included in `get_battle_overview`, so a WebMCP Marshal receives the same
+briefing as the human player.
 
 ## How it fits together
 
