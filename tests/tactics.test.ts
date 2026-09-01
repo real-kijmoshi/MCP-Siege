@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { TICKS_PER_SECOND, UNIT_STATS, counterMultiplier } from '../src/game/config/battle';
+import {
+  CROWDING,
+  FATIGUE,
+  TICKS_PER_SECOND,
+  UNIT_STATS,
+  counterMultiplier,
+} from '../src/game/config/battle';
 import { createGroupFromSpec, type GroupSpec } from '../src/game/config/scenario';
 import { formationRadius, formationSlots } from '../src/game/simulation/Formations';
 import { createEmptyState, findGroup, type GameState } from '../src/game/simulation/GameState';
 import { advanceCombat } from '../src/game/simulation/Combat';
+import { advanceFatigue } from '../src/game/simulation/Fatigue';
 import { advanceMorale } from '../src/game/simulation/Morale';
 import { advanceMovement } from '../src/game/simulation/Movement';
 import { computePath, hasClearLineOfMarch } from '../src/game/simulation/Navigation';
 import { barrierCenterAt, isPassable, useBattleMap, zoneAt } from '../src/game/simulation/Zones';
 import { applyOrderToGroup } from '../src/game/commands/handlers/shared';
-import { FORMATIONS, type UnitCategory } from '../src/game/types/domain';
+import { FORMATIONS, type ArmyGroup, type UnitCategory } from '../src/game/types/domain';
 
 const ANCHOR = { x: 4000, y: 3000 };
 
@@ -516,6 +523,228 @@ describe('envelopment', () => {
     const standing = chase(false);
     expect(standing).toBeGreaterThan(0);
     expect(broken).toBeLessThan(standing * 0.75);
+  });
+});
+
+/**
+ * The press, exhaustion, and the ground at a crossing.
+ *
+ * These are the terms that stop one enormous mass of men from being the answer
+ * to every problem on the map, so each one is pinned down here directly rather
+ * than left to be inferred from the outcome of a battle.
+ */
+describe('the press of men', () => {
+  function pack(count: number, formation: 'block' | 'loose'): number {
+    const state = createEmptyState(5150);
+    for (let n = 0; n < count; n += 1) {
+      createGroupFromSpec(state, {
+        id: `packed_${n}`,
+        name: `Packed ${n}`,
+        ownerId: 'player',
+        anchor: { x: 4000, y: 3000 },
+        formation,
+        stance: 'hold_ground',
+        composition: [['infantry', 400]],
+      });
+    }
+    // Crowding is smoothed, so it needs a moment to settle on its reading.
+    for (let tick = 0; tick < 120; tick += 1) {
+      state.currentTick += 1;
+      advanceCombat(state);
+    }
+    return findGroup(state, 'packed_0')?.crowding ?? -1;
+  }
+
+  it('leaves a formation at its own spacing alone and crushes regiments stacked on one another', () => {
+    expect(pack(1, 'block')).toBeLessThan(0.05);
+    expect(pack(1, 'loose')).toBeLessThan(0.05);
+    expect(pack(3, 'block')).toBeGreaterThan(0.8);
+  });
+
+  function blowWith(mutate: (group: ArmyGroup) => void): number {
+    const state = createEmptyState(6160);
+    createGroupFromSpec(state, {
+      id: 'striker',
+      name: 'Striker',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3012 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 1]],
+    });
+    createGroupFromSpec(state, {
+      id: 'target',
+      name: 'Target',
+      ownerId: 'enemy',
+      anchor: { x: 4000, y: 3000 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 1]],
+    });
+    const striker = findGroup(state, 'striker')!;
+    const target = findGroup(state, 'target')!;
+    mutate(striker);
+    state.units.targetIdx[striker.members[0]!] = target.members[0]!;
+    state.currentTick = 3;
+    advanceCombat(state);
+    return UNIT_STATS.infantry.maxHitPoints - (state.units.hp[target.members[0]!] ?? 0);
+  }
+
+  it('takes the fight out of men who are crushed together or worn out', () => {
+    const fresh = blowWith(() => {});
+    const crushed = blowWith((group) => {
+      group.crowding = 1;
+    });
+    const spent = blowWith((group) => {
+      group.fatigue = 1;
+    });
+
+    expect(crushed).toBeLessThan(fresh * (1 - CROWDING.damagePenalty * 0.85));
+    expect(spent).toBeLessThan(fresh * (1 - FATIGUE.damagePenalty * 0.85));
+  });
+
+  function shotAt(crowding: number): number {
+    const state = createEmptyState(6161);
+    createGroupFromSpec(state, {
+      id: 'bows',
+      name: 'Bows',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3100 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['archer', 1]],
+    });
+    createGroupFromSpec(state, {
+      id: 'column',
+      name: 'Column',
+      ownerId: 'enemy',
+      anchor: { x: 4000, y: 3000 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 1]],
+    });
+    const bows = findGroup(state, 'bows')!;
+    const column = findGroup(state, 'column')!;
+    column.crowding = crowding;
+    state.units.targetIdx[bows.members[0]!] = column.members[0]!;
+    state.currentTick = 3;
+    advanceCombat(state);
+    return UNIT_STATS.infantry.maxHitPoints - (state.units.hp[column.members[0]!] ?? 0);
+  }
+
+  it('makes a crushed formation far worse ground to be shot at on', () => {
+    expect(shotAt(1)).toBeGreaterThan(shotAt(0) * 1.4);
+  });
+});
+
+describe('crossings', () => {
+  /**
+   * One blow struck at a defender formed on the far bank, by a man either still
+   * on the bridge or already off it. Positions are written straight into the
+   * pool: the deployment helper would move an anchor off the water, which is
+   * exactly the ground being tested.
+   */
+  function blowFromTheCrossing(fromTheBridge: boolean): number {
+    const state = createEmptyState(9192);
+    useBattleMap('river_vale');
+    const bridgeX = 4000;
+    const centre = barrierCenterAt(bridgeX);
+
+    createGroupFromSpec(state, {
+      id: 'storming',
+      name: 'Storming',
+      ownerId: 'player',
+      anchor: { x: bridgeX, y: 3000 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 1]],
+    });
+    createGroupFromSpec(state, {
+      id: 'holding',
+      name: 'Holding',
+      ownerId: 'enemy',
+      anchor: { x: bridgeX, y: 2000 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 1]],
+    });
+
+    const storming = findGroup(state, 'storming')!;
+    const holding = findGroup(state, 'holding')!;
+    const attacker = storming.members[0]!;
+    const defender = holding.members[0]!;
+
+    // Either side of the north bank, or either side of the waterline. The two
+    // men stand the same ten paces apart in both cases.
+    const defenderY = fromTheBridge ? centre - 140 : centre - 160;
+    const attackerY = defenderY + 10;
+    state.units.x[attacker] = bridgeX;
+    state.units.y[attacker] = attackerY;
+    state.units.x[defender] = bridgeX;
+    state.units.y[defender] = defenderY;
+    storming.anchor.y = attackerY;
+    holding.anchor.y = defenderY;
+    state.units.targetIdx[attacker] = defender;
+
+    state.currentTick = 3;
+    advanceCombat(state);
+    return UNIT_STATS.infantry.maxHitPoints - (state.units.hp[defender] ?? 0);
+  }
+
+  it('costs an assault most of its weight while it is still fighting off the bridge', () => {
+    const formed = blowFromTheCrossing(false);
+    const onTheBridge = blowFromTheCrossing(true);
+    expect(onTheBridge).toBeLessThan(formed * 0.8);
+  });
+});
+
+describe('exhaustion', () => {
+  function endure(engagement: number, marching: boolean, ticks: number): number {
+    const state = createEmptyState(7170);
+    createGroupFromSpec(state, {
+      id: 'weary',
+      name: 'Weary',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3000 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 100]],
+    });
+    const group = findGroup(state, 'weary')!;
+    for (let tick = 0; tick < ticks; tick += 1) {
+      state.currentTick += 1;
+      group.engagement = engagement;
+      group.path = marching ? [{ x: 4000, y: 2000 }] : [];
+      advanceFatigue(state);
+    }
+    return group.fatigue;
+  }
+
+  it('wears men down in contact faster than on the march, and rests them out of both', () => {
+    const fought = endure(1, false, TICKS_PER_SECOND * 60);
+    const marched = endure(0, true, TICKS_PER_SECOND * 60);
+    expect(fought).toBeGreaterThan(0.6);
+    expect(marched).toBeGreaterThan(0);
+    expect(marched).toBeLessThan(fought * 0.5);
+
+    // The same regiment, left standing out of contact, gets its wind back.
+    const state = createEmptyState(7170);
+    createGroupFromSpec(state, {
+      id: 'weary',
+      name: 'Weary',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3000 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 100]],
+    });
+    const group = findGroup(state, 'weary')!;
+    group.fatigue = 1;
+    for (let tick = 0; tick < TICKS_PER_SECOND * 60; tick += 1) {
+      state.currentTick += 1;
+      advanceFatigue(state);
+    }
+    expect(group.fatigue).toBeLessThan(0.6);
   });
 });
 

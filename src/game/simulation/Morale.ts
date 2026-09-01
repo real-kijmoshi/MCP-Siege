@@ -1,4 +1,4 @@
-import { MORALE, MORALE_THRESHOLDS, OBJECTIVE } from '../config/battle';
+import { CROWDING, FATIGUE, MORALE, MORALE_THRESHOLDS, OBJECTIVE } from '../config/battle';
 import type { ArmyGroup, MoraleState } from '../types/domain';
 import { activeGroups, type GameState } from './GameState';
 import { isDefensiveTerrain } from './Zones';
@@ -69,7 +69,10 @@ export function advanceMorale(state: GameState): void {
     // itself; without this, neighbouring routs feed each other into a spiral
     // that no side ever recovers from.
     if (pressure < 0.002) {
-      delta += group.routing ? MORALE.rallyRecoveryPerTick : MORALE.recoveryPerTick;
+      // Spent men steady more slowly than fresh ones, so a regiment pulled out
+      // of a long fight cannot simply be fed straight back into it.
+      const rest = group.routing ? MORALE.rallyRecoveryPerTick : MORALE.recoveryPerTick;
+      delta += rest * (1 - FATIGUE.recoveryDrag * group.fatigue);
     }
 
     let supported = false;
@@ -101,7 +104,16 @@ export function advanceMorale(state: GameState): void {
         delta -= MORALE.flankedPenalty * 0.5;
       }
       if (isDefensiveTerrain(group.anchor.x, group.anchor.y)) delta += MORALE.terrainBonus;
+
+      // The crush. Men packed into a defile cannot see, cannot dress their
+      // ranks and cannot get out, and formations come apart in that state well
+      // before they are killed in it. This is the cost of pushing an army
+      // through one gap in a single mass.
+      delta -= CROWDING.moralePenalty * group.crowding;
     }
+
+    // Exhaustion tells on troops whether they are fighting or running.
+    delta -= FATIGUE.moralePenalty * group.fatigue;
 
     // The sovereign. Men steady in sight of him, and every regiment in the army
     // feels it when he is beset — which is what makes a raid on a lightly held

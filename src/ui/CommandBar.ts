@@ -7,7 +7,7 @@ import {
 } from '../game/config/battle';
 import type { SimulationEngine } from '../game/simulation/Engine';
 import { activeGroups, findGroup, type GameState } from '../game/simulation/GameState';
-import { zoneAt } from '../game/simulation/Zones';
+import { ZONES, terrainAt, zoneAt } from '../game/simulation/Zones';
 import {
   FORMATIONS,
   STANCES,
@@ -37,6 +37,25 @@ function primaryRoleOf(state: GameState, group: ArmyGroup): UnitCategory {
     if ((roleTally[ordinal] ?? 0) > (roleTally[best] ?? 0)) best = ordinal;
   }
   return UNIT_CATEGORIES[best] as UnitCategory;
+}
+
+function terrainAdvice(terrain: ReturnType<typeof terrainAt>): string {
+  switch (terrain) {
+    case 'village':
+      return 'walls absorb 22% incoming damage; cavalry moves 38% slower';
+    case 'hill':
+      return 'defenders take 18% less damage; ranged attacks gain 12%';
+    case 'forest':
+      return 'missiles lose 30%; cavalry attacks lose 28% and moves slowly';
+    case 'crossing':
+      return 'choke point; columns pass through it most cleanly';
+    case 'river':
+      return 'impassable water; use a named crossing';
+    case 'ridge':
+      return 'impassable rock; use a named gap';
+    default:
+      return 'open ground; full speed and strong cavalry charges';
+  }
 }
 
 /**
@@ -300,6 +319,8 @@ export class CommandBar {
     if (groups.length === 1 && groups[0] !== undefined) {
       const group = groups[0];
       const role = primaryRoleOf(state, group);
+      const zone = ZONES[zoneAt(group.anchor.x, group.anchor.y)];
+      const terrain = terrainAt(group.anchor.x, group.anchor.y);
 
       label.textContent = `${group.formation.toUpperCase().replace('_', ' ')} · ${group.stance
         .toUpperCase()
@@ -308,9 +329,15 @@ export class CommandBar {
         group.morale,
       )}% morale`;
 
+      label.textContent = `${zone.name.toUpperCase()} · ${terrain.toUpperCase()} · ${group.formation
+        .toUpperCase()
+        .replace('_', ' ')}`;
+
       // The one place the counter matrix is spelled out in words. Without it a
       // player can lose a cavalry wing to a spear wall and never learn why.
-      this.setMatchup(`${UNIT_STATS[role].label}: ${describeMatchups(role)}`);
+      this.setMatchup(
+        `${UNIT_STATS[role].label}: ${describeMatchups(role)} · ${zone.name}: ${terrainAdvice(terrain)}`,
+      );
     } else {
       label.textContent = `${groups.length} GROUPS SELECTED`;
       detail.textContent = `${men.toLocaleString()} men under orders`;

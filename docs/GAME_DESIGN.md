@@ -48,6 +48,19 @@ Three things follow from it:
   heavy infantry grind ordinary infantry; siege devastates anything packed tight.
 - **Formations.** Line for frontage, column for crossings, wedge to charge,
   square against cavalry, loose to survive bombardment. Each trades something.
+- **The press.** A regiment fights along its frontage, so men beyond what that
+  frontage can hold are not reinforcements — they are a crowd. Pushed together
+  hard enough, a formation loses half its damage, bleeds morale, and becomes the
+  target every archer on the field wants. This is what stops "send everything
+  through the bridge" from being the answer to every map: the gap that makes a
+  crossing worth holding is the same gap that crushes the army trying to force
+  it. The counters are real ones — fewer regiments at a time, loose order, or a
+  second crossing.
+- **Exhaustion.** Men who have been fighting for a quarter of an hour hit softer,
+  steady more slowly and give ground under a press they would have held at the
+  start. It is what makes a reserve worth holding rather than committing, and
+  what makes relieving a spent regiment with a fresh one a real move rather than
+  a tidy one.
 - **Morale.** Most engagements are decided by regiments breaking, not by being
   annihilated. A regiment gives way with roughly a third of its men still
   standing, refuses orders, and streams for the rear; it rallies if it gets
@@ -58,10 +71,12 @@ Three things follow from it:
 - **Terrain.** Every battlefield is built around one dividing feature and the
   few places it can be passed, which is what makes those places worth dying on:
   a river with three bridges, a volcanic spine with two gaps, a tidal channel
-  with one causeway and one ford. Goldmere is the deliberate exception — nothing
-  divides it at all, so both flanks are open the whole way round and the ground
-  gives the commander no help. Forest, hills and villages favour defenders
-  everywhere.
+  with one causeway and one ford. Men still fighting from the crossing itself
+  strike at little more than half weight and can put almost no shove behind it,
+  because a bridge is ground you have to get off, not ground you fight on.
+  Goldmere is the deliberate exception — nothing divides it at all, so both
+  flanks are open the whole way round and the ground gives the commander no
+  help. Forest, hills and villages favour defenders everywhere.
 - **Fog.** You fight on estimates. So does the Marshal. This binds the objective
   too: the enemy king is reported at his last *sighting*, never his position,
   and until he has been seen once he is simply unknown. Fog hides *forces*, not
@@ -120,7 +135,17 @@ commander stops trading blows along the line and drives everything he has left
 at the player's sovereign, so a battle closes on a crisis rather than trailing
 off into a stalemate neither side can break.
 
+The commander also declines to be farmed. He will not march a regiment into
+several times its own numbers standing on the objective — he halts it on the
+ground it holds instead — and once he can see the player's whole weight gathered
+in one place, everything of his that is clear of the fighting goes the other way,
+at the sovereign that weight is no longer standing in front of. A rush is
+therefore a race rather than a free win, and because he is reading his own
+contacts rather than the truth, a feint moves him exactly as a real commitment
+would.
+
 Levy, Captain, and Warlord preserve those authored arcs while changing when the
 enemy commits, how often it reacts to visible contacts, how far it coordinates,
-how broadly it recalls relief for its king, and how soon it makes that final
-drive. Difficulty never grants hidden information or bypasses the command queue.
+how broadly it recalls relief for its king, how quickly it notices an army that
+has committed itself, and how soon it makes that final drive. Difficulty never
+grants hidden information or bypasses the command queue.

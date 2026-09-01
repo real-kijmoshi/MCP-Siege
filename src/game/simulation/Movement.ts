@@ -182,8 +182,9 @@ function advanceUnits(state: GameState, group: ArmyGroup): void {
     // A wide formation cannot physically fit on a bridge or through a defile.
     // Compress only the blocked files onto the passable group anchor while it
     // crosses, then let them dress back into formation on the far side.
-    units.slotX[index] = isPassable(targetX, targetY) ? targetX : group.anchor.x;
-    units.slotY[index] = isPassable(targetX, targetY) ? targetY : group.anchor.y;
+    const targetPassable = isPassable(targetX, targetY);
+    units.slotX[index] = targetPassable ? targetX : group.anchor.x;
+    units.slotY[index] = targetPassable ? targetY : group.anchor.y;
 
     const x = units.x[index] ?? 0;
     const y = units.y[index] ?? 0;

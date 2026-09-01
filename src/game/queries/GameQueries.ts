@@ -1,5 +1,7 @@
 import {
   CONTACT,
+  CROWDING,
+  FATIGUE,
   FORMATION_PROFILES,
   OBJECTIVE,
   TICKS_PER_SECOND,
@@ -94,6 +96,22 @@ export interface ArmySummary {
    * position is doing its job.
    */
   pinned: boolean;
+  /**
+   * True when the men are packed too tightly to fight properly, which happens
+   * when several regiments are pushed onto the same ground or through the same
+   * defile. A crushed formation loses much of its damage, bleeds morale, and
+   * is worth twice as much to enemy archers. The answer is space: send fewer
+   * regiments through at once, or spread into loose order.
+   */
+  crowded: boolean;
+  /**
+   * How spent the regiment is, 0 fresh to 100 exhausted. Troops that have been
+   * fighting for a long time hit softer and give ground more easily, which is
+   * what makes relieving a tired regiment with a fresh one worth doing.
+   */
+  fatigue: number;
+  /** True once fatigue has reached the point where it is costing the group. */
+  spent: boolean;
 }
 
 export interface ArmyDetails extends ArmySummary {
@@ -376,6 +394,9 @@ export class GameQueries {
         state.currentTick - group.lastCasualtyTick < ENGAGED_TICKS,
       surrounded: group.encirclement > 0,
       pinned: !group.routing && group.engagement >= CONTACT.pinEngagement,
+      crowded: group.crowding >= CROWDING.reportThreshold,
+      fatigue: Math.round(group.fatigue * 100),
+      spent: group.fatigue >= FATIGUE.reportThreshold,
     };
     if (group.order.targetZone !== undefined) summary.targetZone = group.order.targetZone;
     if (group.order.targetGroupId !== undefined) summary.targetGroupId = group.order.targetGroupId;
@@ -650,6 +671,11 @@ export class GameQueries {
       if (group.routing) attention.push(`${group.name} is routing.`);
       else if (group.encirclement > 0) attention.push(`${group.name} is being surrounded.`);
       else if (group.morale < 35) attention.push(`${group.name} is close to breaking.`);
+      else if (group.crowding >= CROWDING.reportThreshold) {
+        attention.push(`${group.name} is packed too tightly to fight; give it room.`);
+      } else if (group.fatigue >= FATIGUE.reportThreshold) {
+        attention.push(`${group.name} is spent and should be relieved.`);
+      }
     }
     if (visibleContacts.length === 0) {
       attention.push('No enemy formation is in sight; do not treat an empty report as an empty front.');

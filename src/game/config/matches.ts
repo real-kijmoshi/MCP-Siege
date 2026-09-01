@@ -40,6 +40,22 @@ export interface DifficultyDefinition {
    * battle reached twenty minutes with no decision at all.
    */
   finalPushSeconds: number;
+  /**
+   * When the commander starts looking for an army that has committed itself.
+   *
+   * The single most effective thing a player could do was to put every regiment
+   * he owned onto one crossing and walk through: the defenders there were
+   * outnumbered five to one, and nothing on the far side of the field ever
+   * noticed. Past this point an enemy that sees the player's weight gathered in
+   * one place sends everything clear of the fighting the other way, at the
+   * player's own sovereign. Scaled by `timelineScale` like the rest of the arc.
+   */
+  opportunismSeconds: number;
+  /**
+   * Share of the player's *sighted* strength that must be standing in one zone
+   * before the commander calls it a commitment worth exploiting.
+   */
+  opportunismConcentration: number;
 }
 
 export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
@@ -47,12 +63,16 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
     id: 'levy',
     name: 'Levy',
     subtitle: 'Forgiving',
-    description: 'Slower commitments and a narrower response radius. Best for learning command.',
+    description:
+      'Slower commitments, a narrower response radius, and a commander slow to punish an army ' +
+      'that has committed itself. Best for learning command.',
     timelineScale: 1,
     reactionSeconds: 8,
     reactionRadius: 1200,
     kingDefenseRadius: 2100,
     finalPushSeconds: 660,
+    opportunismSeconds: 300,
+    opportunismConcentration: 0.7,
   },
   captain: {
     id: 'captain',
@@ -64,6 +84,8 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
     reactionRadius: 1500,
     kingDefenseRadius: 2600,
     finalPushSeconds: 540,
+    opportunismSeconds: 150,
+    opportunismConcentration: 0.58,
   },
   warlord: {
     id: 'warlord',
@@ -75,6 +97,8 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
     reactionRadius: 2050,
     kingDefenseRadius: 3400,
     finalPushSeconds: 420,
+    opportunismSeconds: 90,
+    opportunismConcentration: 0.5,
   },
 };
 

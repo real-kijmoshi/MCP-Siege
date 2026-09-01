@@ -291,10 +291,10 @@ function redeploy(groups: readonly GroupSpec[], changes: GroupChanges): GroupSpe
 }
 
 const RIVERWATCH_SCRIPT: readonly ScriptedAiOrder[] = [
-  { atSeconds: 40, groupId: 'iron_host', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
-  { atSeconds: 45, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
-  { atSeconds: 50, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
-  { atSeconds: 60, groupId: 'black_arrows', order: 'move', targetZone: 'central_bridge', formation: 'column' },
+  { atSeconds: 18, groupId: 'iron_host', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
+  { atSeconds: 22, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
+  { atSeconds: 28, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
+  { atSeconds: 34, groupId: 'black_arrows', order: 'move', targetZone: 'central_bridge', formation: 'column' },
   { atSeconds: 85, groupId: 'iron_host', order: 'attack_zone', targetZone: 'central_field', formation: 'line' },
   { atSeconds: 92, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_field', formation: 'line' },
   { atSeconds: 100, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'central_field', formation: 'double_line' },
@@ -865,6 +865,8 @@ export function createGroupFromSpec(state: GameState, spec: GroupSpec): ArmyGrou
     routing: false,
     engagement: 0,
     encirclement: 0,
+    crowding: 0,
+    fatigue: 0,
   };
 
   const faction = factionOf(spec.ownerId);

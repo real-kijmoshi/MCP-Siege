@@ -35,6 +35,7 @@ import {
 import { advanceAlerts, resetAlertTracking } from './Alerts';
 import { advanceCombat } from './Combat';
 import { collectTriggeredOrders } from './Conditions';
+import { advanceFatigue } from './Fatigue';
 import { createEmptyState, type GameState } from './GameState';
 import { advanceMorale } from './Morale';
 import { advanceMovement } from './Movement';
@@ -106,6 +107,7 @@ export class SimulationEngine {
 
     advanceMovement(this.state);
     advanceCombat(this.state);
+    advanceFatigue(this.state);
     advanceMorale(this.state);
     advanceVisibility(this.state);
     advanceZoneControl(this.state);

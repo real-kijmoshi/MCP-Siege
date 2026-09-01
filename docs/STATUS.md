@@ -1,7 +1,106 @@
 # Current Milestone
 
-Interface pass complete. No simulation rule, command, tool or scenario changed;
-the work is entirely in what the screen says and where it says it.
+Massed-attack pass complete: numbers alone no longer decide a battle. Men packed
+into one gap are crushed and fight badly, troops in prolonged contact wear out,
+an assault still fighting from a crossing strikes at little more than half
+weight, and the enemy commander refuses to be farmed — he declines hopeless
+assaults and marches on the player's sovereign the moment the player's army
+commits itself to one place.
+
+# Massed Attack Pass
+
+## The problem
+
+Putting every regiment onto the central bridge and walking through was strictly
+correct on every divided map. Mass had no cost: nothing punished stacking
+regiments on one another, a bridge was a slightly slower piece of open field,
+troops never tired, and the enemy commander both fed his own regiments into the
+mass a formation at a time and never noticed that the rest of the field had been
+abandoned. The battle it produced was arithmetic, not a decision.
+
+## What changed
+
+- **The press.** `Combat` samples the density of *friendly* men around each
+  soldier, staggered across ticks, and folds it into `group.crowding`. A
+  formation at its own spacing reads zero; regiments stacked on one another, or
+  compressed onto a bridge, read one. A crushed formation loses half its damage,
+  bleeds morale, and takes far heavier arrow and siege casualties. Loose order
+  and fewer regiments at a time are the answers, and both are real moves.
+- **Exhaustion.** A new `Fatigue` system, group-level and one pass over roughly
+  twenty records, accrues with contact and with marching and sheds while standing
+  out of both. Spent troops hit softer, steady more slowly and lose their footing
+  under a press — which is what finally makes a reserve worth holding rather than
+  committing on the first minute.
+- **The crossing is ground you have to get off.** An attacker still fighting from
+  inside the barrier delivers 60% damage against a defender who is not, and puts
+  only 40% of his weight behind the shove, so a large enough column can no longer
+  simply bulldoze a blocking line off the far end.
+- **The commander declines to be farmed.** He will not march a regiment into
+  3.5 times its own numbers standing on the objective; he halts it where it
+  stands instead. Past an early, difficulty-scaled point he also watches where the
+  player's sighted weight actually is, and once it is gathered in one zone he
+  sends everything clear of the fighting at the player's king. He reads his own
+  contacts, never the truth, so a feint moves him exactly as a commitment does.
+- **Both conditions are visible.** The roster carries `CRUSHED` and `SPENT`
+  tokens and a third bar reading vigour beside strength and morale;
+  `get_armies` reports `crowded`, `fatigue` and `spent`, and the overview's
+  attention list names regiments that need room or relief.
+
+## Where it lands
+
+Across three seeds on Captain, the all-in rush now costs roughly two thirds of
+the player's army and loses about as often as it wins, where before it won every
+time with the army largely intact. `npm run test:balance` replays the rush
+against a measured defence and prints both.
+
+# Gameplay Rescue Pass
+
+## Playability and combat
+
+- **No soldier is stamped into water at deployment.** Scenario construction now
+  validates every formation slot and moves the regiment the shortest deterministic
+  distance that fits its full footprint on passable ground. All seven deployments
+  are covered by unit-level passability checks.
+- Broad formations compress their blocked files onto the regiment anchor while
+  crossing a bridge, ford or gap, then dress back into formation on the far side.
+  Navigation also falls back to a passability-grid corridor when an authored zone
+  route cannot carry the formation, removing the observed dead march.
+- Orders queued while paused are validated and acknowledged immediately without
+  advancing simulation systems. March speed and turning are brisker, and the first
+  Riverwatch assault begins at 18 seconds instead of leaving forty empty seconds.
+- True multi-sided envelopment now scales nonlinearly and decisively outperforms a
+  frontal grind. Arrow flights travel across the field; melee contact sparks; siege
+  impacts retain a hot core, shock ring and smoke halo for long enough to read.
+
+## Battlefield identity and interaction
+
+- Removed the full-screen debug vocabulary: permanent zone circles are gone,
+  roads use curved worn paths, river flow is visible, crossings follow the barrier
+  angle and carry deck detail, and hills use irregular contours.
+- Procedural scatter is seeded per map rather than identically. Ashfall uses lifted
+  volcanic earth and crags, Goldmere uses bright harvest strips and open flanks,
+  the Sunken Coast uses cold tidal ground and a diagonal channel, while River Vale
+  remains green and river-led.
+- The War Council no longer recolours one River Vale image four times. Ashfall,
+  Goldmere and the Sunken Coast have separate authored SVG command maps matching
+  their live topology.
+- Hovering a named place highlights its boundary and explains its tactical effect.
+  Selecting one regiment also reports its zone, current terrain, exact defensive,
+  movement or ranged benefit, role matchups and real order route.
+- Strategic zoom draws oriented regiment footprints instead of thousands of
+  sub-pixel dots. Selection routes show real waypoints and mass orders collapse to
+  one destination marker instead of a map-wide spiderweb.
+
+## WebMCP and verification
+
+- Battle overview projections now distinguish unobserved fronts from advantage,
+  expose attention items and next actions, and include current orders and targets.
+  Action schemas discriminate target requirements, reject malformed targets before
+  queueing, and plan steps receive safe immediate defaults when omitted.
+- Production typecheck and build pass. The default suite passes **133 tests in 9
+  files**; the full opening army measures **4.58 ms/tick for 7,950 living units**,
+  well inside the fixed 50 ms budget. Long output-only balance and crowd probes are
+  isolated under `npm run test:balance` rather than the default worker pool.
 
 # Interface Pass
 

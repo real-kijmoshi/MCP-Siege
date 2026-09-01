@@ -422,7 +422,9 @@ export const CONTACT = {
   /** Arcs at which a formation counts as completely ringed. */
   envelopedArcs: 7,
   /** Extra damage taken at full encirclement. */
-  encirclementDamage: 1.1,
+  // A four-sided assault must decisively outperform the same men fed into one
+  // frontage; otherwise flanking is visual noise rather than the core tactic.
+  encirclementDamage: 2.5,
 
   /** Cone, in radians either side of the facing, that counts as the front. */
   frontArc: Math.PI / 3,
@@ -449,6 +451,103 @@ export const CONTACT = {
   pressureScale: 4.5,
   /** Hard cap on group displacement from combat pressure in one tick. */
   maximumYieldPerTick: 2.2,
+
+  /**
+   * What a formation still delivers while it is fighting from the crossing
+   * itself, against men who are not.
+   *
+   * A bridge or a ford is not ground you fight on; it is ground you have to get
+   * off. Men coming over it arrive strung out and in no order, unable to bring
+   * their numbers to bear on a line already formed on the far bank. Without
+   * this term a crossing was merely a slightly slower piece of open field, and
+   * the correct play on every divided map was to walk the whole army onto the
+   * bridge and out the other side.
+   */
+  assaultingCrossing: 0.6,
+  /**
+   * Share of its shoving weight a body of men standing on a crossing can bring.
+   *
+   * You cannot put your shoulder into a line while the man beside you is on a
+   * parapet. Without this a large enough column simply bulldozed the defenders
+   * off the far end, whatever they were standing in.
+   */
+  crossingPressure: 0.4,
+} as const;
+
+/* ----------------------------------------------------------------- crowding */
+
+/**
+ * The press of your own men.
+ *
+ * This is the term that makes ground worth more than numbers. A regiment fights
+ * along its frontage, so men beyond what that frontage can hold contribute
+ * nothing — and packed hard enough they contribute less than nothing: ranks
+ * cannot close, weapons cannot be used, and every arrow that falls finds a
+ * body. Without it the strongest move in the game was to push the whole army
+ * through one gap in a single mass, because mass had no cost at all.
+ *
+ * Density is sampled per soldier as the number of *friendly* men within
+ * `radius`, which is what makes several regiments stacked on one bridge read
+ * exactly as badly as it should. A formation at its natural spacing sits below
+ * `comfortable` and pays nothing.
+ */
+export const CROWDING = {
+  /** How far around a man his own crowd is counted, world units. */
+  radius: 26,
+  /** Neighbours a formation at its own spacing carries. Below this, no penalty. */
+  comfortable: 10,
+  /** Neighbours at which men can no longer fight at all as a body. */
+  crushed: 24,
+  /**
+   * Only one man in this many samples his neighbourhood each tick.
+   *
+   * The sample is the one genuinely new per-soldier search in the tick, so this
+   * is the whole cost of the system. Eight still asks fifty men of a four
+   * hundred strong regiment every step, which is far more than a smoothed
+   * reading needs.
+   */
+  stride: 8,
+  /** How fast a group's reported crowding follows the sample, per tick. */
+  smoothing: 0.12,
+  /** Share of its damage a fully crushed formation loses. */
+  damagePenalty: 0.5,
+  /** Extra arrow and shell damage taken at full crush. */
+  rangedVulnerability: 0.7,
+  /** Morale lost per tick at full crush. */
+  moralePenalty: 0.075,
+  /** Crowding at which the roster and the Marshal are told about it. */
+  reportThreshold: 0.4,
+} as const;
+
+/* ------------------------------------------------------------------ fatigue */
+
+/**
+ * Exhaustion.
+ *
+ * Men cannot fight indefinitely, and this is what makes a reserve worth
+ * holding. Without it one mass of troops could grind from one end of a battle
+ * to the other at undiminished strength, so there was never a moment when
+ * committing fresh men mattered more than having committed them already. A
+ * spent regiment hits softer, steadies slower, and gives ground under a press
+ * it would have held ten minutes earlier.
+ */
+export const FATIGUE = {
+  /** Accrued per tick by a formation fully in contact. Spent in about a minute. */
+  combatPerTick: 0.00075,
+  /** Accrued per tick on the march, so a long approach is not free. */
+  marchPerTick: 0.00012,
+  /** Shed per tick by a formation standing out of contact. */
+  restPerTick: 0.0004,
+  /** Share of its damage a wholly spent formation loses. */
+  damagePenalty: 0.32,
+  /** Morale lost per tick at full exhaustion. */
+  moralePenalty: 0.014,
+  /** Share of its morale recovery a spent formation forfeits. */
+  recoveryDrag: 0.6,
+  /** Share of its footing a spent formation loses under physical pressure. */
+  yieldPenalty: 0.25,
+  /** Fatigue at which a regiment is reported as spent. */
+  reportThreshold: 0.55,
 } as const;
 
 /* --------------------------------------------------------------- movement */

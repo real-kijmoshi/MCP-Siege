@@ -224,6 +224,20 @@ export interface ArmyGroup {
    * the arcs blows actually arrived on, and read by both damage and morale.
    */
   encirclement: number;
+  /**
+   * How hard the men are packed against one another, 0 at a formation's own
+   * spacing and 1 when they are crushed together. Written by `Combat` from the
+   * density of *friendly* troops around each man, so several regiments forced
+   * through one gap register it as sharply as they deserve to. Read by damage
+   * and morale: a crushed body of men fights badly and is a gift to archers.
+   */
+  crowding: number;
+  /**
+   * How spent the regiment is, 0 fresh and 1 exhausted. Written by `Fatigue`
+   * and read by damage, morale and the pressure solver. This is the term that
+   * makes a reserve worth holding rather than committing everything at once.
+   */
+  fatigue: number;
 }
 
 /* ------------------------------------------------------------- conditions */

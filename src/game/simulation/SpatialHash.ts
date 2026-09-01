@@ -130,6 +130,44 @@ export class SpatialHash {
   }
 
   /**
+   * How many indexed units stand within `radius` of a point, excluding `self`.
+   *
+   * Kept separate from `forEachNear` because the crowding sample runs for a
+   * cohort of the whole army every tick, and a visitor callback there would
+   * allocate a closure per soldier.
+   */
+  public countNear(
+    x: number,
+    y: number,
+    radius: number,
+    pool: UnitPool,
+    self: number,
+  ): number {
+    const minColumn = Math.max(0, Math.floor((x - radius) / SPATIAL_CELL_SIZE));
+    const maxColumn = Math.min(this.columns - 1, Math.floor((x + radius) / SPATIAL_CELL_SIZE));
+    const minRow = Math.max(0, Math.floor((y - radius) / SPATIAL_CELL_SIZE));
+    const maxRow = Math.min(this.rows - 1, Math.floor((y + radius) / SPATIAL_CELL_SIZE));
+    const radiusSquared = radius * radius;
+
+    let found = 0;
+    for (let row = minRow; row <= maxRow; row += 1) {
+      const rowOffset = row * this.columns;
+      for (let column = minColumn; column <= maxColumn; column += 1) {
+        const cell = rowOffset + column;
+        const end = this.starts[cell + 1] ?? 0;
+        for (let slot = this.starts[cell] ?? 0; slot < end; slot += 1) {
+          const candidate = this.items[slot] ?? -1;
+          if (candidate < 0 || candidate === self || pool.alive[candidate] !== 1) continue;
+          const dx = (pool.x[candidate] ?? 0) - x;
+          const dy = (pool.y[candidate] ?? 0) - y;
+          if (dx * dx + dy * dy <= radiusSquared) found += 1;
+        }
+      }
+    }
+    return found;
+  }
+
+  /**
    * Adds a deterministic separation vector for bodies overlapping `self`.
    * The caller owns `out`, so local avoidance adds no per-unit allocations.
    */

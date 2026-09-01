@@ -100,6 +100,8 @@ export function handleSplitGroup(
     routing: source.routing,
     engagement: 0,
     encirclement: 0,
+    crowding: 0,
+    fatigue: 0,
   };
 
   for (const index of taken) state.units.group[index] = slot;

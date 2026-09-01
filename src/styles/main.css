@@ -1808,6 +1808,15 @@ body {
   color: var(--bad);
 }
 
+/* Conditions the commander can fix by moving men rather than by fighting. */
+.army-row .contact.crushed {
+  color: var(--bad);
+}
+
+.army-row .contact.spent {
+  color: var(--warn);
+}
+
 .army-row .bars {
   display: flex;
   gap: 6px;

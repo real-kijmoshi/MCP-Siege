@@ -30,8 +30,8 @@ export class ArmyList {
           `${army.id}:${army.strength}:${army.activity}:${Math.round(army.morale / 3)}:${
             army.engaged ? 'e' : '-'
           }:${army.surrounded ? 's' : '-'}:${army.pinned ? 'p' : '-'}:${
-            selection.has(army.id) ? 1 : 0
-          }`,
+            army.crowded ? 'c' : '-'
+          }:${Math.round(army.fatigue / 10)}:${selection.has(army.id) ? 1 : 0}`,
       )
       .join('|');
     if (signature === this.signature) return;
@@ -92,11 +92,39 @@ export class ArmyList {
       activity.append(' ', contact);
     }
 
+    // The two conditions a commander can actually fix, and which are invisible
+    // on a strength bar: men with no room to swing, and men with nothing left.
+    // Both are the price of pushing everything through one place at once.
+    if (army.crowded) {
+      const crush = document.createElement('span');
+      crush.className = 'contact crushed';
+      crush.textContent = 'CRUSHED';
+      crush.title =
+        'Packed too tightly to fight. Send fewer regiments through this ground at once, ' +
+        'or spread into loose order.';
+      activity.append(' ', crush);
+    } else if (army.spent) {
+      const spent = document.createElement('span');
+      spent.className = 'contact spent';
+      spent.textContent = 'SPENT';
+      spent.title =
+        'Exhausted. These men hit softer and give ground more easily; relieve them with a ' +
+        'fresh regiment and let them rest out of contact.';
+      activity.append(' ', spent);
+    }
+
     const bars = document.createElement('div');
     bars.className = 'bars';
     bars.append(
       this.bar(army.strengthPercent, '#4d9dff', `Strength ${army.strengthPercent}%`),
       this.bar(army.morale, moraleColor(army.morale), `Morale ${army.morale}% (${army.moraleState})`),
+      // Read as how much fight is left in the men rather than how tired they
+      // are, so all three bars mean the same thing: full is good.
+      this.bar(
+        100 - army.fatigue,
+        army.fatigue >= 55 ? '#c8783c' : '#7c8d6a',
+        `Vigour ${100 - army.fatigue}% (fatigue ${army.fatigue}%)`,
+      ),
     );
 
     button.append(head, activity, bars);

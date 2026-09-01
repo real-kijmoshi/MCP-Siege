@@ -68,6 +68,8 @@ export function deployWave(state: GameState, playerId: PlayerId, name: string): 
     routing: false,
     engagement: 0,
     encirclement: 0,
+    crowding: 0,
+    fatigue: 0,
   };
 
   const xs = new Float32Array(total);

@@ -2,6 +2,8 @@ import {
   ACQUISITION_MARGIN,
   ACQUISITION_STRIDE,
   CONTACT,
+  CROWDING,
+  FATIGUE,
   FORMATION_PROFILES,
   REACQUISITION_STRIDE,
   STANCE_PROFILES,
@@ -13,7 +15,7 @@ import type { GameState } from './GameState';
 import { nextRandom } from './Random';
 import { SpatialHash } from './SpatialHash';
 import { UnitPool } from './UnitPool';
-import { isPassable, terrainAt } from './Zones';
+import { isInBarrier, isPassable, terrainAt } from './Zones';
 
 /**
  * Combat resolution.
@@ -36,6 +38,9 @@ let contactCounts = new Int32Array(64);
 let arcCounts = new Int32Array(64 * CONTACT.arcCount);
 let pressureX = new Float32Array(64);
 let pressureY = new Float32Array(64);
+/** Friendly neighbours counted this tick, and how many men were asked. */
+let crowdSum = new Int32Array(64);
+let crowdSamples = new Int32Array(64);
 
 /** Minimum real body of troops that must press from one arc for it to count. */
 const MIN_ARC_CONTACT = 4;
@@ -46,6 +51,8 @@ function ensureContactBuffers(groupCount: number): void {
     arcCounts.fill(0, 0, groupCount * CONTACT.arcCount);
     pressureX.fill(0, 0, groupCount);
     pressureY.fill(0, 0, groupCount);
+    crowdSum.fill(0, 0, groupCount);
+    crowdSamples.fill(0, 0, groupCount);
     return;
   }
   let capacity = contactCounts.length;
@@ -54,6 +61,8 @@ function ensureContactBuffers(groupCount: number): void {
   arcCounts = new Int32Array(capacity * CONTACT.arcCount);
   pressureX = new Float32Array(capacity);
   pressureY = new Float32Array(capacity);
+  crowdSum = new Int32Array(capacity);
+  crowdSamples = new Int32Array(capacity);
 }
 
 const ARC_WIDTH = (Math.PI * 2) / CONTACT.arcCount;
@@ -119,12 +128,25 @@ function computeDamage(
     // Shaken troops fight poorly even before they break.
     damage *= 0.6 + 0.4 * (attackerGroup.morale / 100);
     if (stats.range < 100) damage *= FORMATION_PROFILES[attackerGroup.formation].meleeModifier;
+    // Men jammed shoulder to shoulder cannot use their weapons, and men who
+    // have been fighting for a quarter of an hour swing short. Together these
+    // stop one enormous mass of troops from being the answer to everything: it
+    // arrives crushed, and it does not stay fresh.
+    damage *= 1 - CROWDING.damagePenalty * attackerGroup.crowding;
+    damage *= 1 - FATIGUE.damagePenalty * attackerGroup.fatigue;
   }
 
   if (defenderGroup !== undefined) {
     const profile = FORMATION_PROFILES[defenderGroup.formation];
     damage *= STANCE_PROFILES[defenderGroup.stance].damageTakenModifier;
-    if (stats.range >= 100) damage *= profile.rangedVulnerability;
+    // A packed body of men is what archers and siege exist for: at that density
+    // no shaft is wasted, which is what makes bombarding a column stalled on a
+    // bridge the right answer to it.
+    if (stats.range >= 100) {
+      damage *=
+        profile.rangedVulnerability *
+        (1 + CROWDING.rangedVulnerability * defenderGroup.crowding);
+    }
     if (attackerCategory === 'cavalry') damage /= profile.antiCavalry;
 
     // Where the blow lands on the formation. A regiment is only strong along
@@ -159,10 +181,28 @@ function computeDamage(
 
     // Being attacked from every quarter at once. Ranks cannot close, there is
     // nowhere to give ground, and every man is fighting two.
-    damage *= 1 + CONTACT.encirclementDamage * defenderGroup.encirclement;
+    // Pressure rises sharply only once attacks cover most of the perimeter.
+    // This keeps a broad frontal line from masquerading as a surround while a
+    // genuine four-sided attack collapses the trapped formation decisively.
+    damage *=
+      1 +
+      CONTACT.encirclementDamage *
+        defenderGroup.encirclement *
+        defenderGroup.encirclement;
 
     // Men who have already broken are being cut down, not fought.
     if (defenderGroup.routing) damage *= CONTACT.pursuitDamage;
+  }
+
+  // Fighting your way off a bridge. Men still on the crossing are strung out in
+  // whatever order the defile allowed, against a line that is already formed;
+  // this is the whole reason a crossing is worth holding rather than merely
+  // worth walking over.
+  if (
+    isInBarrier(units.x[attacker] ?? 0, units.y[attacker] ?? 0) &&
+    !isInBarrier(units.x[defender] ?? 0, units.y[defender] ?? 0)
+  ) {
+    damage *= CONTACT.assaultingCrossing;
   }
 
   const defenderTerrain = terrainAt(units.x[defender] ?? 0, units.y[defender] ?? 0);
@@ -221,7 +261,8 @@ function applySplash(
     const vulnerability =
       victimGroup === undefined
         ? 1
-        : FORMATION_PROFILES[victimGroup.formation].splashVulnerability;
+        : FORMATION_PROFILES[victimGroup.formation].splashVulnerability *
+          (1 + CROWDING.rangedVulnerability * victimGroup.crowding);
     // Falls off with distance so the centre of the blast is the worst place.
     const dx = (units.x[victim] ?? 0) - centerX;
     const dy = (units.y[victim] ?? 0) - centerY;
@@ -253,6 +294,17 @@ export function advanceCombat(state: GameState): void {
     const stats = UNIT_STATS[category];
     const x = units.x[index] ?? 0;
     const y = units.y[index] ?? 0;
+
+    // How hard this man's own side is packed around him. Staggered by index so
+    // only a cohort of the army pays for the search each tick, and taken before
+    // the target logic below so men with nobody to fight still count.
+    const ownSlot = units.group[index] ?? -1;
+    if (ownSlot >= 0 && index % CROWDING.stride === state.currentTick % CROWDING.stride) {
+      const friendly = units.owner[index] === FACTION_PLAYER ? playerHash : enemyHash;
+      crowdSum[ownSlot] =
+        (crowdSum[ownSlot] ?? 0) + friendly.countNear(x, y, CROWDING.radius, units, index);
+      crowdSamples[ownSlot] = (crowdSamples[ownSlot] ?? 0) + 1;
+    }
 
     const stored = units.targetIdx[index] ?? -1;
     const hasLiveTarget = stored >= 0 && units.alive[stored] === 1;
@@ -316,7 +368,10 @@ export function advanceCombat(state: GameState): void {
           Math.hypot(units.velocityX[index] ?? 0, units.velocityY[index] ?? 0) /
             Math.max(0.001, stats.speed),
         );
-        const momentum = stats.mass * (0.3 + speedShare * 0.9);
+        const momentum =
+          stats.mass *
+          (0.3 + speedShare * 0.9) *
+          (isInBarrier(x, y) ? CONTACT.crossingPressure : 1);
         pressureX[defenderSlot] = (pressureX[defenderSlot] ?? 0) + (dx / distance) * momentum;
         pressureY[defenderSlot] = (pressureY[defenderSlot] ?? 0) + (dy / distance) * momentum;
       }
@@ -362,11 +417,13 @@ function applyCombatPressure(state: GameState): void {
     const formationResistance =
       group.formation === 'square' ? 1.45 : group.formation === 'block' ? 1.15 : 1;
     const moraleResistance = 0.65 + group.morale * 0.0035;
+    // Exhausted men keep their feet less well than fresh ones.
+    const enduranceResistance = 1 - FATIGUE.yieldPenalty * group.fatigue;
     const yielded = Math.min(
       CONTACT.maximumYieldPerTick,
       (magnitude / Math.max(1, group.members.length)) *
         CONTACT.pressureScale /
-        (stanceResistance * formationResistance * moraleResistance),
+        (stanceResistance * formationResistance * moraleResistance * enduranceResistance),
     );
     const nextX = group.anchor.x + (x / magnitude) * yielded;
     const nextY = group.anchor.y + (y / magnitude) * yielded;
@@ -396,7 +453,18 @@ function summariseContact(state: GameState): void {
     if (strength === 0) {
       group.engagement = 0;
       group.encirclement = 0;
+      group.crowding = 0;
       continue;
+    }
+
+    // Smoothed, because one tick's sample of a moving formation jitters far too
+    // much to hang a damage multiplier on.
+    const samples = crowdSamples[slot] ?? 0;
+    if (samples > 0) {
+      const density = (crowdSum[slot] ?? 0) / samples;
+      const span = Math.max(1, CROWDING.crushed - CROWDING.comfortable);
+      const measured = Math.max(0, Math.min(1, (density - CROWDING.comfortable) / span));
+      group.crowding += (measured - group.crowding) * CROWDING.smoothing;
     }
 
     group.engagement = Math.min(1, (contactCounts[slot] ?? 0) / strength);

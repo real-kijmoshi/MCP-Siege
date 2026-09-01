@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620">
+  <defs>
+    <linearGradient id="ground" x2="0" y2="1"><stop stop-color="#385b52"/><stop offset="1" stop-color="#263f3a"/></linearGradient>
+    <pattern id="salt" width="55" height="55" patternUnits="userSpaceOnUse"><path d="M4 46q20-18 46 0" fill="none" stroke="#8bb0a2" stroke-opacity=".15" stroke-width="4"/></pattern>
+  </defs>
+  <rect width="1200" height="620" fill="url(#ground)"/><rect width="1200" height="620" fill="url(#salt)"/>
+  <path d="M0 520C215 470 328 406 474 340S803 195 1200 90v176c-270 55-471 135-638 212S216 595 0 620Z" fill="#164758" stroke="#4c8793" stroke-width="10"/>
+  <g fill="none" stroke="#78adba" stroke-opacity=".3" stroke-width="5" stroke-dasharray="55 35"><path d="M0 556Q330 478 520 385T1200 146"/><path d="M90 620Q400 530 595 435T1200 205"/></g>
+  <g fill="#77705b" stroke="#afa477" stroke-width="6"><path d="m350 463 77-35 119 162-82 30z"/><path d="m905 180 116-37 28 58-121 39z"/></g>
+  <g stroke="#7e806e" stroke-width="17" fill="none" stroke-linecap="round"><path d="M290 620Q390 545 447 513M500 535Q650 425 810 330T1200 45"/><path d="M780 620Q770 460 866 316M974 190Q1070 124 1200 118"/></g>
+  <g fill="#1e493b"><ellipse cx="160" cy="410" rx="145" ry="105"/><ellipse cx="280" cy="125" rx="165" ry="112"/></g>
+  <g fill="#806c52"><rect x="755" y="465" width="44" height="29"/><rect x="807" y="444" width="55" height="32"/><rect x="842" y="493" width="39" height="26"/></g>
+</svg>

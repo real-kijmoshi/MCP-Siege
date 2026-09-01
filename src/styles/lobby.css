@@ -499,16 +499,8 @@
 .lobby[data-scenario='last_light'] .map-objective-ring { left: 47%; top: 73%; }
 .lobby[data-scenario='last_light'] .crown-standard { left: 50%; top: 71%; }
 
-/*
- * One command-map plate, four battlefields.
- *
- * There is a single illustrated portrait, so each ground is separated by
- * treatment rather than by new art: ash country runs hot and desaturated, the
- * harvest plain runs gold, the drowned coast runs cold and blue. It reads as a
- * different place at a glance, which is all the ledger needs it to do.
- */
 .lobby[data-map='ashfall_pass'] .battlefield-portrait {
-  filter: saturate(0.42) sepia(0.35) hue-rotate(-18deg) brightness(0.82) contrast(1.12);
+  background-image: url('/assets/ashfall-command-map.svg');
 }
 
 .lobby[data-map='ashfall_pass'] .map-shade {
@@ -516,7 +508,7 @@
 }
 
 .lobby[data-map='goldmere'] .battlefield-portrait {
-  filter: saturate(1.15) sepia(0.22) hue-rotate(-12deg) brightness(1.04);
+  background-image: url('/assets/goldmere-command-map.svg');
 }
 
 .lobby[data-map='goldmere'] .map-shade {
@@ -524,7 +516,7 @@
 }
 
 .lobby[data-map='sunken_causeway'] .battlefield-portrait {
-  filter: saturate(0.72) hue-rotate(22deg) brightness(0.92) contrast(1.06);
+  background-image: url('/assets/sunken-coast-command-map.svg');
 }
 
 .lobby[data-map='sunken_causeway'] .map-shade {

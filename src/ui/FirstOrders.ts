@@ -12,7 +12,7 @@ import type { ScenarioId } from '../game/config/matches';
  * has done its job.
  */
 /** How long the brief stays up if the player gives no order at all. */
-const LINGER_MS = 24_000;
+const LINGER_MS = 14_000;
 
 export class FirstOrders {
   private readonly element = document.getElementById('first-orders');

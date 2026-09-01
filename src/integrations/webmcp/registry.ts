@@ -69,7 +69,13 @@ export async function registerWebMcpTools(
         'pinned — held in melee, and unable to march away until the fight is settled — and ' +
         'whether it is surrounded, meaning the attack is coming from more quarters than the ' +
         'formation can face. A surrounded group takes far heavier casualties and breaks fast, ' +
-        'so it is the first thing worth answering. Read-only.',
+        'so it is the first thing worth answering. Each group also reports whether it is ' +
+        'crowded — packed so tightly against friendly regiments that it cannot fight, which ' +
+        'is what happens when several formations are pushed through one crossing at once — ' +
+        'and how spent it is, from 0 fresh to 100 exhausted. Crowded troops lose half their ' +
+        'damage and are far easier to shoot; spent troops hit softer and give ground. Both ' +
+        'are answered by manoeuvre: give a crushed regiment room, and relieve a spent one ' +
+        'with a fresh formation. Read-only.',
       inputSchema: EMPTY_INPUT_SCHEMA,
       annotations: { readOnlyHint: true },
       execute: () => handlers.getArmies(),

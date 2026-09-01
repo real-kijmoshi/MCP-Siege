@@ -296,4 +296,60 @@ describe('battle tempo', () => {
     );
     expect(driving.length).toBeGreaterThan(0);
   });
+
+  /**
+   * The answer to a doomstack.
+   *
+   * Putting every regiment on one crossing and walking through it used to be
+   * the whole game: the defenders there were outnumbered five to one, the rest
+   * of the enemy army never noticed, and the rush was over long before the
+   * scripted last act could punish it. A commander who sees the player's whole
+   * weight in one place has to stop feeding regiments into it and go the other
+   * way, at the sovereign the player has just left behind.
+   */
+  it('refuses a hopeless assault and marches around an army that has committed itself', async () => {
+    const engine = new SimulationEngine({ difficultyId: 'captain' });
+    const state = engine.getState();
+
+    const committed = activeGroups(state, 'player')
+      .filter((group) => group.id !== 'royal_guard')
+      .map((group) => group.id);
+
+    let sawOpportunism = false;
+    let sawRefusal = false;
+
+    for (let tick = 0; tick < TICKS_PER_SECOND * 260; tick += 1) {
+      await breathe(tick);
+      // A commander who keeps pressing the same point, and nothing else.
+      if (tick % (TICKS_PER_SECOND * 30) === 0) {
+        engine.dispatch('human', {
+          type: 'order_groups',
+          playerId: 'player',
+          groupIds: committed,
+          order: 'attack_zone',
+          targetZone: 'central_bridge',
+        });
+      }
+      engine.step();
+      if (state.alerts.some((alert) => alert.key === 'enemy_exploits_opening')) {
+        sawOpportunism = true;
+      }
+      // A regiment that halted its own march on the mass rather than joining it.
+      if (
+        state.groups.some(
+          (group) =>
+            group.ownerId === 'enemy' &&
+            group.members.length > 0 &&
+            group.order.kind === 'defend_zone' &&
+            group.order.targetZone !== 'enemy_base',
+        )
+      ) {
+        sawRefusal = true;
+      }
+      if (state.objective.outcome !== 'ongoing') break;
+    }
+
+    expect(sawRefusal).toBe(true);
+    expect(sawOpportunism).toBe(true);
+  });
 });
