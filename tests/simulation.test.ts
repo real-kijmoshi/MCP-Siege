@@ -28,9 +28,11 @@ describe('scenario', () => {
     const player = activeGroups(state, 'player');
     const enemy = activeGroups(state, 'enemy');
 
-    // Nine field regiments a side, plus the Royal Guard each king rides with.
-    expect(player.length).toBe(10);
-    expect(enemy.length).toBe(10);
+    // Twelve field regiments a side -- the line, the horse, the trains, the
+    // shot, the guns and the surgeons -- plus the Royal Guard each king rides
+    // with.
+    expect(player.length).toBe(13);
+    expect(enemy.length).toBe(13);
     expect(state.objective.kings.player.guardGroupId).toBe('royal_guard');
     expect(state.objective.kings.enemy.guardGroupId).toBe('ashen_guard');
 
@@ -66,8 +68,8 @@ describe('scenario', () => {
     const state = engine.getState();
 
     expect(state.scenarioId).toBe(scenarioId);
-    expect(activeGroups(state, 'player')).toHaveLength(10);
-    expect(activeGroups(state, 'enemy')).toHaveLength(10);
+    expect(activeGroups(state, 'player')).toHaveLength(13);
+    expect(activeGroups(state, 'enemy')).toHaveLength(13);
     expect(state.objective.initialStrength.player).toBeGreaterThan(3000);
     expect(state.objective.initialStrength.enemy).toBeGreaterThan(3000);
     expect(state.objective.kings.player.guardGroupId).toBe('royal_guard');
@@ -271,7 +273,11 @@ describe('battle tempo', () => {
     }
 
     expect(state.objective.outcome).not.toBe('ongoing');
-  });
+    // Twenty-five battle-minutes of simulation for two armies of four thousand
+    // is well past what the default per-test budget allows, and the battle
+    // itself now runs longer than it did: guns, shot and surgeons all lengthen
+    // an engagement, which is the point of them.
+  }, 600_000);
 
   it('commits the enemy against the player king once the escalation is spent', async () => {
     const engine = new SimulationEngine({ difficultyId: 'warlord' });
