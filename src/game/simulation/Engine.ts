@@ -20,7 +20,9 @@ import {
   handleExecutePlan,
   handleModifyPlan,
 } from '../commands/handlers/plans';
+import { handleDeployFormation } from '../commands/handlers/deployFormation';
 import {
+  handleDetachCategory,
   handleMergeGroups,
   handleRenameGroup,
   handleSplitGroup,
@@ -36,6 +38,7 @@ import { advanceAlerts, resetAlertTracking } from './Alerts';
 import { advanceCombat } from './Combat';
 import { collectTriggeredOrders } from './Conditions';
 import { advanceFatigue } from './Fatigue';
+import { advanceFieldSupport } from './FieldSupport';
 import { createEmptyState, type GameState } from './GameState';
 import { advanceMorale } from './Morale';
 import { advanceMovement } from './Movement';
@@ -107,6 +110,9 @@ export class SimulationEngine {
 
     advanceMovement(this.state);
     advanceCombat(this.state);
+    // Between the fighting and its consequences: the surgeons read the contact
+    // this tick produced, and fatigue and morale read the care they gave.
+    advanceFieldSupport(this.state);
     advanceFatigue(this.state);
     advanceMorale(this.state);
     advanceVisibility(this.state);
@@ -206,10 +212,14 @@ export class SimulationEngine {
         return handleChangeFormation(command, this.state);
       case 'split_group':
         return handleSplitGroup(command, this.state);
+      case 'detach_category':
+        return handleDetachCategory(command, this.state);
       case 'merge_groups':
         return handleMergeGroups(command, this.state);
       case 'rename_group':
         return handleRenameGroup(command, this.state);
+      case 'deploy_formation':
+        return handleDeployFormation(command, this.state);
       case 'set_conditional_order':
         return handleSetConditionalOrder(command, this.state);
       case 'cancel_conditional_order':
