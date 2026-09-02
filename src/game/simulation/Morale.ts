@@ -1,4 +1,11 @@
-import { CROWDING, FATIGUE, MORALE, MORALE_THRESHOLDS, OBJECTIVE } from '../config/battle';
+import {
+  CROWDING,
+  FATIGUE,
+  FIELD_SUPPORT,
+  MORALE,
+  MORALE_THRESHOLDS,
+  OBJECTIVE,
+} from '../config/battle';
 import type { ArmyGroup, MoraleState } from '../types/domain';
 import { activeGroups, type GameState } from './GameState';
 import { isDefensiveTerrain } from './Zones';
@@ -73,6 +80,10 @@ export function advanceMorale(state: GameState): void {
       // of a long fight cannot simply be fed straight back into it.
       const rest = group.routing ? MORALE.rallyRecoveryPerTick : MORALE.recoveryPerTick;
       delta += rest * (1 - FATIGUE.recoveryDrag * group.fatigue);
+      // Being looked after steadies men on its own, over and above the rest it
+      // buys them. `FieldSupport` has already zeroed care for anybody still in
+      // contact, so this can never reward a regiment for staying in the line.
+      delta += FIELD_SUPPORT.moralePerTick * group.succour;
     }
 
     let supported = false;
