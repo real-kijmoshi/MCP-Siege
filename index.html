@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a0f0b" />
+    <meta name="theme-color" content="#15110a" />
     <meta name="color-scheme" content="dark" />
     <title>Siege — WebMCP Battle Command</title>
     <meta
@@ -17,7 +17,7 @@
       <div class="fatal-screen"><div><strong>JavaScript is required</strong><p>Siege runs its deterministic battle simulation in your browser.</p></div></div>
     </noscript>
     <div class="viewport-warning" role="alert">
-      <div><strong>A larger battlefield is required</strong><p>Siege is a desktop command game. Use a window at least 1100 × 620 to deploy the army.</p></div>
+      <div><strong>A larger battlefield is required</strong><p>Siege needs a window at least 760 × 480 to draw the field.</p></div>
     </div>
     <section class="lobby" id="lobby" data-scenario="riverwatch" data-map="river_vale" aria-label="Battle lobby">
       <header class="lobby-header">
@@ -84,26 +84,33 @@
     <div id="app" aria-hidden="true" inert>
       <header class="top-bar">
         <div class="brand">
-          <strong>SIEGE</strong>
-          <small id="match-label">BATTLE COMMAND</small>
+          <span class="brand-mark icon" data-icon="banner"></span>
+          <span class="brand-words">
+            <strong>SIEGE</strong>
+            <small id="match-label">BATTLE COMMAND</small>
+          </span>
         </div>
 
         <div class="stat-cluster">
           <div class="stat" data-tone="own" title="Total men under your command">
-            <small>STRENGTH</small>
-            <b id="stat-strength">0</b>
+            <span class="icon" data-icon="strength"></span>
+            <span class="stat-body"><small>STRENGTH</small><b id="stat-strength">0</b></span>
+          </div>
+          <div class="stat" data-tone="morale" title="Average morale across your regiments">
+            <span class="icon" data-icon="morale"></span>
+            <span class="stat-body"><small>MORALE</small><b id="stat-morale">—</b></span>
           </div>
           <div class="stat" data-tone="foe" title="Enemy strength you can currently see">
-            <small>ENEMY SEEN</small>
-            <b id="stat-enemy">0</b>
+            <span class="icon" data-icon="enemy"></span>
+            <span class="stat-body"><small>ENEMY SEEN</small><b id="stat-enemy">0</b></span>
           </div>
           <div class="stat" title="Reinforcement waves ready to commit">
-            <small>REINFORCEMENTS</small>
-            <b id="stat-reinforcements">0</b>
+            <span class="icon" data-icon="reinforce"></span>
+            <span class="stat-body"><small>RESERVES</small><b id="stat-reinforcements">0</b></span>
           </div>
           <div class="stat" title="Time elapsed">
-            <small>ELAPSED</small>
-            <b id="stat-clock">0:00</b>
+            <span class="icon" data-icon="clock"></span>
+            <span class="stat-body"><small>ELAPSED</small><b id="stat-clock">0:00</b></span>
           </div>
         </div>
 
@@ -124,7 +131,7 @@
 
       <main class="stage">
         <aside class="army-list" aria-label="Army groups">
-          <h2>ARMY GROUPS<span id="army-list-count"></span></h2>
+          <h2><span>ARMY GROUPS</span><span id="army-list-count"></span></h2>
           <div id="army-list-body"></div>
         </aside>
 
@@ -134,7 +141,7 @@
 
           <div class="objective-strip" id="objective-strip" aria-label="Objective">
             <div class="objective" id="objective-own" data-status="safe">
-              <span class="crown">&#9819;</span>
+              <span class="icon crown" data-icon="crown"></span>
               <div class="body">
                 <small id="objective-own-name">YOUR KING</small>
                 <b id="objective-own-state">Safe</b>
@@ -142,7 +149,7 @@
               <div class="capture"><i id="objective-own-bar"></i></div>
             </div>
             <div class="objective" id="objective-foe" data-status="safe">
-              <span class="crown">&#9818;</span>
+              <span class="icon crown" data-icon="crown"></span>
               <div class="body">
                 <small id="objective-foe-name">ENEMY KING</small>
                 <b id="objective-foe-state">Not sighted</b>
@@ -153,10 +160,6 @@
 
           <div class="alert-feed" id="alert-feed" role="status" aria-live="polite"></div>
           <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
-          <div class="minimap-wrap">
-            <canvas id="minimap" aria-label="Battlefield minimap"></canvas>
-          </div>
 
           <div class="outcome" id="outcome" hidden role="dialog" aria-modal="true" aria-labelledby="outcome-title">
             <div class="outcome-card" tabindex="-1">
@@ -190,9 +193,7 @@
           </details>
 
           <div class="first-orders" id="first-orders">
-            <button type="button" class="dismiss" id="first-orders-dismiss" aria-label="Dismiss">
-              ×
-            </button>
+            <button type="button" class="dismiss" id="first-orders-dismiss" aria-label="Dismiss">×</button>
             <small>BATTLE PAUSED · YOUR ORDERS</small>
             <h3 id="first-orders-title">Hold the crossings</h3>
             <p id="first-orders-body"></p>
@@ -206,6 +207,16 @@
             </div>
           </div>
         </div>
+
+        <aside class="field-journal" aria-label="Field journal">
+          <section class="journal-block minimap-block">
+            <h2><span class="icon" data-icon="terrain"></span>THE FIELD</h2>
+            <div class="minimap-wrap">
+              <canvas id="minimap" aria-label="Battlefield minimap"></canvas>
+            </div>
+          </section>
+          <div class="journal-scroll" id="field-journal"></div>
+        </aside>
       </main>
 
       <footer class="command-bar">
@@ -216,30 +227,30 @@
 
         <div class="commands" id="commands">
           <button type="button" data-command="attack" title="Attack the nearest known enemy force" disabled>
-            <span>⚔</span>ATTACK
+            <span class="icon" data-icon="attack"></span>ATTACK
           </button>
           <button type="button" data-command="hold" title="Hold position and do not advance" disabled>
-            <span>⬣</span>HOLD
+            <span class="icon" data-icon="hold"></span>HOLD
           </button>
           <button type="button" data-command="defend" title="Dig in and defend the current zone" disabled>
-            <span>⛨</span>DEFEND
+            <span class="icon" data-icon="defend"></span>DEFEND
           </button>
           <button type="button" data-command="retreat" title="Withdraw to the rear" disabled>
-            <span>↩</span>RETREAT
+            <span class="icon" data-icon="retreat"></span>RETREAT
           </button>
           <span class="command-divider" aria-hidden="true"></span>
           <button type="button" data-command="formation" title="Change formation" disabled>
-            <span>▦</span>FORMATION
+            <span class="icon" data-icon="formation"></span>FORMATION
           </button>
           <button type="button" data-command="stance" title="Change how far these men will leave the line" disabled>
-            <span>◈</span>STANCE
+            <span class="icon" data-icon="stance"></span>STANCE
           </button>
           <span class="command-divider" aria-hidden="true"></span>
           <button type="button" data-command="split" title="Split the selected group in half" disabled>
-            <span>⇄</span>SPLIT
+            <span class="icon" data-icon="split"></span>SPLIT
           </button>
           <button type="button" data-command="merge" title="Merge the selected groups" disabled>
-            <span>⇉</span>MERGE
+            <span class="icon" data-icon="merge"></span>MERGE
           </button>
         </div>
 
@@ -262,3 +273,4 @@
     <script type="module" src="/src/app/main.ts"></script>
   </body>
 </html>
+
