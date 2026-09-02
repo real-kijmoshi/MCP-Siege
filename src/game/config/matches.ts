@@ -23,9 +23,21 @@ export interface ScriptedAiOrder {
   stance?: Stance;
 }
 
+/** Plain tier, so a player who does not know a levy from a warlord still can. */
+export const DIFFICULTY_TIERS = ['Easy', 'Medium', 'Hard'] as const;
+export type DifficultyTier = (typeof DIFFICULTY_TIERS)[number];
+
 export interface DifficultyDefinition {
   id: DifficultyId;
   name: string;
+  /**
+   * Which of the three this is, in the words everyone already knows.
+   *
+   * The three commanders have always differed, but the lobby offered only their
+   * titles, and nothing about "Levy", "Captain" and "Warlord" says which one a
+   * first battle should be fought against.
+   */
+  tier: DifficultyTier;
   subtitle: string;
   description: string;
   timelineScale: number;
@@ -56,16 +68,50 @@ export interface DifficultyDefinition {
    * before the commander calls it a commitment worth exploiting.
    */
   opportunismConcentration: number;
+  /**
+   * Odds at which the commander refuses to march onto an objective.
+   *
+   * Sighted strength on the ground, as a multiple of the regiment being sent at
+   * it. A timid commander turns back from a fight he could have won and can be
+   * bluffed by a screen; a hard one only declines what is genuinely hopeless,
+   * so the player cannot hold a bridge with one regiment and be left alone.
+   */
+  declineRatio: number;
+  /** And an absolute floor, so a weak detachment is still expected to attack. */
+  declineMass: number;
+  /**
+   * How many regiments the commander will put onto one objective at once.
+   *
+   * This is the difference between an army and a queue. At one, free regiments
+   * each answer whatever contact is nearest them, which is how a scripted
+   * assault walked into a massed defence a regiment at a time and died in
+   * detail — the single most exploitable thing the enemy did. Above one, the
+   * commander picks a point and sends several together.
+   */
+  massedAssault: number;
+  /**
+   * Share of its original strength below which a regiment is worn out, and is
+   * rotated to the rear rather than left standing in the line.
+   *
+   * Deliberately well above the point of collapse. A regiment that has actually
+   * been broken is already routing, and a routing regiment takes no orders from
+   * anybody — so a threshold set at the edge of destruction would describe a
+   * behaviour that could never fire. This is the commander relieving a tired
+   * regiment while it is still worth relieving. Zero for one who never does.
+   */
+  withdrawSpentBelow: number;
 }
 
 export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
   levy: {
     id: 'levy',
     name: 'Levy',
+    tier: 'Easy',
     subtitle: 'Forgiving',
     description:
-      'Slower commitments, a narrower response radius, and a commander slow to punish an army ' +
-      'that has committed itself. Best for learning command.',
+      'Commits slowly, answers only what is close, and feeds his regiments in one at a time. ' +
+      'He calls off an attack at odds he could have beaten and leaves the broken ones standing. ' +
+      'Best for learning command.',
     timelineScale: 1,
     reactionSeconds: 8,
     reactionRadius: 1200,
@@ -73,12 +119,19 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
     finalPushSeconds: 660,
     opportunismSeconds: 300,
     opportunismConcentration: 0.7,
+    declineRatio: 1.8,
+    declineMass: 700,
+    massedAssault: 1,
+    withdrawSpentBelow: 0,
   },
   captain: {
     id: 'captain',
     name: 'Captain',
+    tier: 'Medium',
     subtitle: 'Intended',
-    description: 'The authored battle tempo: alert reactions, firm flanks, and timely relief.',
+    description:
+      'The authored battle tempo. Alert reactions, firm flanks and timely relief, assaults ' +
+      'delivered by a pair of regiments rather than one, and spent troops rotated to the rear.',
     timelineScale: 0.74,
     reactionSeconds: 5,
     reactionRadius: 1500,
@@ -86,12 +139,20 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
     finalPushSeconds: 540,
     opportunismSeconds: 150,
     opportunismConcentration: 0.58,
+    declineRatio: 3.5,
+    declineMass: 1400,
+    massedAssault: 2,
+    withdrawSpentBelow: 0.4,
   },
   warlord: {
     id: 'warlord',
     name: 'Warlord',
+    tier: 'Hard',
     subtitle: 'Relentless',
-    description: 'Earlier assaults, rapid reactions, and defenders who coordinate across the rear.',
+    description:
+      'Earlier assaults, rapid reactions and defenders who coordinate across the rear. He ' +
+      'masses three regiments on a point before he attacks it, presses odds a lesser commander ' +
+      'would refuse, and pulls his broken regiments back to rally and come again.',
     timelineScale: 0.55,
     reactionSeconds: 3,
     reactionRadius: 2050,
@@ -99,6 +160,10 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
     finalPushSeconds: 420,
     opportunismSeconds: 90,
     opportunismConcentration: 0.5,
+    declineRatio: 5,
+    declineMass: 2200,
+    massedAssault: 3,
+    withdrawSpentBelow: 0.55,
   },
 };
 

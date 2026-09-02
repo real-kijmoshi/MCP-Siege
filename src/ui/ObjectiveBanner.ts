@@ -22,6 +22,10 @@ export class ObjectiveBanner {
   private readonly outcomeCard = document.querySelector<HTMLElement>('.outcome-card');
   private readonly outcomeTitle = document.getElementById('outcome-title');
   private readonly outcomeReason = document.getElementById('outcome-reason');
+  private readonly outcomeElapsed = document.getElementById('outcome-elapsed');
+  private readonly outcomeSurvivors = document.getElementById('outcome-survivors');
+  private readonly outcomeLosses = document.getElementById('outcome-losses');
+  private readonly outcomeRegiments = document.getElementById('outcome-regiments');
 
   private decided = false;
 
@@ -29,6 +33,13 @@ export class ObjectiveBanner {
     document
       .getElementById('outcome-restart')
       ?.addEventListener('click', () => window.location.reload());
+    this.outcome?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab') return;
+      // The result dialog has one action. Keep keyboard focus on it instead of
+      // letting Tab wander into controls dimmed behind the modal battlefield.
+      event.preventDefault();
+      document.getElementById('outcome-restart')?.focus({ preventScroll: true });
+    });
   }
 
   public update(report: ObjectiveReport): void {
@@ -79,8 +90,24 @@ export class ObjectiveBanner {
 
   private renderOutcome(report: ObjectiveReport): void {
     const won = report.outcome === 'player_victory';
+    const minutes = Math.floor(report.result.elapsedSeconds / 60);
+    const seconds = report.result.elapsedSeconds % 60;
     if (this.outcomeTitle !== null) this.outcomeTitle.textContent = won ? 'VICTORY' : 'DEFEAT';
     if (this.outcomeReason !== null) this.outcomeReason.textContent = report.outcomeReason;
+    if (this.outcomeElapsed !== null) {
+      this.outcomeElapsed.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
+    }
+    if (this.outcomeSurvivors !== null) {
+      this.outcomeSurvivors.textContent = report.result.survivingUnits.toLocaleString();
+    }
+    if (this.outcomeLosses !== null) {
+      this.outcomeLosses.textContent = report.result.losses.toLocaleString();
+    }
+    if (this.outcomeRegiments !== null) {
+      this.outcomeRegiments.textContent =
+        `${report.result.survivingRegiments} regiments remain from ` +
+        `${report.result.initialUnits.toLocaleString()} men deployed.`;
+    }
     this.outcomeCard?.classList.toggle('defeat', !won);
     this.outcome?.removeAttribute('hidden');
     this.outcomeCard?.focus({ preventScroll: true });

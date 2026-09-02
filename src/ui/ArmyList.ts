@@ -31,13 +31,24 @@ export class ArmyList {
             army.engaged ? 'e' : '-'
           }:${army.surrounded ? 's' : '-'}:${army.pinned ? 'p' : '-'}:${
             army.crowded ? 'c' : '-'
-          }:${Math.round(army.fatigue / 10)}:${selection.has(army.id) ? 1 : 0}`,
+          }:${army.limbered ? 'l' : '-'}:${army.tended ? 't' : '-'}:${
+            Math.round(army.fatigue / 10)
+          }:${selection.has(army.id) ? 1 : 0}`,
       )
       .join('|');
     if (signature === this.signature) return;
     this.signature = signature;
 
+    const focusedGroupId =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement.closest<HTMLButtonElement>('.army-row')?.dataset.groupId
+        : undefined;
     this.body.replaceChildren(...armies.map((army) => this.row(army, selection.has(army.id))));
+    if (focusedGroupId !== undefined) {
+      for (const row of this.body.querySelectorAll<HTMLButtonElement>('.army-row')) {
+        if (row.dataset.groupId === focusedGroupId) row.focus({ preventScroll: true });
+      }
+    }
 
     // How much of the army is still standing, next to the heading, so the size of
     // the roster is not something the commander has to count.
@@ -54,7 +65,9 @@ export class ArmyList {
     button.className = `army-row${selected ? ' selected' : ''}${
       army.moraleState === 'routing' ? ' routing' : ''
     }${army.engaged ? ' engaged' : ''}`;
+    button.dataset.groupId = army.id;
     button.dataset.role = army.primaryRole;
+    button.setAttribute('aria-pressed', String(selected));
     button.title = `${UNIT_STATS[army.primaryRole].label} · ${army.zoneName}\nDouble-click to centre the camera.`;
 
     const head = document.createElement('div');
@@ -111,6 +124,26 @@ export class ArmyList {
         'Exhausted. These men hit softer and give ground more easily; relieve them with a ' +
         'fresh regiment and let them rest out of contact.';
       activity.append(' ', spent);
+    }
+
+    // Guns on the road are not guns. This is the single easiest thing to get
+    // wrong with a battery and the only thing on the roster that says so.
+    if (army.limbered) {
+      const limbered = document.createElement('span');
+      limbered.className = 'contact limbered';
+      limbered.textContent = 'LIMBERED';
+      limbered.title =
+        'The guns are on their teams and cannot fire. They need a few seconds standing ' +
+        'still before they will shoot at anything.';
+      activity.append(' ', limbered);
+    } else if (army.tended) {
+      const tended = document.createElement('span');
+      tended.className = 'contact tended';
+      tended.textContent = 'TENDED';
+      tended.title =
+        'A field hospital is within reach. Left out of contact these men recover their ' +
+        'wounded, their wind and their nerve far faster than they would alone.';
+      activity.append(' ', tended);
     }
 
     const bars = document.createElement('div');

@@ -68,7 +68,13 @@ describe('operations away from the Vale', () => {
 
       expect(state.objective.outcome).not.toBe('ongoing');
       expect(state.objective.outcomeReason.length).toBeGreaterThan(0);
-    });
+    },
+    // These march a full army for eight or nine minutes of game time before
+    // anything concedes. The Long Causeway needs about ten thousand ticks, which
+    // sat close enough to the suite's default sixty seconds to fail on a busy
+    // machine while the battle itself was perfectly healthy. The assertion is
+    // that the operation reaches a decision, not that it does so quickly.
+    150_000);
   }
 
   it('keeps two battles on two maps out of each other’s geography', () => {

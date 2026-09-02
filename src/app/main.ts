@@ -90,12 +90,29 @@ async function bootstrap(): Promise<void> {
   const alertFeed = new AlertFeed((x, y) => renderer.camera.centerOn(x, y));
   const toast = new Toast();
   const objectiveBanner = new ObjectiveBanner();
-  const firstOrders = new FirstOrders(selection.scenarioId);
 
-  let speed = 1;
-  const topBar = new TopBar((next) => {
+  // Give a first-time commander time to read the field. The opening assault is
+  // only seconds away on Captain, so starting the clock under the briefing
+  // punished the player for reading the instructions we put in front of them.
+  let speed = 0;
+  let openingHold = true;
+  let firstOrders: FirstOrders | undefined;
+  let topBar: TopBar;
+  const setSpeed = (next: number): void => {
     speed = next;
-  });
+    topBar.syncSpeed(speed);
+    if (next > 0 && openingHold) {
+      openingHold = false;
+      firstOrders?.dismiss();
+    }
+  };
+  const beginFromOpening = (): void => {
+    if (!openingHold) return;
+    setSpeed(1);
+  };
+  topBar = new TopBar(setSpeed);
+  topBar.syncSpeed(0);
+  firstOrders = new FirstOrders(selection.scenarioId, beginFromOpening);
 
   const armyList = new ArmyList(
     (groupId, additive) => {
@@ -108,25 +125,25 @@ async function bootstrap(): Promise<void> {
   );
 
   const commandBar = new CommandBar(engine, renderer.selection, (message) => {
+    beginFromOpening();
     toast.show(message);
-    firstOrders.dismiss();
+    firstOrders?.dismiss();
   });
 
   const input = new Input(battlefieldCanvas, minimapCanvas, minimap, renderer, engine, {
     onSelectionChange: () => commandBar.update(),
     onTogglePause: () => {
-      speed = speed === 0 ? 1 : 0;
-      topBar.syncSpeed(speed);
+      setSpeed(speed === 0 ? 1 : 0);
     },
     onSpeedChange: (delta) => {
       const steps = [0, 1, 2, 4];
       const current = steps.indexOf(speed);
-      speed = steps[Math.max(0, Math.min(steps.length - 1, current + delta))] ?? 1;
-      topBar.syncSpeed(speed);
+      setSpeed(steps[Math.max(0, Math.min(steps.length - 1, current + delta))] ?? 1);
     },
     onOrderIssued: (message) => {
+      beginFromOpening();
       toast.show(message);
-      firstOrders.dismiss();
+      firstOrders?.dismiss();
     },
   });
 
@@ -191,7 +208,14 @@ async function bootstrap(): Promise<void> {
   const handlers = createWebMcpToolHandlers({
     engine,
     queries,
-    onMarshalAction: (summary) => toast.show(summary, true),
+    onMarshalAction: (summary, commandType) => {
+      // Drafting is genuinely inert: a Marshal can discuss, create and revise
+      // a plan while the opening field remains frozen for the commander.
+      if (!['create_plan', 'modify_plan', 'cancel_plan'].includes(commandType)) {
+        beginFromOpening();
+      }
+      toast.show(summary, true);
+    },
   });
 
   // The tool schemas offer only the ground this battle is fought on.

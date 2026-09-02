@@ -145,7 +145,8 @@ export async function registerWebMcpTools(
       title: 'Get active orders',
       description:
         'What every group is currently doing, plus any standing conditional orders that are ' +
-        'armed and waiting for their trigger. Read-only.',
+        'armed and waiting for their trigger. Reports how many named-route waypoints remain ' +
+        'without exposing their raw coordinates. Read-only.',
       inputSchema: EMPTY_INPUT_SCHEMA,
       annotations: { readOnlyHint: true },
       execute: () => handlers.getActiveOrders(),
@@ -173,11 +174,24 @@ export async function registerWebMcpTools(
       execute: (input) => handlers.orderGroup(input),
     },
     {
+      name: 'deploy_custom_formation',
+      title: 'Deploy a custom formation',
+      description:
+        'Atomically arrange up to fourteen regiments around one named strategic zone. Assign ' +
+        'each regiment a unique front, line, wing, rear, or reserve slot plus its own formation, ' +
+        'stance, and move/attack/defend order. The game derives passable positions from those ' +
+        'semantic slots; raw coordinates and individual soldiers are never exposed.',
+      inputSchema: schemas.DEPLOY_FORMATION_SCHEMA,
+      annotations: { readOnlyHint: false },
+      execute: (input) => handlers.deployFormation(input),
+    },
+    {
       name: 'reorganize_armies',
       title: 'Reorganise armies',
       description:
-        'Split a group into a detachment, merge several groups into one, or rename a group. ' +
-        'Splitting preserves the mix of troop types.',
+        'Split a group into a mixed detachment, detach one troop category into its own regiment, ' +
+        'merge several groups, or rename a group. Category detachments give fine control of ' +
+        'archers, guns, cavalry, surgeons, and other arms without exposing soldier ids.',
       inputSchema: schemas.REORGANIZE_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.reorganizeArmies(input),
@@ -205,8 +219,10 @@ export async function registerWebMcpTools(
       name: 'focus_siege',
       title: 'Focus siege',
       description:
-        'Commit a siege group to bombard a zone. Siege outranges everything but is slow and ' +
-        'helpless in close combat, so it is deployed loose and holding ground.',
+        'Commit a siege or artillery group to bombard a zone. Both outrange everything else ' +
+        'but are slow and helpless in close combat, so they are deployed loose and holding ' +
+        'ground. Guns must also stand still to fire at all: a battery still on the march ' +
+        'shoots at nothing, so order it onto its ground well before you need it firing.',
       inputSchema: schemas.FOCUS_SIEGE_SCHEMA,
       annotations: { readOnlyHint: false },
       execute: (input) => handlers.focusSiege(input),

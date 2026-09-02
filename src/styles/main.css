@@ -1817,6 +1817,14 @@ body {
   color: var(--warn);
 }
 
+.army-row .contact.limbered {
+  color: var(--warn);
+}
+
+.army-row .contact.tended {
+  color: #6fd5a8;
+}
+
 .army-row .bars {
   display: flex;
   gap: 6px;
@@ -2023,6 +2031,43 @@ body {
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--text-dim);
+}
+
+.outcome-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin-top: 24px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--line);
+}
+
+.outcome-stats > div {
+  display: flex;
+  min-width: 110px;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  background: #111810;
+}
+
+.outcome-stats small {
+  font-size: 8px;
+  letter-spacing: 0.16em;
+}
+
+.outcome-stats b {
+  color: var(--text);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.outcome-card .outcome-regiments {
+  margin-top: 10px;
+  color: var(--text-faint);
+  font-size: 10px;
 }
 
 .outcome-card button {
@@ -2401,9 +2446,15 @@ body {
   border-color: #2f4a63;
 }
 
-.army-row[data-role='archer'] .role {
+.army-row[data-role='archer'] .role,
+.army-row[data-role='handgunner'] .role {
   color: #cfe08d;
   border-color: #46532c;
+}
+
+.army-row[data-role='surgeon'] .role {
+  color: #9fe0c4;
+  border-color: #2b5346;
 }
 
 .army-row[data-role='spearman'] .role {
@@ -2412,7 +2463,8 @@ body {
 }
 
 .army-row[data-role='heavy_infantry'] .role,
-.army-row[data-role='siege'] .role {
+.army-row[data-role='siege'] .role,
+.army-row[data-role='cannon'] .role {
   color: #d3b7ff;
   border-color: #45385c;
 }
@@ -2583,6 +2635,44 @@ body {
 .first-orders .dismiss:hover {
   background: var(--panel-raised);
   color: var(--text);
+}
+
+.first-orders-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.first-orders-actions button {
+  pointer-events: auto;
+  padding: 6px 8px;
+  border: 1px solid #5b4a25;
+  border-radius: 4px;
+  background: #201c10;
+  color: var(--king);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.first-orders-actions button:hover {
+  border-color: var(--king);
+  background: #2a2413;
+}
+
+.first-orders-actions kbd {
+  margin-left: 4px;
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 400;
 }
 
 /*

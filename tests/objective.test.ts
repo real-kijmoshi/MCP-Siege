@@ -241,6 +241,13 @@ describe('the objective in the scenario', () => {
     expect(report.enemyKing.lastSeenZone).toBeUndefined();
     expect(report.enemyKing.visibleNow).toBe(false);
     expect(report.enemyKing.note).toContain('Never sighted');
+    expect(report.result).toEqual({
+      elapsedSeconds: 0,
+      initialUnits: 4306,
+      survivingUnits: 4306,
+      losses: 0,
+      survivingRegiments: 13,
+    });
 
     // Nothing in the projection carries his true position, in any form.
     const trueY = engine.getState().objective.kings.enemy.position.y;

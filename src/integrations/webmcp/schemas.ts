@@ -3,6 +3,7 @@ import {
   ORDER_KINDS,
   PLAN_ACTIONS,
   STANCES,
+  TACTICAL_SLOTS,
   UNIT_CATEGORIES,
   ZONE_IDS,
   type ZoneId,
@@ -160,6 +161,10 @@ export function createToolSchemas(zoneIds: readonly ZoneId[] = ZONE_IDS) {
     formation: formationSchema,
     stance: stanceSchema,
   } as const;
+  const appendSchema = {
+    type: 'boolean',
+    description: 'If true, queue this destination after the regiment\'s existing route.',
+  } as const;
   const targetGroupSchema = {
     ...groupIdSchema,
     description: 'A friendly id from get_armies for support, or a known enemy id from get_intelligence.',
@@ -172,7 +177,12 @@ export function createToolSchemas(zoneIds: readonly ZoneId[] = ZONE_IDS) {
     oneOf: [
       ...(['move', 'attack_zone', 'defend_zone', 'scout'] as const).map((order) => ({
         type: 'object',
-        properties: { ...commonOrderProperties, order: { const: order }, targetZone: zoneSchema },
+        properties: {
+          ...commonOrderProperties,
+          order: { const: order },
+          targetZone: zoneSchema,
+          append: appendSchema,
+        },
         required: ['groupIds', 'order', 'targetZone'],
         additionalProperties: false,
       })),
@@ -182,6 +192,7 @@ export function createToolSchemas(zoneIds: readonly ZoneId[] = ZONE_IDS) {
           ...commonOrderProperties,
           order: { const: order },
           targetGroupId: targetGroupSchema,
+          append: appendSchema,
         },
         required: ['groupIds', 'order', 'targetGroupId'],
         additionalProperties: false,
@@ -200,8 +211,10 @@ export function createToolSchemas(zoneIds: readonly ZoneId[] = ZONE_IDS) {
     properties: {
       operation: {
         type: 'string',
-        enum: ['split', 'merge', 'rename'],
-        description: 'split detaches part of a group; merge fuses groups; rename relabels one.',
+        enum: ['split', 'detach', 'merge', 'rename'],
+        description:
+          'split takes a mixed share; detach extracts one troop category; merge fuses groups; ' +
+          'rename relabels one.',
       },
       groupId: { ...groupIdSchema, description: 'The group to split or rename.' },
       groupIds: {
@@ -217,6 +230,11 @@ export function createToolSchemas(zoneIds: readonly ZoneId[] = ZONE_IDS) {
         minimum: 1,
         maximum: 99,
         description: 'Share of the group moved into the detachment when splitting.',
+      },
+      category: {
+        type: 'string',
+        enum: UNIT_CATEGORIES,
+        description: 'Troop category extracted by detach without exposing soldier ids.',
       },
       name: {
         type: 'string',
@@ -270,6 +288,44 @@ export function createToolSchemas(zoneIds: readonly ZoneId[] = ZONE_IDS) {
       targetZone: zoneSchema,
       targetGroupId: { ...groupIdSchema, description: 'Send the new wave to support this group.' },
     },
+    additionalProperties: false,
+  } as const;
+
+  const DEPLOY_FORMATION_SCHEMA = {
+    type: 'object',
+    description:
+      'A custom multi-regiment deployment around named ground. Slots are semantic positions, ' +
+      'never raw coordinates.',
+    properties: {
+      targetZone: zoneSchema,
+      assignments: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 14,
+        items: {
+          type: 'object',
+          properties: {
+            groupId: groupIdSchema,
+            slot: {
+              type: 'string',
+              enum: TACTICAL_SLOTS,
+              description:
+                'Unique place in the deployment: front, main line, rear, reserve, or far wing.',
+            },
+            order: {
+              type: 'string',
+              enum: ['move', 'attack_zone', 'defend_zone'],
+              description: 'How this regiment behaves while occupying its assigned slot.',
+            },
+            formation: formationSchema,
+            stance: stanceSchema,
+          },
+          required: ['groupId', 'slot', 'order'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['targetZone', 'assignments'],
     additionalProperties: false,
   } as const;
 
@@ -387,6 +443,7 @@ export function createToolSchemas(zoneIds: readonly ZoneId[] = ZONE_IDS) {
     CANCEL_CONDITIONAL_SCHEMA,
     CONDITION_SCHEMA,
     CREATE_PLAN_SCHEMA,
+    DEPLOY_FORMATION_SCHEMA,
     DIRECT_REINFORCEMENTS_SCHEMA,
     FOCUS_SIEGE_SCHEMA,
     MODIFY_PLAN_SCHEMA,

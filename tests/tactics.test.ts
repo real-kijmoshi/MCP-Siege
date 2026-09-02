@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CROWDING,
   FATIGUE,
+  FORMATION_PROFILES,
   TICKS_PER_SECOND,
   UNIT_STATS,
   counterMultiplier,
@@ -76,6 +77,15 @@ describe('formations', () => {
     };
     expect(area('loose')).toBeGreaterThan(area('block') * 1.5);
   });
+
+  it('makes open ranks better for archers than a marching column', () => {
+    expect(FORMATION_PROFILES.line.rangedModifier).toBeGreaterThan(
+      FORMATION_PROFILES.column.rangedModifier * 1.4,
+    );
+    expect(FORMATION_PROFILES.double_line.rangedModifier).toBeGreaterThan(
+      FORMATION_PROFILES.block.rangedModifier,
+    );
+  });
 });
 
 describe('counters', () => {
@@ -136,6 +146,47 @@ function duel(
 }
 
 describe('combat', () => {
+  function archerShot(formation: 'line' | 'column'): { damage: number; engagement: number } {
+    const state = createEmptyState(6060);
+    createGroupFromSpec(state, {
+      id: 'bows',
+      name: 'Bows',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3000 },
+      formation,
+      stance: 'defensive',
+      composition: [['archer', 1]],
+    });
+    createGroupFromSpec(state, {
+      id: 'target',
+      name: 'Target',
+      ownerId: 'enemy',
+      anchor: { x: 4200, y: 3000 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 1]],
+    });
+    const bows = findGroup(state, 'bows')!;
+    const target = findGroup(state, 'target')!;
+    state.units.targetIdx[bows.members[0]!] = target.members[0]!;
+    advanceCombat(state);
+    return {
+      damage: UNIT_STATS.infantry.maxHitPoints - (state.units.hp[target.members[0]!] ?? 0),
+      engagement: bows.engagement,
+    };
+  }
+
+  it('lets archers fire beyond the old short range without physically pinning themselves', () => {
+    expect(UNIT_STATS.archer.range).toBeGreaterThan(200);
+    const shot = archerShot('line');
+    expect(shot.damage).toBeGreaterThan(0);
+    expect(shot.engagement).toBe(0);
+  });
+
+  it('rewards an archer line with a stronger volley than a column', () => {
+    expect(archerShot('line').damage).toBeGreaterThan(archerShot('column').damage * 1.4);
+  });
+
   it('lets spearmen break an equal number of cavalry', () => {
     const result = duel({ category: 'spearman', count: 200 }, { category: 'cavalry', count: 200 });
     expect(result.attackers).toBeGreaterThan(result.defenders);
@@ -252,6 +303,47 @@ describe('combat', () => {
 });
 
 describe('movement physics', () => {
+  it('halts a missile-led assault to fire and wheels the formation toward its target', () => {
+    const state = createEmptyState(7070);
+    createGroupFromSpec(state, {
+      id: 'bows',
+      name: 'Bows',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3000 },
+      formation: 'line',
+      stance: 'aggressive',
+      composition: [['archer', 12]],
+    });
+    createGroupFromSpec(state, {
+      id: 'foe',
+      name: 'Foe',
+      ownerId: 'enemy',
+      anchor: { x: 4200, y: 3000 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 12]],
+    });
+    const bows = findGroup(state, 'bows')!;
+    const foe = findGroup(state, 'foe')!;
+    bows.order = {
+      kind: 'attack_zone',
+      targetZone: 'central_field',
+      destination: { x: 4500, y: 3000 },
+      issuedAtTick: 0,
+    };
+    bows.path = [{ x: 4500, y: 3000 }];
+    for (let index = 0; index < bows.members.length; index += 1) {
+      state.units.targetIdx[bows.members[index]!] = foe.members[index]!;
+    }
+
+    const beforeX = bows.anchor.x;
+    const beforeFacing = bows.facing;
+    advanceMovement(state);
+
+    expect(bows.anchor.x).toBe(beforeX);
+    expect(Math.abs(bows.facing)).toBeLessThan(Math.abs(beforeFacing));
+  });
+
   it('separates overlapping friendly regiments without exposing soldier identities', () => {
     const state = createEmptyState(2020);
     for (const id of ['first', 'second']) {
@@ -635,6 +727,7 @@ describe('the press of men', () => {
   it('makes a crushed formation far worse ground to be shot at on', () => {
     expect(shotAt(1)).toBeGreaterThan(shotAt(0) * 1.4);
   });
+
 });
 
 describe('crossings', () => {

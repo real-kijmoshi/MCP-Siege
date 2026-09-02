@@ -6,6 +6,8 @@ import type {
   PlanStep,
   PlayerId,
   Stance,
+  TacticalSlot,
+  UnitCategory,
   Vector2D,
   ZoneId,
 } from '../types/domain';
@@ -70,6 +72,33 @@ export interface RenameGroupPayload {
   playerId: PlayerId;
   groupId: string;
   name: string;
+}
+
+/** Extract one troop arm into a new addressable regiment without exposing soldiers. */
+export interface DetachCategoryPayload {
+  type: 'detach_category';
+  playerId: PlayerId;
+  groupId: string;
+  category: UnitCategory;
+  /** Share of that category to detach, 1-100. */
+  percent: number;
+  newGroupName: string;
+}
+
+export interface FormationAssignment {
+  groupId: string;
+  slot: TacticalSlot;
+  order: 'move' | 'attack_zone' | 'defend_zone';
+  formation?: Formation;
+  stance?: Stance;
+}
+
+/** Atomically arranges several regiments around one named strategic zone. */
+export interface DeployFormationPayload {
+  type: 'deploy_formation';
+  playerId: PlayerId;
+  targetZone: ZoneId;
+  assignments: FormationAssignment[];
 }
 
 export interface SetConditionalOrderPayload {
@@ -144,8 +173,10 @@ export type GameCommandPayload =
   | OrderGroupsPayload
   | ChangeFormationPayload
   | SplitGroupPayload
+  | DetachCategoryPayload
   | MergeGroupsPayload
   | RenameGroupPayload
+  | DeployFormationPayload
   | SetConditionalOrderPayload
   | CancelConditionalOrderPayload
   | FocusSiegePayload

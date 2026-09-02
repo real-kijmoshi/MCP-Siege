@@ -65,9 +65,12 @@
 
             <div class="commit-column">
               <div class="commander-setting">
-                <span>Enemy commander</span>
+                <div class="difficulty-heading">
+                  <span>Enemy commander</span>
+                  <small>Sets the difficulty</small>
+                </div>
                 <div class="difficulty-list" id="lobby-difficulties"></div>
-                <p id="difficulty-description"></p>
+                <p class="difficulty-description" id="difficulty-description"></p>
               </div>
               <button class="deploy-button" id="lobby-deploy" type="button">
                 <span>DEPLOY ARMY</span><i>→</i>
@@ -107,10 +110,10 @@
         <div class="spacer"></div>
 
         <div class="speed-control" role="group" aria-label="Simulation speed">
-          <button type="button" data-speed="0" id="speed-pause" title="Pause [Space]" aria-pressed="false">❚❚</button>
-          <button type="button" data-speed="1" class="active" aria-pressed="true">1×</button>
-          <button type="button" data-speed="2" aria-pressed="false">2×</button>
-          <button type="button" data-speed="4" aria-pressed="false">4×</button>
+          <button type="button" data-speed="0" id="speed-pause" class="active" title="Pause [Space]" aria-label="Pause battle" aria-pressed="true">❚❚</button>
+          <button type="button" data-speed="1" aria-label="Normal speed" aria-pressed="false">1×</button>
+          <button type="button" data-speed="2" aria-label="Double speed" aria-pressed="false">2×</button>
+          <button type="button" data-speed="4" aria-label="Quadruple speed" aria-pressed="false">4×</button>
         </div>
 
         <div class="webmcp-status" id="webmcp-status" title="WebMCP tool availability">
@@ -160,7 +163,13 @@
               <small>THE FIELD IS DECIDED</small>
               <h1 id="outcome-title">VICTORY</h1>
               <p id="outcome-reason"></p>
-              <button type="button" id="outcome-restart">FIGHT AGAIN</button>
+              <div class="outcome-stats" aria-label="Battle result">
+                <div><small>ELAPSED</small><b id="outcome-elapsed">0:00</b></div>
+                <div><small>SURVIVORS</small><b id="outcome-survivors">0</b></div>
+                <div><small>LOSSES</small><b id="outcome-losses">0</b></div>
+              </div>
+              <p class="outcome-regiments" id="outcome-regiments"></p>
+              <button type="button" id="outcome-restart">RETURN TO WAR COUNCIL</button>
             </div>
           </div>
 
@@ -184,13 +193,17 @@
             <button type="button" class="dismiss" id="first-orders-dismiss" aria-label="Dismiss">
               ×
             </button>
-            <small>YOUR ORDERS</small>
+            <small>BATTLE PAUSED · YOUR ORDERS</small>
             <h3 id="first-orders-title">Hold the crossings</h3>
             <p id="first-orders-body"></p>
             <ul>
               <li><b>Win:</b> break the enemy guard, then hold the ring around its king.</li>
               <li><b>Command:</b> select a regiment, right-click to move, Ctrl+right-click to attack ground.</li>
             </ul>
+            <div class="first-orders-actions">
+              <span>Issue an order, or</span>
+              <button type="button" id="first-orders-begin">BEGIN BATTLE <kbd>SPACE</kbd></button>
+            </div>
           </div>
         </div>
       </main>
