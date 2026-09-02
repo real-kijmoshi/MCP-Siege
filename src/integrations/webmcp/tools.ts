@@ -2,12 +2,18 @@ import { TICKS_PER_SECOND } from '../../game/config/battle';
 import type { SimulationEngine } from '../../game/simulation/Engine';
 import { activeZoneIds, useBattleMap } from '../../game/simulation/Zones';
 import { GameQueries, QueryError } from '../../game/queries/GameQueries';
-import type { CommandResult, GameCommandPayload, PlanModification } from '../../game/commands/types';
+import type {
+  CommandResult,
+  FormationAssignment,
+  GameCommandPayload,
+  PlanModification,
+} from '../../game/commands/types';
 import {
   FORMATIONS,
   ORDER_KINDS,
   PLAN_ACTIONS,
   STANCES,
+  TACTICAL_SLOTS,
   UNIT_CATEGORIES,
   type Formation,
   type OrderKind,
@@ -15,12 +21,15 @@ import {
   type PlanCondition,
   type PlanStep,
   type Stance,
+  type TacticalSlot,
+  type UnitCategory,
   type ZoneId,
 } from '../../game/types/domain';
 import { toolFailure, toolSuccess, type ToolResult } from './results';
 import {
   InputError,
   asObject,
+  optionalBoolean,
   optionalEnum,
   optionalString,
   rejectUnknown,
@@ -64,6 +73,7 @@ export interface WebMcpToolHandlers {
   cancelConditionalOrder: (input: unknown) => Promise<ToolResult<unknown>>;
   focusSiege: (input: unknown) => Promise<ToolResult<unknown>>;
   directReinforcements: (input: unknown) => Promise<ToolResult<unknown>>;
+  deployFormation: (input: unknown) => Promise<ToolResult<unknown>>;
 
   createPlan: (input: unknown) => Promise<ToolResult<unknown>>;
   modifyPlan: (input: unknown) => Promise<ToolResult<unknown>>;
@@ -75,7 +85,7 @@ export interface ToolContext {
   engine: SimulationEngine;
   queries: GameQueries;
   /** Notifies the page that an order arrived from outside, for the toast. */
-  onMarshalAction?: (summary: string) => void;
+  onMarshalAction?: (summary: string, commandType: GameCommandPayload['type']) => void;
 }
 
 function readSafely<T>(read: () => T): ToolResult<T> {
@@ -211,7 +221,7 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
 
     if (!result.ok) return toolFailure(result.code, result.message, result.suggestions);
 
-    context.onMarshalAction?.(result.summary);
+    context.onMarshalAction?.(result.summary, payload.type);
     return toolSuccess({
       ok: true,
       commandId: result.commandId,
@@ -301,6 +311,7 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
         'targetGroupId',
         'formation',
         'stance',
+        'append',
       ]);
 
       const order = requireEnum<OrderKind>(
@@ -312,6 +323,7 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
       const targetGroupId = optionalString(input, 'targetGroupId', 64);
       const formation = optionalEnum<Formation>(input, 'formation', FORMATIONS);
       const stance = optionalEnum<Stance>(input, 'stance', STANCES);
+      const append = optionalBoolean(input, 'append');
 
       const zoneOrders: readonly OrderKind[] = ['move', 'attack_zone', 'defend_zone', 'scout'];
       const groupOrders: readonly OrderKind[] = ['attack_group', 'support'];
@@ -334,6 +346,11 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
           'Use hold or retreat with only groupIds, plus optional formation or stance.',
         ]);
       }
+      if (append === true && (order === 'hold' || order === 'retreat')) {
+        throw new InputError(`Order "${order}" cannot be queued as a waypoint.`, [
+          'Queue move, attack, defend, scout, or support orders instead.',
+        ]);
+      }
 
       return submit({
         type: 'order_groups',
@@ -344,13 +361,14 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
         ...(targetGroupId !== undefined ? { targetGroupId } : {}),
         ...(formation !== undefined ? { formation } : {}),
         ...(stance !== undefined ? { stance } : {}),
+        ...(append !== undefined ? { append } : {}),
       });
     }),
 
     reorganizeArmies: guarded(async (raw) => {
       const input = asObject(raw);
-      rejectUnknown(input, ['operation', 'groupId', 'groupIds', 'percent', 'name']);
-      const operation = requireEnum(input, 'operation', ['split', 'merge', 'rename'] as const);
+      rejectUnknown(input, ['operation', 'groupId', 'groupIds', 'category', 'percent', 'name']);
+      const operation = requireEnum(input, 'operation', ['split', 'detach', 'merge', 'rename'] as const);
 
       if (operation === 'split') {
         return submit({
@@ -369,6 +387,17 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
           playerId: PLAYER,
           groupIds: requireStringArray(input, 'groupIds', 2, 8),
           ...(name !== undefined ? { newGroupName: name } : {}),
+        });
+      }
+
+      if (operation === 'detach') {
+        return submit({
+          type: 'detach_category',
+          playerId: PLAYER,
+          groupId: requireString(input, 'groupId', 64),
+          category: requireEnum<UnitCategory>(input, 'category', UNIT_CATEGORIES),
+          percent: requireInteger(input, 'percent', 1, 100),
+          newGroupName: requireString(input, 'name', 40),
         });
       }
 
@@ -445,6 +474,36 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
         playerId: PLAYER,
         ...(targetZone !== undefined ? { targetZone } : {}),
         ...(targetGroupId !== undefined ? { targetGroupId } : {}),
+      });
+    }),
+
+    deployFormation: guarded(async (raw) => {
+      const input = asObject(raw);
+      rejectUnknown(input, ['targetZone', 'assignments']);
+      const rawAssignments = input.assignments;
+      if (!Array.isArray(rawAssignments) || rawAssignments.length < 1 || rawAssignments.length > 14) {
+        throw new InputError('"assignments" must contain between 1 and 14 regiment assignments.');
+      }
+
+      const assignments: FormationAssignment[] = rawAssignments.map((rawAssignment) => {
+        const assignment = asObject(rawAssignment);
+        rejectUnknown(assignment, ['groupId', 'slot', 'order', 'formation', 'stance']);
+        const formation = optionalEnum<Formation>(assignment, 'formation', FORMATIONS);
+        const stance = optionalEnum<Stance>(assignment, 'stance', STANCES);
+        return {
+          groupId: requireString(assignment, 'groupId', 64),
+          slot: requireEnum<TacticalSlot>(assignment, 'slot', TACTICAL_SLOTS),
+          order: requireEnum(assignment, 'order', ['move', 'attack_zone', 'defend_zone'] as const),
+          ...(formation !== undefined ? { formation } : {}),
+          ...(stance !== undefined ? { stance } : {}),
+        };
+      });
+
+      return submit({
+        type: 'deploy_formation',
+        playerId: PLAYER,
+        targetZone: requireEnum<ZoneId>(input, 'targetZone', activeZoneIds()),
+        assignments,
       });
     }),
 
