@@ -56,9 +56,10 @@ describe('registration', () => {
     expect(registered).toContain('execute_plan');
     expect(registered).toContain('order_group');
     expect(registered).toContain('set_conditional_order');
+    expect(registered).toContain('deploy_custom_formation');
     expect(registered).toContain('get_objective');
     expect(new Set(registered).size).toBe(registered.length);
-    expect(registered.length).toBe(21);
+    expect(registered.length).toBe(22);
   });
 
   it('reports unavailability rather than throwing when the API is absent', async () => {
@@ -153,6 +154,61 @@ describe('commands', () => {
     expect(group?.path.length).toBeGreaterThan(0);
   });
 
+  it('queues named-zone waypoints instead of replacing the current march', async () => {
+    await call(
+      tools.orderGroup({ groupIds: ['cavalry_i'], order: 'move', targetZone: 'west_crossing' }),
+    );
+    const group = activeGroups(engine.getState(), 'player').find((entry) => entry.id === 'cavalry_i')!;
+    const before = group.path.length;
+
+    unwrap(
+      await call(
+        tools.orderGroup({
+          groupIds: ['cavalry_i'],
+          order: 'move',
+          targetZone: 'east_crossing',
+          append: true,
+        }),
+      ),
+    );
+
+    expect(group.path.length).toBeGreaterThan(before);
+    expect(group.order.targetZone).toBe('east_crossing');
+  });
+
+  it('deploys a custom multi-regiment formation with per-group tactics', async () => {
+    const data = unwrap(
+      await call(
+        tools.deployFormation({
+          targetZone: 'central_field',
+          assignments: [
+            {
+              groupId: 'legion_i',
+              slot: 'front_center',
+              order: 'attack_zone',
+              formation: 'double_line',
+              stance: 'aggressive',
+            },
+            {
+              groupId: 'archers_i',
+              slot: 'rear_center',
+              order: 'defend_zone',
+              formation: 'line',
+              stance: 'hold_ground',
+            },
+          ],
+        }),
+      ),
+    );
+    expect(data.groupIds).toEqual(['legion_i', 'archers_i']);
+
+    const legion = activeGroups(engine.getState(), 'player').find((group) => group.id === 'legion_i')!;
+    const archers = activeGroups(engine.getState(), 'player').find((group) => group.id === 'archers_i')!;
+    expect(legion.formation).toBe('double_line');
+    expect(archers.stance).toBe('hold_ground');
+    expect(legion.order.destination).not.toEqual(archers.order.destination);
+  });
+
   it('rejects an incomplete order before it reaches the command queue', async () => {
     expectFailure(
       await tools.orderGroup({ groupIds: ['legion_i'], order: 'move' }),
@@ -211,6 +267,29 @@ describe('commands', () => {
       (detachment?.members ?? []).map((index) => state.units.categoryOf(index)),
     );
     expect(categories.size).toBeGreaterThan(1);
+  });
+
+  it('detaches a troop category into a new regiment without soldier ids', async () => {
+    const state = engine.getState();
+    const source = activeGroups(state, 'player').find((group) => group.id === 'reserve_i')!;
+    const before = source.members.length;
+    const data = unwrap(
+      await call(
+        tools.reorganizeArmies({
+          operation: 'detach',
+          groupId: 'reserve_i',
+          category: 'archer',
+          percent: 100,
+          name: 'Reserve Archers',
+        }),
+      ),
+    );
+
+    const detachment = activeGroups(state, 'player').find((group) => group.id === data.newGroupId)!;
+    expect(detachment.members.length).toBeGreaterThan(0);
+    expect(detachment.members.every((index) => state.units.categoryOf(index) === 'archer')).toBe(true);
+    expect(source.members.length + detachment.members.length).toBe(before);
+    expect(JSON.stringify(data)).not.toContain('members');
   });
 
   it('refuses to command the enemy', async () => {
