@@ -15,8 +15,15 @@ export const FIXED_STEP_MS = 1000 / TICKS_PER_SECOND;
 export const MAP_WIDTH = 8000;
 export const MAP_HEIGHT = 5000;
 
-/** Capacity of the unit pool. Sized above the scenario so reinforcements fit. */
-export const UNIT_CAPACITY = 10_000;
+/**
+ * Capacity of the unit pool. Sized above the scenario so reinforcements fit.
+ *
+ * Raised from ten thousand when the guns, the shot and the hospitals joined the
+ * order of battle: the two armies now muster around eight and a half thousand
+ * men between them, and a long battle banks several reinforcement waves on top
+ * of that.
+ */
+export const UNIT_CAPACITY = 12_000;
 
 /* --------------------------------------------------------------- unit stats */
 
@@ -39,8 +46,19 @@ export interface UnitStats {
   /** Extra damage delivered when arriving at speed. */
   chargePower: number;
   vision: number;
-  /** Splash radius in world units. Only siege has one. */
+  /** Splash radius in world units. Only siege and the guns have one. */
   splashRadius: number;
+  /**
+   * Ticks a piece must stand still before it can fire. Zero for everything a
+   * man carries.
+   *
+   * A gun is not a weapon that happens to be slow; it is a weapon that has to
+   * be *placed*. Trailing it forward with the advance means it shoots at
+   * nothing, so where the battery stands is a decision made early and paid for
+   * late, which is the whole reason artillery is a different arm from siege
+   * rather than a longer-ranged version of it.
+   */
+  deployTicks: number;
   /** Contribution to a group's reported "strength" figure. */
   strengthValue: number;
 }
@@ -63,6 +81,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.18,
     vision: 300,
     splashRadius: 0,
+    deployTicks: 0,
     strengthValue: 1,
   },
   spearman: {
@@ -78,21 +97,23 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.1,
     vision: 300,
     splashRadius: 0,
+    deployTicks: 0,
     strengthValue: 1,
   },
   archer: {
     label: 'Archers',
     maxHitPoints: 65,
     attack: 4.2,
-    range: 155,
+    range: 230,
     cooldownTicks: 20,
     speed: perSecond(57),
     acceleration: 0.25,
     bodyRadius: 5,
     mass: 0.85,
     chargePower: 0,
-    vision: 430,
+    vision: 500,
     splashRadius: 0,
+    deployTicks: 0,
     strengthValue: 1,
   },
   cavalry: {
@@ -108,6 +129,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.9,
     vision: 380,
     splashRadius: 0,
+    deployTicks: 0,
     strengthValue: 1.6,
   },
   heavy_infantry: {
@@ -123,6 +145,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.3,
     vision: 280,
     splashRadius: 0,
+    deployTicks: 0,
     strengthValue: 1.8,
   },
   siege: {
@@ -138,7 +161,59 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0,
     vision: 360,
     splashRadius: 52,
+    deployTicks: 0,
     strengthValue: 6,
+  },
+  handgunner: {
+    label: 'Handgunners',
+    maxHitPoints: 70,
+    attack: 11,
+    range: 118,
+    cooldownTicks: 46,
+    speed: perSecond(52),
+    acceleration: 0.22,
+    bodyRadius: 5.2,
+    mass: 0.9,
+    chargePower: 0,
+    vision: 360,
+    splashRadius: 0,
+    deployTicks: 0,
+    strengthValue: 1.2,
+  },
+  cannon: {
+    label: 'Cannon',
+    maxHitPoints: 150,
+    attack: 62,
+    range: 620,
+    cooldownTicks: 150,
+    speed: perSecond(16),
+    acceleration: 0.06,
+    bodyRadius: 11,
+    mass: 3.6,
+    chargePower: 0,
+    vision: 400,
+    splashRadius: 30,
+    deployTicks: TICKS_PER_SECOND * 4,
+    strengthValue: 8,
+  },
+  surgeon: {
+    label: 'Field Hospital',
+    maxHitPoints: 60,
+    // Surgeons carry no weapon at all. Nothing in `Combat` ever gives them a
+    // target, which is also why they hold no enemy in place by standing near
+    // him: a hospital cannot be used as a blocking force.
+    attack: 0,
+    range: 0,
+    cooldownTicks: 40,
+    speed: perSecond(50),
+    acceleration: 0.2,
+    bodyRadius: 5,
+    mass: 0.8,
+    chargePower: 0,
+    vision: 300,
+    splashRadius: 0,
+    deployTicks: 0,
+    strengthValue: 0.3,
   },
   scout: {
     label: 'Scouts',
@@ -153,6 +228,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.12,
     vision: 720,
     splashRadius: 0,
+    deployTicks: 0,
     strengthValue: 0.4,
   },
 };
@@ -162,13 +238,25 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
  * Only the tactically meaningful relationships deviate from 1.
  */
 export const COUNTER_MATRIX: Record<UnitCategory, Partial<Record<UnitCategory, number>>> = {
-  infantry: { archer: 1.4, siege: 1.5, scout: 1.6, heavy_infantry: 0.7 },
-  spearman: { cavalry: 2.4, archer: 1.2, scout: 1.4, heavy_infantry: 0.8 },
-  archer: { infantry: 1.0, heavy_infantry: 0.55, cavalry: 0.8, siege: 1.3, scout: 1.2 },
-  cavalry: { archer: 2.6, siege: 2.2, scout: 2.0, spearman: 0.45, heavy_infantry: 0.75 },
-  heavy_infantry: { infantry: 1.3, spearman: 1.2, archer: 1.5, cavalry: 0.9 },
-  siege: { infantry: 1.2, heavy_infantry: 1.2, spearman: 1.2, archer: 1.1, cavalry: 0.6 },
-  scout: {},
+  infantry: { archer: 1.4, handgunner: 1.35, siege: 1.5, cannon: 1.6, scout: 1.6, surgeon: 2, heavy_infantry: 0.7 },
+  spearman: { cavalry: 2.4, archer: 1.2, handgunner: 1.2, scout: 1.4, surgeon: 1.7, heavy_infantry: 0.8 },
+  archer: { infantry: 1.0, heavy_infantry: 0.55, cavalry: 0.8, siege: 1.3, cannon: 1.3, scout: 1.2, surgeon: 1.5 },
+  // Shot is the answer to armour that bows have never been: a ball goes through
+  // plate a shaft turns on. It pays for that at half the bow's reach and more
+  // than twice its reload, so archers standing off at two hundred paces shoot
+  // handgunners to pieces without ever being shot at.
+  handgunner: { heavy_infantry: 1.7, siege: 1.4, cannon: 1.35, surgeon: 1.5, archer: 1.1, cavalry: 0.7, scout: 0.5 },
+  cavalry: { archer: 2.6, handgunner: 2.2, siege: 2.2, cannon: 2.4, scout: 2.0, surgeon: 3, spearman: 0.45, heavy_infantry: 0.75 },
+  heavy_infantry: { infantry: 1.3, spearman: 1.2, archer: 1.5, handgunner: 1.5, cannon: 1.4, surgeon: 1.9, cavalry: 0.9 },
+  siege: { infantry: 1.2, heavy_infantry: 1.2, spearman: 1.2, archer: 1.1, handgunner: 1.15, cannon: 1.2, cavalry: 0.6 },
+  // A gun beats whatever has to stand still to be useful and hits almost
+  // nothing that does not. Counter-battery is the sharpest number in the
+  // table: the only reliable answer to a battery is another battery, or horse
+  // brought round into its rear.
+  cannon: { siege: 1.8, cannon: 1.5, heavy_infantry: 1.6, infantry: 1.15, spearman: 1.15, surgeon: 1.2, cavalry: 0.5, scout: 0.35 },
+  // Riders who find the baggage. The one matchup scouts have ever had.
+  scout: { surgeon: 1.4 },
+  surgeon: {},
 };
 
 export function counterMultiplier(attacker: UnitCategory, defender: UnitCategory): number {
@@ -184,6 +272,8 @@ export interface FormationProfile {
   /** Spacing between slots, world units. */
   spacing: number;
   meleeModifier: number;
+  /** Archer damage delivered from this arrangement. */
+  rangedModifier: number;
   /** Higher means more damage taken from arrows. */
   rangedVulnerability: number;
   /** Higher means better resistance to a cavalry charge. */
@@ -200,28 +290,31 @@ export const FORMATION_PROFILES: Record<Formation, FormationProfile> = {
     frontage: 1.9,
     spacing: 15,
     meleeModifier: 1,
+    rangedModifier: 1.14,
     rangedVulnerability: 1,
     antiCavalry: 1,
     speedModifier: 0.9,
     splashVulnerability: 1,
-    description: 'Wide frontage. Brings the most men into contact.',
+    description: 'Wide frontage. Strongest archer volleys and melee contact.',
   },
   column: {
     label: 'Column',
     frontage: 0.35,
     spacing: 15,
     meleeModifier: 0.8,
+    rangedModifier: 0.72,
     rangedVulnerability: 0.9,
     antiCavalry: 0.8,
     speedModifier: 1.25,
     splashVulnerability: 1.2,
-    description: 'Narrow and fast. Best for crossings and forest tracks.',
+    description: 'Narrow and fast. Best for crossings; poor in a firefight.',
   },
   block: {
     label: 'Block',
     frontage: 1,
     spacing: 14,
     meleeModifier: 1.05,
+    rangedModifier: 0.92,
     rangedVulnerability: 1.1,
     antiCavalry: 1,
     speedModifier: 1,
@@ -233,44 +326,48 @@ export const FORMATION_PROFILES: Record<Formation, FormationProfile> = {
     frontage: 0.85,
     spacing: 16,
     meleeModifier: 1.35,
+    rangedModifier: 0.76,
     rangedVulnerability: 1,
     antiCavalry: 0.9,
     speedModifier: 1.1,
     splashVulnerability: 1.1,
-    description: 'Offensive shock formation. Strong charge, weak flanks.',
+    description: 'Offensive shock formation. Strong charge, weak archer volleys.',
   },
   double_line: {
     label: 'Double Line',
     frontage: 1.45,
     spacing: 15,
     meleeModifier: 1.1,
+    rangedModifier: 1.08,
     rangedVulnerability: 1,
     antiCavalry: 1.05,
     speedModifier: 0.95,
     splashVulnerability: 1.05,
-    description: 'Broad front with a second rank to feed the fight.',
+    description: 'Broad, resilient front with strong sustained volleys.',
   },
   loose: {
     label: 'Loose',
     frontage: 1.35,
     spacing: 30,
     meleeModifier: 0.8,
+    rangedModifier: 0.96,
     rangedVulnerability: 0.65,
     antiCavalry: 0.85,
     speedModifier: 1.05,
     splashVulnerability: 0.4,
-    description: 'Dispersed. Greatly reduces siege and arrow casualties.',
+    description: 'Dispersed. Survives missiles well at a small volley cost.',
   },
   square: {
     label: 'Defensive Square',
     frontage: 0.95,
     spacing: 15,
     meleeModifier: 0.95,
+    rangedModifier: 0.82,
     rangedVulnerability: 1.1,
     antiCavalry: 1.7,
     speedModifier: 0.55,
     splashVulnerability: 1.15,
-    description: 'Hollow square. Excellent against cavalry, very slow.',
+    description: 'Hollow square. Excellent against cavalry, slow with weak volleys.',
   },
 };
 
@@ -550,6 +647,59 @@ export const FATIGUE = {
   reportThreshold: 0.55,
 } as const;
 
+/* ------------------------------------------------------------ field hospital */
+
+/**
+ * The surgeons.
+ *
+ * Every other system in the battle takes something away and never gives it
+ * back: men die, formations tire, morale spent is morale lost. A battle
+ * therefore only ever ran one direction, and a regiment pulled out of the line
+ * was simply a regiment removed from the battle for good.
+ *
+ * A field hospital is the one thing on the field that runs the other way. It
+ * does nothing at all for troops in contact -- you cannot dress a wound in a
+ * melee -- but a regiment withdrawn behind the line and left alone near the
+ * hospital gets its lightly wounded back on their feet, recovers its wind
+ * faster, and steadies sooner. That turns relieving a spent regiment from a
+ * tidy move into a real one, and it gives an army a reason to hold ground
+ * behind its own line rather than in front of it.
+ *
+ * It is emphatically not an economy: nothing is produced, nothing is bought,
+ * and no man who has actually fallen comes back.
+ */
+export const FIELD_SUPPORT = {
+  /** How far a hospital's care reaches from its own anchor, world units. */
+  radius: 560,
+  /**
+   * Men one surgeon can look after. A seventy-strong hospital therefore tends
+   * a body of about four hundred completely, and a nine-hundred-man legion
+   * about half -- so a hospital helps a battered regiment far more than a whole
+   * one, which is exactly the order a commander should be treating them in.
+   */
+  tendedPerSurgeon: 6,
+  /**
+   * Hit points restored per tick to one tended man, at full care.
+   *
+   * Slow on purpose: about half a minute to bring a badly cut infantryman back
+   * to his feet, so withdrawing a regiment costs real time in the battle line.
+   */
+  healPerTick: 0.13,
+  /** Only one man in this many is looked at each tick. Bounds the whole cost. */
+  healStride: 4,
+  /** Extra fatigue shed per tick by a fully tended regiment out of contact. */
+  restPerTick: 0.00055,
+  /** Extra morale recovered per tick by a fully tended regiment. */
+  moralePerTick: 0.05,
+  /**
+   * Engagement above which care stops entirely. Deliberately the same threshold
+   * `Fatigue` and `Movement` use, so "in contact" means one thing everywhere.
+   */
+  maximumEngagement: 0.02,
+  /** Care at which the roster and the Marshal are told a regiment is being tended. */
+  reportThreshold: 0.15,
+} as const;
+
 /* --------------------------------------------------------------- movement */
 
 export const PHYSICS = {
@@ -569,22 +719,31 @@ export const PHYSICS = {
 
 /** March pace on ground that disrupts ranks, by broad troop role. */
 export function terrainSpeedModifier(category: UnitCategory, terrain: string): number {
+  // Guns fare worse off level ground than anything else on the field. A battery
+  // ordered through a wood is a battery out of the battle, which is what makes
+  // the ground between a gun and the position you want it in part of the plan.
   if (terrain === 'forest') {
+    if (category === 'cannon') return 0.32;
     if (category === 'cavalry') return 0.58;
     if (category === 'siege') return 0.48;
     return 0.76;
   }
   if (terrain === 'hill') {
+    if (category === 'cannon') return 0.46;
     if (category === 'cavalry') return 0.72;
     if (category === 'siege') return 0.6;
     return 0.84;
   }
   if (terrain === 'village') {
+    if (category === 'cannon') return 0.6;
     if (category === 'cavalry') return 0.62;
     if (category === 'siege') return 0.7;
     return 0.86;
   }
-  if (terrain === 'crossing') return category === 'cavalry' ? 0.82 : 0.9;
+  if (terrain === 'crossing') {
+    if (category === 'cannon') return 0.72;
+    return category === 'cavalry' ? 0.82 : 0.9;
+  }
   return 1;
 }
 
@@ -690,10 +849,13 @@ export const CATEGORY_TOKEN: Record<UnitCategory, string> = {
   infantry: 'INF',
   spearman: 'SPR',
   archer: 'ARC',
+  handgunner: 'SHT',
   cavalry: 'CAV',
   heavy_infantry: 'HVY',
   siege: 'SGE',
+  cannon: 'GUN',
   scout: 'SCT',
+  surgeon: 'MED',
 };
 
 /** Threshold at which a counter is worth telling the player about. */
