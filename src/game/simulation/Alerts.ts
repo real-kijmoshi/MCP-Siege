@@ -185,6 +185,19 @@ export function advanceAlerts(state: GameState): void {
         { zoneId: contact.lastSeenZone },
       );
     }
+    // Guns are worth their own warning rather than being folded in with the
+    // siege train. A battery reaches half again as far, so the moment one is
+    // sighted the ground a regiment may safely stand on has changed.
+    if (contact.composition.includes('cannon')) {
+      raise(
+        state,
+        `contact:cannon:${contact.lastSeenZone}`,
+        'contact',
+        'critical',
+        `Enemy guns sighted at ${ZONES[contact.lastSeenZone].name}.`,
+        { zoneId: contact.lastSeenZone },
+      );
+    }
   }
 
   if (state.players.player.availableWaves > 0) {
