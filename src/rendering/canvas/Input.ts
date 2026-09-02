@@ -71,7 +71,23 @@ export class Input {
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('blur', this.resetTransientInput);
+    window.addEventListener('pointercancel', this.resetTransientInput);
   }
+
+  /** A lost pointer or focus must never leave the camera marching by itself. */
+  private readonly resetTransientInput = (): void => {
+    this.pressedKeys.clear();
+    this.panPointerId = undefined;
+    this.orderPointerId = undefined;
+    this.orderStart = undefined;
+    this.orderPanned = false;
+    this.dragStart = undefined;
+    this.dragging = false;
+    this.minimapDragging = false;
+    this.renderer.dragBox = undefined;
+    this.renderer.hoveredZone = undefined;
+  };
 
   /* ------------------------------------------------------------- pointer */
 
@@ -418,7 +434,9 @@ export class Input {
 
     switch (event.key.toLowerCase()) {
       case ' ':
-        this.callbacks.onTogglePause();
+        // Key repeat used to strobe rapidly between pause and play while Space
+        // was held. One physical press should be one time-control decision.
+        if (!event.repeat) this.callbacks.onTogglePause();
         event.preventDefault();
         break;
       case 'f':
