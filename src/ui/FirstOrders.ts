@@ -9,16 +9,14 @@ import type { ScenarioId } from '../game/config/matches';
  * button does anything. This card carries that across the cut: the objective,
  * the two controls that matter, and the one rule that makes the counter matrix
  * learnable. It leaves as soon as the player gives an order, because by then it
- * has done its job.
+ * has done its job. The clock waits here as well: reading the briefing should
+ * never spend the few quiet seconds before the opening assault.
  */
-/** How long the brief stays up if the player gives no order at all. */
-const LINGER_MS = 14_000;
-
 export class FirstOrders {
   private readonly element = document.getElementById('first-orders');
   private dismissed = false;
 
-  public constructor(scenarioId: ScenarioId) {
+  public constructor(scenarioId: ScenarioId, onBegin: () => void) {
     const scenario = SCENARIOS[scenarioId];
 
     const title = document.getElementById('first-orders-title');
@@ -29,14 +27,13 @@ export class FirstOrders {
 
     document
       .getElementById('first-orders-dismiss')
-      ?.addEventListener('click', () => this.dismiss());
-
-    // A player who only watches never issues an order, and the card would sit
-    // over his battlefield for the rest of the battle.
-    window.setTimeout(() => this.dismiss(), LINGER_MS);
+      ?.addEventListener('click', onBegin);
+    document
+      .getElementById('first-orders-begin')
+      ?.addEventListener('click', onBegin);
   }
 
-  /** Called when the player issues their first order of any kind. */
+  /** Called when the player begins the battle or issues their first order. */
   public dismiss(): void {
     if (this.dismissed || this.element === null) return;
     this.dismissed = true;
