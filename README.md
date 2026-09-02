@@ -4,7 +4,7 @@ A browser strategy game about commanding **more army than one person can drive b
 hand**, built so that an external AI agent can fight alongside you through
 [WebMCP](https://github.com/webmachinelearning/webmcp).
 
-Roughly 7,950 soldiers in twenty regiments fight over a river crossing, a
+Roughly 8,700 soldiers in twenty-six regiments fight over a river crossing, a
 volcanic pass, an open harvest plain or a tidal causeway, and each side has a
 king to lose. You are the Commander. An agent in a WebMCP-capable browser —
 ChatGPT's in-app browser, or Chrome with the WebMCP flag — is your **Marshal**.
@@ -24,8 +24,8 @@ npm run dev      # http://localhost:5173
 
 ```bash
 npm run typecheck   # strict TypeScript
-npm run test        # 58 deterministic tests, no browser needed
-npm run build       # static bundle, ~39 kB gzipped
+npm run test        # 139 deterministic tests, no browser needed
+npm run build       # static bundle, ~62 kB gzipped
 ```
 
 Deploys as a static site. `vercel.json` and `public/_headers` carry the two
@@ -75,12 +75,15 @@ The three letters in front of a regiment's name are its troop type, and the
 readout at bottom-left names what that type beats and what beats it. Most fights
 are decided by that matchup and by regiments losing heart, not by arithmetic.
 
+The battlefield opens paused so the first briefing never costs battle time.
+Issue an order, press Space, or choose a speed to begin.
+
 Zoom out far enough and regiments collapse into density blobs with names and
 morale bars, which is the view you actually want when three fronts are moving.
 
 ## What the Marshal can do
 
-Twenty-one tools. Reads are fog-limited; every write goes through the same
+Twenty-two tools. Reads are fog-limited; every write goes through the same
 `CommandQueue` as your own clicks.
 
 **Read** — `get_battle_overview`, `get_objective`, `get_armies`,
@@ -88,8 +91,9 @@ Twenty-one tools. Reads are fog-limited; every write goes through the same
 `get_front_status`, `get_alerts`, `get_strategic_zones`, `get_active_orders`,
 `get_plan`
 
-**Command** — `order_group`, `reorganize_armies`, `set_conditional_order`,
-`cancel_conditional_order`, `focus_siege`, `direct_reinforcements`
+**Command** — `order_group`, `deploy_custom_formation`, `reorganize_armies`,
+`set_conditional_order`, `cancel_conditional_order`, `focus_siege`,
+`direct_reinforcements`
 
 **Plan Mode** — `create_plan`, `modify_plan`, `execute_plan`, `cancel_plan`
 
@@ -97,6 +101,14 @@ Locations are named zones (`central_bridge`, `cinder_gap`, `goldmere_town`, …)
 never pixels, so the Marshal reasons in the same terms you do. The zone enum is
 built per battle from the map actually being fought over, so the Marshal is
 never offered ground that is not in front of it.
+
+`order_group` can append named-zone waypoints to a regiment's current route.
+`deploy_custom_formation` goes further: in one atomic command the Marshal can
+place different regiments in named front, wing, line, rear, and reserve slots
+around a zone, with a different formation, stance, and behavior for each. The
+game derives passable destinations from those semantic slots. `reorganize_armies`
+can also detach a troop category — for example the archers or surgeons from a
+mixed reserve — into a new regiment. Soldier pool indices remain private.
 
 ### Plan Mode
 
