@@ -2,6 +2,7 @@ import {
   CONTACT,
   CROWDING,
   FATIGUE,
+  FIELD_SUPPORT,
   FORMATION_PROFILES,
   OBJECTIVE,
   TICKS_PER_SECOND,
@@ -112,6 +113,24 @@ export interface ArmySummary {
   fatigue: number;
   /** True once fatigue has reached the point where it is costing the group. */
   spent: boolean;
+  /**
+   * True while the group is carrying guns that are still on their teams and
+   * therefore cannot fire.
+   *
+   * A battery on the march is not a weapon, it is baggage, and the one mistake
+   * everybody makes with artillery is walking it forward with the advance and
+   * wondering why it never shoots. Reported rather than inferred, because
+   * nothing else the commander can see would tell him.
+   */
+  limbered: boolean;
+  /**
+   * True while a field hospital within reach is tending this regiment.
+   *
+   * Only ever true out of contact: care stops the moment the fighting reaches
+   * it. This is the readout that makes withdrawing a battered regiment legible
+   * as a move rather than a retreat.
+   */
+  tended: boolean;
 }
 
 export interface ArmyDetails extends ArmySummary {
@@ -215,6 +234,13 @@ export interface ObjectiveReport {
   captureRadius: number;
   yourKing: OwnKingReport;
   enemyKing: EnemyKingReport;
+  result: {
+    elapsedSeconds: number;
+    initialUnits: number;
+    survivingUnits: number;
+    losses: number;
+    survivingRegiments: number;
+  };
 }
 
 export interface FrontReport {
@@ -245,6 +271,8 @@ export interface ActiveOrdersReport {
     orderKind: string;
     targetZone?: ZoneId;
     targetGroupId?: string;
+    /** Count only: waypoint coordinates remain inside the simulation boundary. */
+    waypointsRemaining: number;
     secondsAgo: number;
   }>;
   conditionalOrders: Array<{
@@ -285,6 +313,18 @@ function strengthOf(state: GameState, group: ArmyGroup): number {
     total += UNIT_STATS[state.units.categoryOf(index)].strengthValue;
   }
   return Math.round(total);
+}
+
+/**
+ * Whether a group's guns are still on the move and so cannot fire.
+ *
+ * Read from the anchor rather than from the pieces themselves: a battery is
+ * unlimbered as a body, and asking every gun would be a pass over the pool for
+ * a line of roster text. A group with no guns in it is never limbered.
+ */
+function isLimbered(state: GameState, group: ArmyGroup): boolean {
+  if (group.path.length === 0 && !group.routing) return false;
+  return group.members.some((index) => UNIT_STATS[state.units.categoryOf(index)].deployTicks > 0);
 }
 
 /** The category the largest share of a group's men belong to. */
@@ -397,6 +437,8 @@ export class GameQueries {
       crowded: group.crowding >= CROWDING.reportThreshold,
       fatigue: Math.round(group.fatigue * 100),
       spent: group.fatigue >= FATIGUE.reportThreshold,
+      limbered: isLimbered(state, group),
+      tended: group.succour >= FIELD_SUPPORT.reportThreshold,
     };
     if (group.order.targetZone !== undefined) summary.targetZone = group.order.targetZone;
     if (group.order.targetGroupId !== undefined) summary.targetGroupId = group.order.targetGroupId;
@@ -579,6 +621,9 @@ export class GameQueries {
     const state = this.state();
     const own = state.objective.kings[playerId];
     const foe = state.objective.kings[opponentOf(playerId)];
+    const ownGroups = activeGroups(state, playerId);
+    const survivingUnits = ownGroups.reduce((sum, group) => sum + group.members.length, 0);
+    const initialUnits = state.objective.initialStrength[playerId];
 
     const ownZone = zoneAt(own.position.x, own.position.y);
     const sighting = foe.lastSightingByOpponent;
@@ -612,6 +657,13 @@ export class GameQueries {
       outcome: state.objective.outcome,
       outcomeReason: state.objective.outcomeReason,
       captureRadius: OBJECTIVE.captureRadius,
+      result: {
+        elapsedSeconds: this.seconds(state.currentTick),
+        initialUnits,
+        survivingUnits,
+        losses: Math.max(0, initialUnits - survivingUnits),
+        survivingRegiments: ownGroups.length,
+      },
       yourKing: {
         name: own.name,
         status: this.kingStatusOf(own),
@@ -735,6 +787,7 @@ export class GameQueries {
           name: group.name,
           order: activityOf(group),
           orderKind: group.order.kind,
+          waypointsRemaining: group.path.length,
           secondsAgo: this.seconds(state.currentTick - group.order.issuedAtTick),
         };
         if (group.order.targetZone !== undefined) order.targetZone = group.order.targetZone;
