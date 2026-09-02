@@ -37,10 +37,13 @@ export const UNIT_CATEGORIES = [
   'infantry',
   'spearman',
   'archer',
+  'handgunner',
   'cavalry',
   'heavy_infantry',
   'siege',
+  'cannon',
   'scout',
+  'surgeon',
 ] as const;
 export type UnitCategory = (typeof UNIT_CATEGORIES)[number];
 
@@ -72,6 +75,31 @@ export type Formation = (typeof FORMATIONS)[number];
 
 export const STANCES = ['aggressive', 'defensive', 'hold_ground'] as const;
 export type Stance = (typeof STANCES)[number];
+
+/**
+ * Named regiment positions inside a coordinated battlefield deployment.
+ *
+ * These are deliberately semantic rather than coordinates. WebMCP may arrange
+ * regiments into a custom line, screen or reserve around named ground, but it
+ * still never receives a pixel-level movement surface or soldier identities.
+ */
+export const TACTICAL_SLOTS = [
+  'front_left',
+  'front_center',
+  'front_right',
+  'far_left',
+  'left',
+  'center',
+  'right',
+  'far_right',
+  'rear_left',
+  'rear_center',
+  'rear_right',
+  'reserve_left',
+  'reserve_center',
+  'reserve_right',
+] as const;
+export type TacticalSlot = (typeof TACTICAL_SLOTS)[number];
 
 /* ----------------------------------------------------------------- morale */
 
@@ -203,6 +231,20 @@ export interface ArmyGroup {
   moraleState: MoraleState;
   /** Group-level waypoints produced by `Navigation`. Consumed front to back. */
   path: Vector2D[];
+  /**
+   * Consecutive ticks the anchor has failed to close on its next waypoint.
+   *
+   * A march is planned once, but a marching body is pushed about by the
+   * regiments around it, so the line it was given and the line it is actually
+   * walking drift apart. This is how `Movement` notices that a group is no
+   * longer getting anywhere and asks `Navigation` for a fresh route.
+   */
+  stallTicks: number;
+  /**
+   * Tick of the last automatic re-route, so a regiment that genuinely cannot be
+   * routed re-searches occasionally rather than every tick.
+   */
+  lastReplanTick: number;
   /** Strength at spawn, used for percentage readouts. */
   initialStrength: number;
   homeZone: ZoneId;
@@ -238,6 +280,17 @@ export interface ArmyGroup {
    * makes a reserve worth holding rather than committing everything at once.
    */
   fatigue: number;
+  /**
+   * How well the regiment is being tended by a field hospital, 0 for men left
+   * to their own surgeons and 1 for a formation small enough to be wholly cared
+   * for. Written by `FieldSupport` from the hospitals within reach; read by
+   * `Fatigue`, `Morale` and the healing pass itself.
+   *
+   * This is the term that makes withdrawing a battered regiment a move rather
+   * than an admission. Nothing about it works in contact: men cannot be tended
+   * while they are still fighting.
+   */
+  succour: number;
 }
 
 /* ------------------------------------------------------------- conditions */
