@@ -12,7 +12,12 @@ import { PALETTE } from './palette';
  * thousands of lines a frame.
  */
 export class EffectsLayer {
-  public draw(context: CanvasRenderingContext2D, camera: Camera, state: GameState): void {
+  public draw(
+    context: CanvasRenderingContext2D,
+    camera: Camera,
+    state: GameState,
+    interpolation = 1,
+  ): void {
     const events = state.combatEvents;
     if (events.length === 0) return;
 
@@ -31,7 +36,7 @@ export class EffectsLayer {
       }
       if (visibilityAt(state, 'player', event.x, event.y) !== 2) continue;
 
-      const age = Math.max(0, state.currentTick - event.tick);
+      const age = Math.max(0, state.currentTick - event.tick - (1 - interpolation));
       const life = Math.max(0, 1 - age / 13);
 
       if (event.kind === 'arrow') {
@@ -68,7 +73,7 @@ export class EffectsLayer {
     for (const event of events) {
       if (event.kind !== 'siege') continue;
       if (visibilityAt(state, 'player', event.targetX, event.targetY) !== 2) continue;
-      const age = Math.max(0, state.currentTick - event.tick);
+      const age = Math.max(0, state.currentTick - event.tick - (1 - interpolation));
       const life = Math.max(0, 1 - age / 13);
       const radius = 18 + age * 11;
       context.globalAlpha = life * 0.85;

@@ -4,6 +4,7 @@ import { visibilityAt } from '../../game/simulation/Visibility';
 import type { KingState, Vector2D } from '../../game/types/domain';
 import type { Camera } from './Camera';
 import { PALETTE } from './palette';
+import { ICON_CROWN, KEEP, LABEL_FONT, bakeSprite } from './pixelart';
 
 /**
  * The kings.
@@ -19,110 +20,134 @@ import { PALETTE } from './palette';
  * until he has been sighted once.
  */
 export class ObjectiveLayer {
+  /** Baked once. Two blits a frame, whatever the camera is doing. */
+  private readonly keep = bakeSprite(KEEP, 1);
+  private readonly crown = bakeSprite(ICON_CROWN, 1);
+
   public draw(context: CanvasRenderingContext2D, camera: Camera, state: GameState): void {
     const objective = state.objective;
+    const tick = state.currentTick;
 
     context.save();
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
+    context.imageSmoothingEnabled = false;
 
-    this.drawKing(context, camera, objective.kings.player, objective.kings.player.position, false);
+    this.drawKing(context, camera, objective.kings.player, objective.kings.player.position, false, tick);
 
     const foe = objective.kings.enemy;
     const inSight = visibilityAt(state, 'player', foe.position.x, foe.position.y) === 2;
     if (inSight) {
-      this.drawKing(context, camera, foe, foe.position, false);
+      this.drawKing(context, camera, foe, foe.position, false, tick);
     } else if (foe.lastSightingByOpponent !== undefined) {
-      this.drawKing(context, camera, foe, foe.lastSightingByOpponent.position, true);
+      this.drawKing(context, camera, foe, foe.lastSightingByOpponent.position, true, tick);
     }
 
     context.restore();
   }
 
+  /**
+   * A keep with a standard over it.
+   *
+   * The objective is the one thing on the field that must be findable from any
+   * zoom, so the marker holds a constant size on screen and is the only place
+   * the brightest gold in the palette is spent.
+   */
   private drawKing(
     context: CanvasRenderingContext2D,
     camera: Camera,
     king: KingState,
     at: Vector2D,
     remembered: boolean,
+    tick: number,
   ): void {
     const scale = 1 / camera.zoom;
     const threatened = king.captureProgress > 0 || king.besieged;
+    const pixel = Math.max(2, 3 * scale);
 
-    context.globalAlpha = remembered ? 0.4 : 1;
+    context.globalAlpha = remembered ? 0.42 : 1;
 
     // The ground that has to be held to take him. Only worth drawing once
     // somebody is actually trying: an idle ring is just clutter.
     if (threatened && !remembered) {
-      this.drawCaptureRing(context, camera, at, king.captureProgress, king.besieged);
+      this.drawCaptureRing(context, camera, at, king.captureProgress, king.besieged, tick);
     }
 
     const colour = king.ownerId === 'player' ? PALETTE.player : PALETTE.enemy;
-    const height = 46 * scale;
-    const poleWidth = Math.max(2 * scale, 1.5 * scale);
+    const keepWidth = this.keep.width * pixel;
+    const keepHeight = this.keep.height * pixel;
+    const keepLeft = at.x - keepWidth / 2;
+    const keepTop = at.y - keepHeight;
 
-    // Pole.
-    context.strokeStyle = PALETTE.kingGold;
-    context.lineWidth = poleWidth;
-    context.beginPath();
-    context.moveTo(at.x, at.y);
-    context.lineTo(at.x, at.y - height);
-    context.stroke();
+    // A shadow plate under the keep, so it never sinks into a dark wood.
+    context.fillStyle = 'rgba(8, 10, 6, 0.5)';
+    context.fillRect(keepLeft - pixel, keepTop - pixel, keepWidth + pixel * 2, keepHeight + pixel * 2);
+    context.drawImage(this.keep, keepLeft, keepTop, keepWidth, keepHeight);
 
-    // Pennant, in the owner's colour so the two are never confused.
-    const flag = 26 * scale;
+    // The owner's colours run down the keep wall, so the two are never confused.
     context.fillStyle = colour;
-    context.beginPath();
-    context.moveTo(at.x, at.y - height);
-    context.lineTo(at.x + flag, at.y - height + flag * 0.34);
-    context.lineTo(at.x, at.y - height + flag * 0.68);
-    context.closePath();
-    context.fill();
+    context.fillRect(at.x - pixel * 1.5, keepTop + pixel * 4, pixel * 3, pixel * 5);
 
-    // Crown, at the foot of the standard where the man himself stands.
-    this.drawCrown(context, at.x, at.y, 13 * scale, threatened && !remembered);
+    // The standard, waving on the tick clock like every other banner.
+    const poleHeight = 26 * pixel;
+    const poleTop = keepTop - poleHeight;
+    context.fillStyle = PALETTE.timberDark;
+    context.fillRect(at.x - pixel / 2, poleTop, pixel, poleHeight);
+    for (let column = 0; column < 5; column += 1) {
+      const phase = Math.floor((tick + column * 3) / 4) % 4;
+      const lift = (phase === 1 ? -1 : phase === 3 ? 1 : 0) * (column / 5) * pixel;
+      context.fillStyle = column === 2 ? PALETTE.kingGold : colour;
+      context.fillRect(at.x + pixel / 2 + column * pixel, poleTop + lift, pixel, pixel * 5);
+    }
+
+    // The crown, over the gate, on a plate of its own.
+    const crownWidth = this.crown.width * pixel;
+    const crownHeight = this.crown.height * pixel;
+    context.globalAlpha = remembered ? 0.42 : threatened && tick % 20 < 10 ? 0.55 : 1;
+    context.drawImage(
+      threatened ? this.dangerCrown() : this.crown,
+      at.x - crownWidth / 2,
+      keepTop - crownHeight - pixel,
+      crownWidth,
+      crownHeight,
+    );
+    context.globalAlpha = remembered ? 0.42 : 1;
 
     // Name, and the count that matters when it is moving.
-    context.fillStyle = PALETTE.kingGold;
-    context.font = `700 ${13 * scale}px ui-monospace, "SF Mono", Menlo, monospace`;
-    context.textAlign = 'center';
-    context.textBaseline = 'bottom';
     const label = remembered
       ? `${king.name} (last seen)`
       : threatened
         ? `${king.name} — ${Math.round(king.captureProgress)}%`
         : king.name;
-    context.fillText(label, at.x, at.y - height - 8 * scale);
+    const fontSize = 13 * scale;
+    context.font = `700 ${fontSize}px ${LABEL_FONT}`;
+    context.textAlign = 'center';
+    context.textBaseline = 'bottom';
+    const width = context.measureText(label).width + 14 * scale;
+    const plateTop = poleTop - 22 * scale;
+    context.fillStyle = 'rgba(9, 12, 7, 0.86)';
+    context.fillRect(at.x - width / 2, plateTop, width, 18 * scale);
+    context.fillStyle = threatened ? PALETTE.kingDanger : PALETTE.kingGold;
+    context.fillRect(at.x - width / 2, plateTop, width, scale);
+    context.fillRect(at.x - width / 2, plateTop + 17 * scale, width, scale);
+    context.fillText(label, at.x, plateTop + 15 * scale);
 
     context.globalAlpha = 1;
   }
 
-  private drawCrown(
-    context: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    size: number,
-    threatened: boolean,
-  ): void {
-    const half = size;
-    const top = y - size * 1.35;
-
-    context.beginPath();
-    context.moveTo(x - half, y);
-    context.lineTo(x - half, top);
-    context.lineTo(x - half * 0.5, top + size * 0.55);
-    context.lineTo(x, top);
-    context.lineTo(x + half * 0.5, top + size * 0.55);
-    context.lineTo(x + half, top);
-    context.lineTo(x + half, y);
-    context.closePath();
-
-    context.fillStyle = threatened ? PALETTE.kingDanger : PALETTE.kingGold;
-    context.fill();
-    context.strokeStyle = '#1a1206';
-    context.lineWidth = size * 0.16;
-    context.stroke();
+  /** The crown again, in the alarm colour. Baked on first threat, then kept. */
+  private dangerCrown(): HTMLCanvasElement {
+    if (this.dangerCrownCache === undefined) {
+      this.dangerCrownCache = bakeSprite(ICON_CROWN, 1);
+      const context = this.dangerCrownCache.getContext('2d');
+      if (context !== null) {
+        context.globalCompositeOperation = 'source-in';
+        context.fillStyle = PALETTE.kingDanger;
+        context.fillRect(0, 0, this.dangerCrownCache.width, this.dangerCrownCache.height);
+      }
+    }
+    return this.dangerCrownCache;
   }
+
+  private dangerCrownCache: HTMLCanvasElement | undefined;
 
   /** The capture ring, with the progress against it drawn as a filling arc. */
   private drawCaptureRing(
@@ -131,29 +156,40 @@ export class ObjectiveLayer {
     at: Vector2D,
     progress: number,
     besieged: boolean,
+    tick: number,
   ): void {
     const scale = 1 / camera.zoom;
     const radius = OBJECTIVE.captureRadius;
+    const block = Math.max(6, 6 * scale);
+    const steps = 72;
+    // The ring turns slowly while the ground is contested, which is the one
+    // piece of motion that says "this is happening now" from across the map.
+    const spin = besieged ? Math.floor(tick / 3) % steps : 0;
 
-    context.strokeStyle = besieged ? PALETTE.kingDanger : PALETTE.kingGold;
-    context.lineWidth = 2.5 * scale;
-    context.setLineDash([18 * scale, 12 * scale]);
-    context.beginPath();
-    context.arc(at.x, at.y, radius, 0, Math.PI * 2);
-    context.stroke();
-    context.setLineDash([]);
+    context.fillStyle = besieged ? PALETTE.kingDanger : PALETTE.kingGold;
+    for (let step = 0; step < steps; step += 1) {
+      if ((step + spin) % 3 === 0) continue;
+      const angle = (step / steps) * Math.PI * 2;
+      context.fillRect(
+        at.x + Math.cos(angle) * radius - block / 2,
+        at.y + Math.sin(angle) * radius - block / 2,
+        block,
+        block,
+      );
+    }
 
     if (progress <= 0) return;
-    context.strokeStyle = PALETTE.kingDanger;
-    context.lineWidth = 9 * scale;
-    context.beginPath();
-    context.arc(
-      at.x,
-      at.y,
-      radius,
-      -Math.PI / 2,
-      -Math.PI / 2 + (Math.PI * 2 * Math.min(100, progress)) / 100,
-    );
-    context.stroke();
+    // Progress fills the same ring clockwise from the top, in heavier blocks.
+    const taken = Math.round((steps * Math.min(100, progress)) / 100);
+    context.fillStyle = PALETTE.kingDanger;
+    for (let step = 0; step < taken; step += 1) {
+      const angle = -Math.PI / 2 + (step / steps) * Math.PI * 2;
+      context.fillRect(
+        at.x + Math.cos(angle) * radius - block,
+        at.y + Math.sin(angle) * radius - block,
+        block * 2,
+        block * 2,
+      );
+    }
   }
 }

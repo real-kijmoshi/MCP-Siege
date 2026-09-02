@@ -136,6 +136,73 @@ function duel(
 }
 
 describe('combat', () => {
+  it('resolves a combat tick simultaneously instead of favouring the first pool slots', () => {
+    const state = createEmptyState(101);
+    createGroupFromSpec(state, {
+      id: 'first',
+      name: 'First',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3000 },
+      formation: 'block',
+      stance: 'aggressive',
+      composition: [['infantry', 1]],
+    });
+    createGroupFromSpec(state, {
+      id: 'second',
+      name: 'Second',
+      ownerId: 'enemy',
+      anchor: { x: 4000, y: 3010 },
+      formation: 'block',
+      stance: 'aggressive',
+      composition: [['infantry', 1]],
+    });
+    const first = findGroup(state, 'first')!.members[0]!;
+    const second = findGroup(state, 'second')!.members[0]!;
+    state.units.hp[first] = 1;
+    state.units.hp[second] = 1;
+    state.units.targetIdx[first] = second;
+    state.units.targetIdx[second] = first;
+
+    advanceCombat(state);
+
+    expect(state.units.alive[first]).toBe(0);
+    expect(state.units.alive[second]).toBe(0);
+  });
+
+  it('drops a stale target when its recycled slot now belongs to the same faction', () => {
+    const state = createEmptyState(202);
+    createGroupFromSpec(state, {
+      id: 'pursuer',
+      name: 'Pursuer',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3000 },
+      formation: 'block',
+      stance: 'aggressive',
+      composition: [['infantry', 1]],
+    });
+    createGroupFromSpec(state, {
+      id: 'old-enemy',
+      name: 'Old enemy',
+      ownerId: 'enemy',
+      anchor: { x: 4000, y: 3010 },
+      formation: 'block',
+      stance: 'aggressive',
+      composition: [['infantry', 1]],
+    });
+    const pursuer = findGroup(state, 'pursuer')!.members[0]!;
+    const recycled = findGroup(state, 'old-enemy')!.members[0]!;
+    state.units.targetIdx[pursuer] = recycled;
+    state.units.kill(recycled);
+    const friendly = state.units.spawn(0, 0, 'infantry', 4000, 3010);
+    expect(friendly).toBe(recycled);
+    state.currentTick = 1; // not this unit's staggered reacquisition cohort
+
+    advanceCombat(state);
+
+    expect(state.units.targetIdx[pursuer]).toBe(-1);
+    expect(state.units.hp[friendly]).toBe(UNIT_STATS.infantry.maxHitPoints);
+  });
+
   it('lets spearmen break an equal number of cavalry', () => {
     const result = duel({ category: 'spearman', count: 200 }, { category: 'cavalry', count: 200 });
     expect(result.attackers).toBeGreaterThan(result.defenders);

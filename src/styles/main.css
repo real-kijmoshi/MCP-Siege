@@ -1,26 +1,66 @@
 /*
- * The map dominates. Everything else is a thin frame around it: a status strip,
- * a roster, and a command row. No dashboards, no panels competing with the
- * battlefield for attention.
+ * The command screen.
+ *
+ * A medieval pixel interface built out of four materials and nothing else:
+ * oak for the frames a commander holds, iron for the bindings, stone for the
+ * seats things rest in, and parchment for anything he reads. There are no
+ * gradients with soft stops, no rounded corners, no blur and no glass — every
+ * edge in this file is a hard step, because the map underneath is drawn as
+ * pixels and a soft edge anywhere would give the whole thing away.
+ *
+ * The map dominates. The panels are a frame around it, and they are sized so
+ * the battlefield keeps the middle of the screen at every window width.
  */
 
 :root {
-  --bg: #0a0e0b;
-  --panel: #10160f;
-  --panel-raised: #151d14;
-  --line: #253022;
-  --text: #dbe6d8;
-  --text-dim: #8ba189;
-  --text-faint: #5f7360;
-  --player: #4d9dff;
-  --enemy: #ff5347;
-  --good: #5fd08a;
-  --warn: #e8c15a;
-  --bad: #ff6b5b;
-  --plan: #c08bff;
-  --king: #f5c451;
+  /* Ground and ink */
+  --bg: #100d08;
+  --ink: #efe6cc;
+  --ink-dim: #b8a982;
+  --ink-faint: #8a7d5e;
+
+  /* Oak. Three shades, used for every frame the commander touches. */
+  --wood: #3d2c1a;
+  --wood-dark: #241a0f;
+  --wood-light: #5a4025;
+  --wood-lit: #7a5731;
+
+  /* Iron bindings and rivets. */
+  --iron: #4a4741;
+  --iron-dark: #211f1c;
+  --iron-light: #6f6b62;
+
+  /* Stone seats: the recess a button or a list sits in. */
+  --stone: #2a2721;
+  --stone-dark: #171511;
+
+  /* Parchment, for anything with words on it. */
+  --parchment: #d9c9a3;
+  --parchment-dark: #bda87c;
+  --parchment-ink: #2e2213;
+  --parchment-ink-dim: #5d4a2e;
+
+  /* Heraldry. Gold is selection and nothing else; the kings get the brighter one. */
+  --gold: #f0c250;
+  --gold-dark: #a8802a;
+  --king: #ffd75e;
   --king-danger: #ff7a3d;
-  --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --crimson: #9c2f2a;
+
+  /* The two sides, and the three states a regiment can be in. */
+  --player: #5b8ed6;
+  --player-dark: #36598f;
+  --enemy: #b23a30;
+  --good: #74be58;
+  --warn: #d8a63c;
+  --bad: #c2483c;
+  --plan: #a98cd8;
+
+  --mono: ui-monospace, 'Cascadia Mono', Consolas, 'SF Mono', Menlo, monospace;
+
+  /* One rhythm for the whole interface: everything is a multiple of 4. */
+  --gap: 8px;
+  --frame: 3px;
 }
 
 * {
@@ -39,1625 +79,229 @@ body,
 
 body {
   background: var(--bg);
-  color: var(--text);
+  color: var(--ink);
   font-family: var(--mono);
   font-size: 13px;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* --------------------------------------------------------------- war lobby */
-
-.lobby {
-  --lobby-gold: #d7b76a;
-  --lobby-paper: #d8ddcf;
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  grid-template-rows: 72px 1fr 42px;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 78% 28%, rgba(133, 124, 78, 0.12), transparent 28%),
-    linear-gradient(112deg, #0b100d 0%, #111711 45%, #0b0f0c 100%);
-  color: var(--lobby-paper);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.lobby[hidden] {
-  display: none;
-}
-
-.lobby.departing {
-  opacity: 0;
-  transform: scale(1.015);
-}
-
-.lobby-atmosphere {
-  position: absolute;
-  inset: 0;
-  opacity: 0.42;
-  pointer-events: none;
-  mask-image: linear-gradient(90deg, transparent 6%, black 52%, black 100%);
-}
-
-.lobby-atmosphere::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(147, 161, 131, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(147, 161, 131, 0.035) 1px, transparent 1px);
-  background-size: 42px 42px;
-}
-
-.terrain-lines {
-  position: absolute;
-  width: 620px;
-  height: 620px;
-  right: -80px;
-  top: -150px;
-  border: 1px solid rgba(192, 182, 121, 0.15);
-  border-radius: 43% 57% 48% 52%;
-  box-shadow:
-    0 0 0 46px rgba(192, 182, 121, 0.025),
-    0 0 0 47px rgba(192, 182, 121, 0.1),
-    0 0 0 96px rgba(192, 182, 121, 0.02),
-    0 0 0 97px rgba(192, 182, 121, 0.08);
-  transform: rotate(-14deg);
-}
-
-.river-mark {
-  position: absolute;
-  width: 760px;
-  height: 150px;
-  right: -80px;
-  top: 47%;
-  border-top: 2px solid rgba(91, 133, 143, 0.28);
-  border-radius: 50%;
-  transform: rotate(-8deg);
-}
-
-.map-pin {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border: 1px solid var(--lobby-gold);
-  border-radius: 50%;
-  box-shadow: 0 0 0 6px rgba(215, 183, 106, 0.05);
-}
-
-.pin-west { right: 510px; top: 51%; }
-.pin-centre { right: 310px; top: 45%; }
-.pin-east { right: 105px; top: 39%; }
-
-.lobby-header {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 4.5vw;
-  border-bottom: 1px solid rgba(190, 200, 180, 0.1);
-}
-
-.lobby-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.lobby-brand .crown-mark {
-  color: var(--lobby-gold);
-  font-size: 24px;
-}
-
-.lobby-brand div {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.05;
-}
-
-.lobby-brand strong {
-  font-size: 18px;
-  letter-spacing: 0.23em;
-}
-
-.lobby-brand small {
-  margin-top: 5px;
-  font-size: 8px;
-  letter-spacing: 0.3em;
-  color: #788575;
-}
-
-.lobby-header > p {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #778275;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-}
-
-.lobby-header > p span {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #9f493c;
-  box-shadow: 0 0 8px #9f493c;
-}
-
-.lobby-shell {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(460px, 1.08fr) minmax(520px, 0.92fr);
-  min-height: 0;
-  max-width: 1500px;
-  width: 100%;
-  margin: 0 auto;
-  padding: clamp(28px, 4vh, 56px) 4.5vw 24px;
-  gap: clamp(42px, 6vw, 100px);
-}
-
-.operation-select {
-  align-self: center;
-}
-
-.section-kicker,
-.briefing-copy > small {
-  color: var(--lobby-gold);
-  font-size: 9px;
-  letter-spacing: 0.28em;
-}
-
-.operation-select h1 {
-  margin: 13px 0 14px;
-  max-width: 650px;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(34px, 4vw, 58px);
-  font-weight: 400;
-  line-height: 0.98;
-  letter-spacing: -0.03em;
-  color: #e7eadf;
-}
-
-.lobby-intro {
-  max-width: 560px;
-  color: #879184;
-  font-family: system-ui, sans-serif;
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.scenario-list {
-  display: grid;
-  gap: 8px;
-  margin-top: clamp(22px, 3.5vh, 42px);
-}
-
-.scenario-card {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(140px, 0.55fr) 1.45fr;
-  grid-template-rows: auto auto;
-  column-gap: 20px;
-  width: 100%;
-  padding: 15px 18px 14px;
-  text-align: left;
-  color: #849081;
-  background: rgba(15, 21, 16, 0.66);
-  border: 1px solid rgba(139, 155, 133, 0.14);
-  border-radius: 2px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s, border-color 0.15s, transform 0.15s;
-}
-
-.scenario-card::before {
-  content: '';
-  position: absolute;
-  inset: 8px auto 8px 0;
-  width: 2px;
-  background: transparent;
-}
-
-.scenario-card:hover {
-  background: rgba(27, 36, 27, 0.8);
-  border-color: rgba(159, 174, 150, 0.3);
-  transform: translateX(3px);
-}
-
-.scenario-card.selected {
-  background: linear-gradient(90deg, rgba(87, 78, 44, 0.25), rgba(21, 29, 21, 0.84));
-  border-color: rgba(215, 183, 106, 0.42);
-  color: #cbd2c5;
-}
-
-.scenario-card.selected::before { background: var(--lobby-gold); }
-
-.scenario-card small {
-  grid-column: 1;
-  color: #687466;
-  font-size: 8px;
-  letter-spacing: 0.2em;
-}
-
-.scenario-card strong {
-  grid-column: 1;
-  align-self: end;
-  margin-top: 6px;
-  color: #d9ded3;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 18px;
-  font-weight: 400;
-}
-
-.scenario-card > span {
-  grid-column: 2;
-  grid-row: 1 / 3;
-  align-self: center;
-  padding-right: 88px;
-  font-family: system-ui, sans-serif;
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.scenario-card i {
-  position: absolute;
-  right: 17px;
-  bottom: 15px;
-  color: var(--lobby-gold);
-  font-size: 7px;
-  font-style: normal;
-  letter-spacing: 0.12em;
-  opacity: 0;
-}
-
-.scenario-card.selected i { opacity: 1; }
-
-.war-briefing {
-  align-self: center;
-  min-height: 0;
-  background: rgba(11, 16, 12, 0.9);
-  border: 1px solid rgba(157, 171, 148, 0.18);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
-}
-
-.briefing-map {
-  position: relative;
-  height: clamp(120px, 17vh, 178px);
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 30% 70%, rgba(70, 96, 66, 0.34), transparent 27%),
-    linear-gradient(9deg, transparent 49.4%, rgba(93, 128, 135, 0.28) 49.5%, rgba(93, 128, 135, 0.28) 51%, transparent 51.1%),
-    repeating-radial-gradient(ellipse at 72% 20%, transparent 0 18px, rgba(134, 145, 109, 0.06) 19px 20px),
-    #151c15;
-  border-bottom: 1px solid rgba(157, 171, 148, 0.15);
-}
-
-.briefing-map::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, rgba(208, 216, 195, 0.12) 0.8px, transparent 0.9px);
-  background-size: 15px 15px;
-  opacity: 0.24;
-}
-
-.briefing-map .north {
-  position: absolute;
-  z-index: 2;
-  right: 17px;
-  top: 14px;
-  color: #74806e;
-  font-size: 8px;
-  letter-spacing: 0.1em;
-}
-
-.front-line {
-  position: absolute;
-  z-index: 2;
-  left: 15%;
-  right: 14%;
-  top: 51%;
-  border-top: 1px dashed rgba(215, 183, 106, 0.26);
-  transform: rotate(-4deg);
-}
-
-.force {
-  position: absolute;
-  z-index: 3;
-  width: 18px;
-  height: 5px;
-  border-radius: 1px;
-  transition: inset 0.3s ease, transform 0.3s ease;
-}
-
-.force::before,
-.force::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  width: 5px;
-  height: 5px;
-  background: inherit;
-}
-
-.force::before { left: -8px; }
-.force::after { right: -8px; }
-.force-player { background: #5995bd; box-shadow: 0 0 8px rgba(89, 149, 189, 0.4); }
-.force-enemy { background: #b35f50; box-shadow: 0 0 8px rgba(179, 95, 80, 0.4); }
-.force-player.one { left: 31%; top: 66%; }
-.force-player.two { left: 60%; top: 70%; }
-.force-enemy.one { left: 38%; top: 29%; }
-.force-enemy.two { left: 68%; top: 31%; }
-
-.lobby[data-scenario='broken_bridgehead'] .force-player.one { top: 38%; }
-.lobby[data-scenario='broken_bridgehead'] .force-player.two { top: 40%; }
-.lobby[data-scenario='broken_bridgehead'] .front-line { top: 59%; transform: rotate(2deg); }
-.lobby[data-scenario='last_light'] .force-enemy.one { top: 49%; }
-.lobby[data-scenario='last_light'] .force-enemy.two { top: 52%; }
-.lobby[data-scenario='last_light'] .force-player.one { top: 75%; left: 39%; }
-.lobby[data-scenario='last_light'] .force-player.two { top: 78%; left: 58%; }
-
-.briefing-copy {
-  padding: 21px 24px 18px;
-}
-
-.briefing-copy h2 {
-  margin: 5px 0 7px;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 26px;
-  font-weight: 400;
-  color: #e2e6dc;
-}
-
-.briefing-copy > p {
-  min-height: 34px;
-  color: #899586;
-  font-family: system-ui, sans-serif;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.briefing-objective {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border-left: 2px solid var(--lobby-gold);
-  background: rgba(117, 100, 52, 0.1);
-}
-
-.briefing-objective small,
-.briefing-facts small {
-  display: block;
-  margin-bottom: 4px;
-  color: #6f7c6c;
-  font-size: 7px;
-  letter-spacing: 0.17em;
-}
-
-.briefing-objective b {
-  font-family: system-ui, sans-serif;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.35;
-}
-
-.briefing-facts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  margin-top: 14px;
-}
-
-.briefing-facts span + span { border-left: 1px solid rgba(157, 171, 148, 0.13); padding-left: 20px; }
-.briefing-facts b { color: #bdc6b8; font-size: 10px; font-weight: 500; }
-
-.briefing-tags {
-  display: flex;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.briefing-tags span {
-  padding: 3px 6px;
-  color: #82907f;
-  background: rgba(125, 143, 119, 0.08);
-  border: 1px solid rgba(125, 143, 119, 0.14);
-  font-size: 7px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.difficulty-block {
-  padding: 0 24px 18px;
-}
-
-.difficulty-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.difficulty-heading span { color: #9ba696; font-size: 8px; letter-spacing: 0.18em; }
-.difficulty-heading small { color: #596657; font-size: 7px; }
-
-.difficulty-list {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-
-.difficulty-option {
-  min-width: 0;
-  padding: 9px;
-  color: #7d8979;
-  background: #111712;
-  border: 1px solid rgba(139, 155, 133, 0.14);
-  cursor: pointer;
-  font-family: inherit;
-  text-align: left;
-}
-
-.difficulty-option:hover { border-color: rgba(215, 183, 106, 0.32); }
-.difficulty-option.selected { color: #d1d7cb; border-color: rgba(215, 183, 106, 0.52); background: rgba(93, 79, 41, 0.18); }
-.difficulty-option > span { display: flex; justify-content: space-between; align-items: baseline; gap: 5px; }
-.difficulty-option strong { font-family: Georgia, 'Times New Roman', serif; font-size: 14px; font-weight: 400; }
-.difficulty-option small { color: #6e7a6b; font-size: 6px; letter-spacing: 0.1em; text-transform: uppercase; }
-.difficulty-option p { margin-top: 5px; font-family: system-ui, sans-serif; font-size: 8px; line-height: 1.35; }
-
-.deploy-button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 16px 24px;
-  color: #151810;
-  background: var(--lobby-gold);
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-  transition: filter 0.15s;
-}
-
-.deploy-button:hover { filter: brightness(1.1); }
-.deploy-button:disabled { cursor: wait; opacity: 0.7; }
-.deploy-button span { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; }
-.deploy-button i { font-family: system-ui, sans-serif; font-size: 9px; font-style: normal; opacity: 0.66; }
-
-.lobby-footer {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 4.5vw;
-  color: #667263;
-  border-top: 1px solid rgba(190, 200, 180, 0.08);
-  font-size: 7px;
-  letter-spacing: 0.14em;
-}
-
-.lobby-footer i { width: 2px; height: 2px; border-radius: 50%; background: #596557; }
-.lobby-footer p { margin-left: auto; font-family: system-ui, sans-serif; letter-spacing: 0; }
-
-@media (max-width: 1050px), (max-height: 700px) {
-  .lobby-shell { grid-template-columns: minmax(380px, 1fr) minmax(450px, 0.95fr); gap: 28px; padding-top: 20px; }
-  .operation-select h1 { font-size: 38px; }
-  .scenario-list { margin-top: 20px; }
-  .scenario-card { padding: 11px 13px; }
-  .briefing-map { height: 104px; }
-  .briefing-copy { padding: 14px 18px 12px; }
-  .briefing-copy h2 { font-size: 22px; }
-  .difficulty-block { padding: 0 18px 12px; }
-  .deploy-button { padding: 12px 18px; }
-}
-
-/* The council is an in-game setup screen, not a marketing page. Keep the
- * hierarchy blunt: operation list, field report, enemy command, deploy. */
-.lobby {
-  background: #0c110d;
-}
-
-.lobby-atmosphere {
-  opacity: 0.22;
-  mask-image: linear-gradient(90deg, transparent, black 55%, black);
-}
-
-.lobby-atmosphere::before {
-  background-size: 56px 56px;
-}
-
-.terrain-lines {
-  inset: -20% -10% -20% 45%;
-  width: auto;
-  height: auto;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  transform: rotate(-7deg);
-  background:
-    repeating-radial-gradient(ellipse at 58% 48%, transparent 0 46px, rgba(167, 174, 138, 0.11) 47px 48px),
-    linear-gradient(17deg, transparent 49%, rgba(76, 115, 124, 0.22) 49.2% 50%, transparent 50.2%);
-}
-
-.lobby-header > p {
-  gap: 14px;
-}
-
-.lobby-header > p b {
-  padding-left: 14px;
-  color: #9a7259;
-  border-left: 1px solid #394237;
-  font-size: inherit;
-  font-weight: 500;
-}
-
-.lobby-shell {
-  grid-template-columns: minmax(330px, 0.72fr) minmax(520px, 1.28fr);
-  gap: 0;
-  max-width: 1280px;
-  padding: clamp(32px, 5vh, 62px) 4.5vw clamp(28px, 4vh, 48px);
-}
-
-.operation-select {
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding-right: clamp(34px, 4vw, 64px);
-  border-right: 1px solid rgba(151, 163, 143, 0.13);
-}
-
-.section-heading {
-  display: flex;
-  justify-content: space-between;
-  color: #788475;
-  font-size: 8px;
-  letter-spacing: 0.2em;
-}
-
-.section-heading small {
-  font-size: 7px;
-  letter-spacing: 0.12em;
-}
-
-.operation-select h1 {
-  margin: 12px 0 8px;
-  color: #e1e5dc;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 32px;
-  font-weight: 400;
-  letter-spacing: -0.015em;
-}
-
-.lobby-intro {
-  max-width: 390px;
-  font-size: 11px;
-}
-
-.scenario-list {
-  gap: 0;
-  margin-top: 34px;
-  border-top: 1px solid rgba(139, 155, 133, 0.15);
-}
-
-.scenario-card {
-  grid-template-columns: 34px minmax(150px, 1fr) auto 14px;
-  grid-template-rows: 1fr;
-  align-items: center;
-  min-height: 67px;
-  padding: 0 10px 0 0;
-  column-gap: 12px;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid rgba(139, 155, 133, 0.15);
-  border-radius: 0;
-}
-
-.scenario-card::before {
-  inset: 0 auto 0 -1px;
-  width: 2px;
-}
-
-.scenario-card:hover {
-  background: rgba(130, 145, 122, 0.045);
-  border-color: rgba(139, 155, 133, 0.15);
-  transform: none;
-}
-
-.scenario-card.selected {
-  background: rgba(166, 145, 84, 0.07);
-  border-color: rgba(139, 155, 133, 0.15);
-}
-
-.scenario-card small {
-  grid-column: 1;
-  color: #556052;
-  font-size: 8px;
-  text-align: center;
-}
-
-.scenario-card strong {
-  grid-column: 2;
-  align-self: center;
-  margin: 0;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.scenario-card > span {
-  grid-column: 3;
-  grid-row: 1;
-  align-self: center;
-  padding: 0;
-  color: #6f7a6c;
-  font-family: inherit;
-  font-size: 7px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.scenario-card i {
-  position: static;
-  grid-column: 4;
-  color: #697565;
-  font-size: 17px;
-  opacity: 0.45;
-}
-
-.scenario-card.selected i {
-  color: var(--lobby-gold);
-  opacity: 1;
-}
-
-.war-briefing {
-  align-self: stretch;
-  display: grid;
-  grid-template-rows: minmax(145px, 1fr) auto auto auto;
-  margin-left: clamp(34px, 4vw, 64px);
-  background: rgba(10, 15, 11, 0.82);
-  box-shadow: none;
-}
-
-.briefing-map {
-  height: auto;
-  min-height: 160px;
-  background:
-    linear-gradient(9deg, transparent 49.4%, rgba(93, 128, 135, 0.28) 49.5%, rgba(93, 128, 135, 0.28) 51%, transparent 51.1%),
-    repeating-radial-gradient(ellipse at 72% 20%, transparent 0 18px, rgba(134, 145, 109, 0.055) 19px 20px),
-    #141b15;
-}
-
-.map-grid-ref {
-  position: absolute;
-  z-index: 2;
-  left: 16px;
-  top: 14px;
-  color: #667163;
-  font-size: 7px;
-  letter-spacing: 0.16em;
-}
-
-.briefing-copy {
-  padding: 20px 22px 16px;
-}
-
-.briefing-copy h2 {
-  margin-top: 6px;
-  font-size: 24px;
-}
-
-.briefing-copy > p {
-  min-height: 0;
-}
-
-.briefing-objective {
-  margin-top: 13px;
-  padding: 9px 11px;
-  background: transparent;
-  border-left-color: #8e7a47;
-}
-
-.briefing-facts {
-  margin-top: 13px;
-}
-
-.briefing-tags {
-  margin-top: 11px;
-  color: #6d7969;
-  font-size: 7px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.difficulty-block {
-  padding: 15px 22px 13px;
-  border-top: 1px solid rgba(139, 155, 133, 0.13);
-}
-
-.difficulty-heading {
-  margin-bottom: 9px;
-}
-
-.difficulty-list {
-  gap: 0;
-  border: 1px solid rgba(139, 155, 133, 0.18);
-}
-
-.difficulty-option {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 7px;
-  padding: 8px 10px;
-  background: transparent;
-  border: 0;
-  border-right: 1px solid rgba(139, 155, 133, 0.18);
-}
-
-.difficulty-option:last-child {
-  border-right: 0;
-}
-
-.difficulty-option.selected {
-  background: #293023;
-  border-color: rgba(139, 155, 133, 0.18);
-  color: #e0e4da;
-}
-
-.difficulty-option strong {
-  font-family: inherit;
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.difficulty-option small {
-  font-size: 6px;
-}
-
-.difficulty-description {
-  min-height: 24px;
-  margin-top: 9px;
-  color: #748071;
-  font-family: system-ui, sans-serif;
-  font-size: 9px;
-  line-height: 1.35;
-}
-
-.deploy-button {
-  padding: 14px 22px;
-  color: #d9c582;
-  background: #20261d;
-  border-top: 1px solid rgba(215, 183, 106, 0.34);
-}
-
-.deploy-button:hover {
-  background: #2a3125;
-  filter: none;
-}
-
-.deploy-button span {
-  font-size: 9px;
-}
-
-@media (max-width: 1050px), (max-height: 700px) {
-  .lobby-shell { grid-template-columns: minmax(300px, 0.75fr) minmax(440px, 1.25fr); gap: 0; }
-  .operation-select { padding-right: 28px; }
-  .operation-select h1 { font-size: 28px; }
-  .scenario-list { margin-top: 18px; }
-  .scenario-card { min-height: 52px; padding: 0 8px 0 0; }
-  .war-briefing { margin-left: 28px; }
-  .briefing-map { height: auto; min-height: 105px; }
-}
-
-/* ----------------------------------------------------- war council legibility */
-
-.lobby {
-  grid-template-rows: 84px 1fr 68px;
-}
-
-.lobby-header,
-.lobby-footer {
-  padding-left: max(44px, calc((100vw - 1660px) / 2));
-  padding-right: max(44px, calc((100vw - 1660px) / 2));
-}
-
-.lobby-brand .crown-mark {
-  font-size: 28px;
-}
-
-.lobby-brand strong {
-  font-size: 20px;
-}
-
-.lobby-brand small {
-  font-size: 9px;
-}
-
-.campaign-context {
-  display: flex;
-  align-self: stretch;
-  margin-left: clamp(56px, 7vw, 130px);
-}
-
-.campaign-context > span {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 150px;
-  padding: 0 28px;
-  border-left: 1px solid rgba(148, 161, 140, 0.12);
-}
-
-.campaign-context small,
-.field-condition small {
-  margin-bottom: 5px;
-  color: #778474;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-}
-
-.campaign-context b,
-.field-condition b {
-  color: #c2cabe;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-}
-
-.lobby-header > p {
-  margin-left: auto;
-  color: #8c9889;
-  font-size: 10px;
-}
-
-.lobby-shell {
-  grid-template-columns: minmax(580px, 0.82fr) minmax(760px, 1.18fr);
-  gap: 0;
-  max-width: 1660px;
-  padding: clamp(30px, 4vh, 48px) 0;
-}
-
-.operation-select {
-  justify-content: flex-start;
-  padding: 18px clamp(44px, 4vw, 66px) 0 0;
-}
-
-.section-heading {
-  display: block;
-  color: #a0aa9b;
-  font-size: 10px;
-  letter-spacing: 0.18em;
-}
-
-.section-heading span {
-  padding: 0 7px;
-  color: #5f6b5d;
-}
-
-.section-heading b {
-  color: #c2ab68;
-  font-size: inherit;
-  font-weight: 600;
-}
-
-.operation-select h1 {
-  margin: 11px 0 9px;
-  font-size: 29px;
-}
-
-.lobby-intro {
-  max-width: 530px;
-  color: #a2ada0;
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.scenario-list {
-  margin-top: 28px;
-}
-
-.scenario-card {
-  grid-template-columns: 38px minmax(180px, 1fr) minmax(130px, 0.62fr) 92px 14px;
-  grid-template-rows: auto auto;
-  min-height: 125px;
-  padding: 19px 14px 17px 10px;
-  column-gap: 15px;
-  row-gap: 10px;
-  color: #9ca79a;
-}
-
-.scenario-card:hover {
-  background: rgba(130, 145, 122, 0.07);
-}
-
-.scenario-card.selected {
-  background: #1a2119;
-  box-shadow: inset 4px 0 #c5a75c, inset 0 0 0 1px rgba(197, 167, 92, 0.16);
-}
-
-.scenario-card .operation-index {
-  grid-column: 1;
-  grid-row: 1 / 3;
-  align-self: start;
-  padding-top: 3px;
-  color: #788473;
-  font-size: 10px;
-}
-
-.scenario-card.selected .operation-index {
-  color: #d1b568;
-}
-
-.scenario-card .operation-card-main {
-  grid-column: 2;
-  grid-row: 1;
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  font-family: inherit;
-  text-transform: none;
-}
-
-.scenario-card .operation-card-main strong {
-  color: #d8ded4;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 18px;
-  font-weight: 400;
-  letter-spacing: 0;
-}
-
-.scenario-card.selected .operation-card-main strong {
-  color: #eee8d7;
-}
-
-.scenario-card .operation-card-main em {
-  margin-top: 7px;
-  color: #909c8d;
-  font-family: system-ui, sans-serif;
-  font-size: 11px;
-  font-style: normal;
-  line-height: 1.3;
-}
-
-.scenario-card .operation-card-facts {
-  grid-column: 3;
-  grid-row: 1 / 3;
-  align-self: center;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-left: 17px;
-  border-left: 1px solid rgba(139, 155, 133, 0.14);
-}
-
-.operation-card-facts b {
-  color: #bcc5b8;
-  font-family: system-ui, sans-serif;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.operation-card-facts small {
-  color: #7f8b7c;
-  font-size: 9px;
-}
-
-.scenario-card .operation-signals {
-  grid-column: 2;
-  grid-row: 2;
-  display: flex;
-  gap: 9px;
-  align-self: end;
-  padding: 0;
-  color: #879383;
-  font-family: inherit;
-}
-
-.operation-signals small {
-  font-size: 8px;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.operation-signals small + small::before {
-  content: '·';
-  margin-right: 9px;
-  color: #576253;
-}
-
-.scenario-card .operation-pressure {
-  grid-column: 4;
-  grid-row: 1 / 3;
-  align-self: center;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 0;
-  text-align: right;
-}
-
-.operation-pressure small {
-  color: #6e7a6a;
-  font-size: 8px;
-  letter-spacing: 0.12em;
-}
-
-.operation-pressure b {
-  color: #c3ad6a;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.scenario-card i {
-  grid-column: 5;
-  grid-row: 1 / 3;
-  align-self: center;
-}
-
-.war-briefing {
-  grid-template-rows: minmax(250px, 0.85fr) auto auto 56px;
-  margin-left: clamp(44px, 4vw, 66px);
-  border-color: rgba(157, 171, 148, 0.24);
-}
-
-.briefing-map {
-  min-height: 265px;
-  background:
-    radial-gradient(ellipse at 18% 36%, rgba(52, 72, 48, 0.5), transparent 24%),
-    radial-gradient(ellipse at 78% 25%, rgba(66, 75, 50, 0.26), transparent 28%),
-    repeating-radial-gradient(ellipse at 74% 13%, transparent 0 25px, rgba(142, 151, 116, 0.07) 26px 27px),
-    #182018;
-}
-
-.briefing-map::after {
-  opacity: 0.34;
-  background-size: 22px 22px;
-}
-
-.briefing-map .north,
-.map-grid-ref {
-  top: 17px;
-  color: #9aa694;
-  font-size: 9px;
-}
-
-.briefing-map .north {
-  right: 19px;
-}
-
-.map-grid-ref {
-  left: 18px;
-}
-
-.map-key {
-  position: absolute;
-  z-index: 6;
-  right: 48px;
-  top: 16px;
-  display: flex;
-  gap: 15px;
-  color: #8e9a8b;
-  font-size: 8px;
-  letter-spacing: 0.08em;
-}
-
-.map-key span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.map-key i {
-  display: block;
-  width: 10px;
-  height: 4px;
-}
-
-.map-key .friendly { background: #69a7cf; }
-.map-key .enemy { background: #c16b5d; }
-.map-key .objective-key { border: 1px solid #d4b65e; border-radius: 50%; background: transparent; height: 7px; width: 7px; }
-
-.map-river {
-  position: absolute;
-  z-index: 1;
-  left: -6%;
-  top: 48%;
-  width: 112%;
-  height: 36px;
-  background: rgba(54, 88, 96, 0.3);
-  border-top: 1px solid rgba(95, 137, 147, 0.45);
-  border-bottom: 1px solid rgba(95, 137, 147, 0.34);
-  transform: rotate(4deg);
-}
-
-.crossing {
-  position: absolute;
-  z-index: 5;
-  top: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  color: #a5b09f;
-  font-size: 7px;
-  letter-spacing: 0.09em;
-  transform: translate(-50%, -50%) rotate(4deg);
-}
-
-.crossing i {
-  width: 38px;
-  height: 12px;
-  background: repeating-linear-gradient(90deg, #817b5d 0 5px, #4c5041 5px 7px);
-  border: 1px solid #9a9069;
-}
-
-.crossing span {
-  transform: rotate(-4deg);
-}
-
-.crossing-west { left: 22%; top: 47%; }
-.crossing-centre { left: 50%; top: 51%; }
-.crossing-east { left: 78%; top: 55%; }
-
-.front-line {
-  z-index: 3;
-  left: 11%;
-  right: 11%;
-  top: 51%;
-  border-color: rgba(212, 182, 94, 0.45);
-}
-
-.advance-route {
-  position: absolute;
-  z-index: 4;
-  width: 112px;
-  border-top: 2px dashed rgba(105, 167, 207, 0.68);
-  transform-origin: left center;
-}
-
-.advance-route::after {
-  content: '';
-  position: absolute;
-  right: -1px;
-  top: -5px;
-  border-left: 8px solid rgba(105, 167, 207, 0.82);
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-}
-
-.route-one { left: 38%; top: 73%; transform: rotate(-74deg); }
-.route-two { left: 64%; top: 76%; transform: rotate(-66deg); }
-
-.force {
-  width: 25px;
-  height: 7px;
-}
-
-.force::before,
-.force::after {
-  width: 7px;
-  height: 7px;
-}
-
-.force::before { left: -10px; }
-.force::after { right: -10px; }
-.force-player.one { left: 35%; top: 74%; }
-.force-player.two { left: 63%; top: 77%; }
-.force-enemy.one { left: 38%; top: 24%; }
-.force-enemy.two { left: 68%; top: 27%; }
-
-.map-objective {
-  position: absolute;
-  z-index: 7;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #d5b862;
-  font-size: 15px;
-}
-
-.map-objective span {
-  color: #aca77f;
-  font-size: 7px;
-  letter-spacing: 0.1em;
-}
-
-.map-objective.own { left: 7%; bottom: 12%; }
-.map-objective.foe { right: 7%; top: 16%; }
-
-.terrain-label {
-  position: absolute;
-  z-index: 4;
-  color: #707d6c;
-  font-size: 8px;
-  letter-spacing: 0.1em;
-}
-
-.terrain-label.west { left: 8%; top: 31%; }
-.terrain-label.hill { right: 9%; bottom: 26%; }
-
-.lobby[data-scenario='broken_bridgehead'] .route-one { left: 36%; top: 44%; transform: rotate(-35deg); }
-.lobby[data-scenario='broken_bridgehead'] .route-two { left: 61%; top: 45%; transform: rotate(-145deg); }
-.lobby[data-scenario='broken_bridgehead'] .map-objective.own { bottom: 8%; }
-.lobby[data-scenario='last_light'] .route-one { left: 36%; top: 70%; transform: rotate(34deg); border-color: rgba(193, 107, 93, 0.72); }
-.lobby[data-scenario='last_light'] .route-two { left: 69%; top: 69%; transform: rotate(146deg); border-color: rgba(193, 107, 93, 0.72); }
-.lobby[data-scenario='last_light'] .advance-route::after { border-left-color: rgba(193, 107, 93, 0.86); }
-
-.briefing-copy {
-  padding: 22px 25px 20px;
-}
-
-.briefing-title-row {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.briefing-title-row > div:first-child > small {
-  color: var(--lobby-gold);
-  font-size: 9px;
-  letter-spacing: 0.2em;
-}
-
-.briefing-copy h2 {
-  margin: 7px 0 0;
-  font-size: 29px;
-}
-
-.briefing-tags {
-  margin: 0 0 4px;
-  color: #8e9a8a;
-  font-size: 8px;
-  text-align: right;
-}
-
-.briefing-copy > p {
-  margin-top: 9px;
-  color: #adb7aa;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.briefing-order-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 230px;
-  gap: 22px;
-  align-items: stretch;
-  margin-top: 17px;
-}
-
-.briefing-objective {
-  margin: 0;
-  padding: 10px 13px;
-  background: rgba(130, 112, 57, 0.08);
-}
-
-.briefing-objective small,
-.briefing-facts small,
-.briefing-intel-grid small {
-  margin-bottom: 5px;
-  color: #82907e;
-  font-size: 8px;
-}
-
-.briefing-objective b {
-  color: #d3d9cf;
-  font-size: 12px;
-}
-
-.briefing-facts {
-  align-items: center;
-  margin: 0;
-  border: 1px solid rgba(139, 155, 133, 0.12);
-}
-
-.briefing-facts span {
-  padding: 10px 13px;
-}
-
-.briefing-facts b {
-  color: #d0d6cc;
-  font-size: 11px;
-}
-
-.briefing-intel-grid {
-  display: grid;
-  grid-template-columns: 1.15fr 1.25fr 1fr 1fr 1.35fr;
-  margin-top: 18px;
-  border-top: 1px solid rgba(139, 155, 133, 0.13);
-}
-
-.briefing-intel-grid > span {
-  min-width: 0;
-  padding: 13px 13px 0 0;
-}
-
-.briefing-intel-grid > span + span {
-  padding-left: 13px;
-  border-left: 1px solid rgba(139, 155, 133, 0.11);
-}
-
-.briefing-intel-grid small,
-.briefing-intel-grid b {
-  display: block;
-}
-
-.briefing-intel-grid b {
-  color: #aeb8aa;
-  font-family: system-ui, sans-serif;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.35;
-}
-
-.difficulty-block {
-  padding: 17px 25px 15px;
-}
-
-.difficulty-heading span {
-  color: #aab4a6;
-  font-size: 9px;
-}
-
-.difficulty-heading small {
-  color: #7f8c7b;
-  font-size: 8px;
-}
-
-.difficulty-list {
-  border-color: rgba(139, 155, 133, 0.24);
-}
-
-.difficulty-option {
-  align-items: flex-start;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 49px;
-  padding: 8px 13px;
-  border-color: rgba(139, 155, 133, 0.24);
-}
-
-.difficulty-option strong {
-  color: #b9c2b5;
-  font-size: 11px;
-}
-
-.difficulty-option small {
-  color: #7e8a7b;
-  font-size: 8px;
-}
-
-.difficulty-option.selected {
-  box-shadow: inset 0 3px #b99d55;
-}
-
-.difficulty-option.selected strong {
-  color: #ebe7d9;
-}
-
-.difficulty-description {
-  min-height: 0;
-  color: #9da89a;
-  font-size: 11px;
-}
-
-.deploy-button {
-  min-height: 56px;
-  padding: 0 25px;
-  background: #252c22;
-  border-top-color: rgba(215, 183, 106, 0.48);
-}
-
-.deploy-button span {
-  color: #e3cb82;
-  font-size: 11px;
-}
-
-.deploy-button i {
-  color: #a9b1a3;
-  font-size: 10px;
-}
-
-.lobby-footer {
-  gap: 0;
-  background: #0f150f;
-}
-
-.field-condition {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-self: stretch;
-  min-width: 170px;
-  padding: 0 28px;
-  border-left: 1px solid rgba(148, 161, 140, 0.12);
-}
-
-.field-condition:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-
-.lobby-footer p {
-  color: #859180;
-  font-size: 10px;
-}
-
-@media (max-width: 1450px), (max-height: 850px) {
-  .lobby { grid-template-rows: 72px 1fr 56px; }
-  .lobby-header, .lobby-footer { padding-left: 34px; padding-right: 34px; }
-  .campaign-context > span { min-width: 125px; padding: 0 18px; }
-  .lobby-shell { grid-template-columns: minmax(500px, 0.84fr) minmax(650px, 1.16fr); max-width: 1380px; padding: 22px 28px; }
-  .operation-select { padding: 10px 34px 0 0; }
-  .scenario-list { margin-top: 18px; }
-  .scenario-card { min-height: 102px; padding-top: 13px; padding-bottom: 12px; }
-  .war-briefing { margin-left: 34px; grid-template-rows: minmax(200px, 0.8fr) auto auto 50px; }
-  .briefing-map { min-height: 205px; }
-  .briefing-copy { padding: 16px 20px 14px; }
-  .briefing-copy h2 { font-size: 25px; }
-  .briefing-copy > p { font-size: 11px; }
-  .briefing-order-row { margin-top: 11px; }
-  .briefing-intel-grid { margin-top: 12px; }
-  .briefing-intel-grid > span { padding-top: 9px; }
-  .difficulty-block { padding: 12px 20px 10px; }
-  .difficulty-option { min-height: 42px; }
 }
 
 #app {
   display: grid;
-  grid-template-rows: 52px 1fr 84px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 6px),
+    var(--wood-dark);
 }
 
-/* ------------------------------------------------------------------ top bar */
+/* ------------------------------------------------------------- materials */
 
+/* Every pixel glyph in the interface. Never smoothed, never coloured over. */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.pixel-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.icon > .pixel-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------------------------------------------------------------- top bar */
+
+/*
+ * The commander's bar: an oak beam with iron ends. It carries the name of the
+ * battle, the four figures that decide whether to press or hold, and the clock.
+ */
 .top-bar {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: 0;
-  padding: 0 16px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
+  height: 54px;
+  padding: 0 10px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 7px),
+    linear-gradient(180deg, var(--wood-light) 0 2px, var(--wood) 2px calc(100% - 3px), var(--wood-dark) calc(100% - 3px) 100%);
+  box-shadow: inset 0 -3px 0 0 var(--iron-dark), 0 2px 0 0 #0a0805;
+  z-index: 3;
 }
 
 .brand {
   display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 16px 0 6px;
+  border-right: 2px solid var(--wood-dark);
+}
+
+.brand-mark .pixel-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.brand-words {
+  display: flex;
   flex-direction: column;
-  justify-content: center;
-  line-height: 1.2;
-  padding-right: 18px;
+  line-height: 1.15;
 }
 
 .brand strong {
   font-size: 15px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  text-shadow: 1px 1px 0 #1a1207;
 }
 
 .brand small {
+  max-width: 26ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 9px;
-  letter-spacing: 0.18em;
-  color: var(--text-faint);
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
 }
 
 /*
- * The four figures read as one instrument rather than four loose labels: hairline
- * rules between them, one baseline, and tabular figures so a number changing does
- * not shift the row it sits in.
+ * The figures read as one instrument: each sits in its own stone recess with an
+ * iron divider, on one baseline, in tabular figures so a number changing never
+ * shifts the row it sits in.
  */
 .stat-cluster {
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .stat {
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  background: var(--stone-dark);
+  box-shadow: inset 0 0 0 1px #0b0906, inset 0 1px 0 1px #3a352c;
+  clip-path: polygon(
+    3px 0,
+    calc(100% - 3px) 0,
+    100% 3px,
+    100% calc(100% - 3px),
+    calc(100% - 3px) 100%,
+    3px 100%,
+    0 calc(100% - 3px),
+    0 3px
+  );
+}
+
+.stat .pixel-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.stat-body {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  padding: 0 20px;
   line-height: 1.1;
 }
 
-.stat::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 1px;
-  height: 24px;
-  transform: translateY(-50%);
-  background: var(--line);
-}
-
 .stat small {
-  font-size: 8.5px;
+  font-size: 8px;
   letter-spacing: 0.16em;
-  color: var(--text-faint);
+  color: var(--ink-faint);
 }
 
 .stat b {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
 /* Whose men the figure counts, said in colour rather than in another word. */
 .stat[data-tone='own'] b {
-  color: #a6cdff;
+  color: #9cc0ef;
 }
 
 .stat[data-tone='foe'] b {
-  color: #f0968c;
+  color: #dd7a6f;
 }
 
 .spacer {
   flex: 1;
+  min-width: 0;
 }
 
 .speed-control {
   align-self: center;
   display: flex;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  overflow: hidden;
+  gap: 2px;
+  padding: 3px;
+  background: var(--stone-dark);
+  box-shadow: inset 0 0 0 1px #0b0906;
 }
 
 .speed-control button {
-  background: transparent;
+  min-width: 34px;
+  padding: 5px 8px;
+  background: var(--wood);
   border: 0;
-  color: var(--text-dim);
+  box-shadow: inset 0 1px 0 0 var(--wood-lit), inset 0 -1px 0 0 var(--wood-dark);
+  color: var(--ink-dim);
+  cursor: pointer;
   font-family: inherit;
   font-size: 11px;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  font-weight: 700;
+  transition: background 0.1s steps(2), color 0.1s steps(2);
 }
 
 .speed-control button:hover {
-  background: var(--panel-raised);
-  color: var(--text);
+  background: var(--wood-light);
+  color: var(--ink);
 }
 
 .speed-control button.active {
-  background: #23331f;
-  color: var(--text);
+  background: var(--gold-dark);
+  color: #1c1408;
+  box-shadow: inset 0 0 0 2px var(--gold), inset 0 1px 0 2px #ffdf94;
 }
 
 .webmcp-status {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-left: 18px;
-  padding-left: 18px;
-  border-left: 1px solid var(--line);
+  align-self: center;
+  margin-left: 10px;
+  padding: 6px 10px;
+  background: var(--stone-dark);
+  box-shadow: inset 0 0 0 1px #0b0906;
 }
 
 .webmcp-status .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-faint);
+  width: 6px;
+  height: 6px;
+  background: var(--ink-faint);
 }
 
 .webmcp-status small {
   font-size: 9px;
-  letter-spacing: 0.14em;
-  color: var(--text-faint);
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
 }
 
 .webmcp-status[data-status='connected'] .dot {
   background: var(--good);
-  box-shadow: 0 0 7px var(--good);
+  box-shadow: 0 0 0 2px rgba(116, 190, 88, 0.22);
 }
 
 .webmcp-status[data-status='connected'] small {
@@ -1668,48 +312,78 @@ body {
   background: var(--bad);
 }
 
-/* -------------------------------------------------------------------- stage */
+/* ------------------------------------------------------------------ stage */
 
 .stage {
+  /*
+   * The positioning context for both side panels. Below 1180 they lift out of
+   * the grid and float over the map, and without this they would resolve
+   * against the viewport instead and cover the bar above and the bar below.
+   */
+  position: relative;
   display: grid;
-  grid-template-columns: 248px 1fr;
+  grid-template-columns: 250px minmax(0, 1fr) 288px;
   min-height: 0;
+  gap: 0;
 }
 
+/* ------------------------------------------------------------ army roster */
+
+/*
+ * The roster is a rack of oak tablets. Each regiment is one tablet: troop type
+ * burned into the left edge, name and count across the top, and three bars of
+ * how much fight is left in it.
+ */
 .army-list {
   display: flex;
   flex-direction: column;
-  background: var(--panel);
-  border-right: 1px solid var(--line);
   min-height: 0;
-  padding: 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.13) 0 1px, transparent 1px 7px),
+    var(--wood-dark);
+  box-shadow: inset -3px 0 0 0 #0a0805, inset -4px 0 0 0 var(--wood-light);
 }
 
-/* The heading stays put while the roster under it scrolls. */
 .army-list h2 {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 8px;
   flex-shrink: 0;
+  padding: 11px 12px 10px;
+  background: linear-gradient(180deg, var(--wood-light) 0 2px, var(--wood) 2px 100%);
+  box-shadow: inset 0 -2px 0 0 var(--iron-dark);
   font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  color: var(--text-faint);
-  padding: 13px 14px 10px;
-  border-bottom: 1px solid var(--line);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--gold);
 }
 
-.army-list h2 span {
+.army-list h2 span:last-child {
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.08em;
-  color: #4d5f4e;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
 }
 
 #army-list-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px;
+  padding: 8px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* Nothing left to command. Said plainly rather than as an empty column. */
+#army-list-body:empty::after {
+  content: 'NO REGIMENTS STANDING';
+  display: block;
+  padding: 24px 10px;
+  color: var(--ink-faint);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-align: center;
 }
 
 .army-row {
@@ -1717,216 +391,637 @@ body {
   display: block;
   width: 100%;
   text-align: left;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  padding: 8px 9px 9px 12px;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 220, 160, 0.025) 0 1px, transparent 1px 5px),
+    var(--wood);
+  border: 0;
+  box-shadow:
+    inset 0 1px 0 0 var(--wood-lit),
+    inset 0 -2px 0 0 var(--wood-dark),
+    inset 2px 0 0 0 var(--iron-dark);
+  clip-path: polygon(
+    3px 0,
+    calc(100% - 3px) 0,
+    100% 3px,
+    100% calc(100% - 3px),
+    calc(100% - 3px) 100%,
+    3px 100%,
+    0 calc(100% - 3px),
+    0 3px
+  );
   color: inherit;
   cursor: pointer;
   font-family: inherit;
-  margin-bottom: 4px;
-  padding: 8px 10px 9px;
-  transition: background 0.12s, border-color 0.12s;
-}
-
-/*
- * The selected regiment is marked on the edge of the row as well as behind it.
- * A tint alone is easy to lose in a roster of a dozen dark rows.
- */
-.army-row::before {
-  content: '';
-  position: absolute;
-  left: -1px;
-  top: 7px;
-  bottom: 7px;
-  width: 2px;
-  border-radius: 2px;
-  background: transparent;
-  transition: background 0.12s;
+  transition: background 0.1s steps(2), box-shadow 0.1s steps(2);
 }
 
 .army-row:hover {
-  background: var(--panel-raised);
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 220, 160, 0.03) 0 1px, transparent 1px 5px),
+    var(--wood-light);
+  box-shadow:
+    inset 0 1px 0 0 var(--wood-lit),
+    inset 0 -2px 0 0 var(--wood-dark),
+    inset 3px 0 0 0 var(--gold-dark);
 }
 
+/*
+ * The selected regiment is picked out with the same gold the map draws around
+ * it, on the edge and behind it at once: a tint alone is easy to lose in a
+ * rack of a dozen dark tablets.
+ */
 .army-row.selected {
-  background: #1b3424;
-  border-color: #63b878;
-  box-shadow: inset 3px 0 0 var(--good);
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 220, 160, 0.05) 0 1px, transparent 1px 5px),
+    #4a3418;
+  box-shadow:
+    inset 0 0 0 2px var(--gold),
+    inset 0 0 0 3px #1d1408,
+    inset 5px 0 0 3px var(--gold-dark);
 }
 
-.army-row.selected::before {
-  background: var(--player);
+.army-row.selected .name {
+  color: var(--gold);
 }
 
 .army-row .row-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
+}
+
+/* The troop silhouette, seated in stone, with its three letters beneath. */
+.army-row .role {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+  width: 30px;
+  padding: 3px 0 2px;
+  background: var(--stone-dark);
+  box-shadow: inset 0 0 0 1px #0b0906, inset 0 1px 0 1px #37322a;
+}
+
+.army-row .role .pixel-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.army-row .role i {
+  font-size: 7px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.army-row[data-role='cavalry'] .role i,
+.army-row[data-role='scout'] .role i {
+  color: #9ecbff;
+}
+
+.army-row[data-role='archer'] .role i {
+  color: #cfe08d;
+}
+
+.army-row[data-role='spearman'] .role i {
+  color: #e0c48d;
+}
+
+.army-row[data-role='heavy_infantry'] .role i,
+.army-row[data-role='siege'] .role i {
+  color: #d3b7ff;
 }
 
 .army-row .name {
   flex: 1;
   min-width: 0;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .army-row .count {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-dim);
   flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
 }
 
 .army-row .activity {
+  margin-top: 5px;
   font-size: 10px;
-  color: var(--text-faint);
-  margin-top: 3px;
+  color: var(--ink-faint);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 /*
- * The state of the fight rather than the order that started it. Kept to a
- * single small token so a roster of a dozen regiments still reads as a list,
- * with the one that is coming apart picked out of it.
+ * The state of the fight rather than the order that started it, as a stamped
+ * token. One regiment coming apart has to be findable in a rack of twelve.
  */
 .army-row .contact {
+  padding: 0 3px;
   font-weight: 700;
   letter-spacing: 0.06em;
+  background: rgba(0, 0, 0, 0.35);
 }
 
-.army-row .contact.pinned {
-  color: var(--warn);
-}
-
-.army-row .contact.surrounded {
-  color: var(--bad);
-}
-
-/* Conditions the commander can fix by moving men rather than by fighting. */
-.army-row .contact.crushed {
-  color: var(--bad);
-}
-
+.army-row .contact.pinned,
 .army-row .contact.spent {
   color: var(--warn);
 }
 
+.army-row .contact.surrounded,
+.army-row .contact.crushed {
+  color: #ffb0a6;
+  background: var(--crimson);
+}
+
 .army-row .bars {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   margin-top: 7px;
 }
 
 .bar {
   flex: 1;
-  height: 4px;
-  background: #1b241a;
-  border-radius: 2px;
-  overflow: hidden;
+  height: 6px;
+  background: var(--stone-dark);
+  box-shadow: inset 0 0 0 1px #0b0906;
 }
 
 .bar i {
   display: block;
   height: 100%;
+  box-shadow: inset 0 -2px 0 0 rgba(0, 0, 0, 0.3);
 }
 
 .army-row.routing .name {
-  color: var(--bad);
+  color: #ffb0a6;
 }
 
-/* ---------------------------------------------------------------------- map */
+/* A regiment currently taking losses. The rack should shout before the map. */
+.army-row.engaged {
+  box-shadow:
+    inset 0 1px 0 0 var(--wood-lit),
+    inset 0 -2px 0 0 var(--wood-dark),
+    inset 4px 0 0 0 var(--bad);
+}
+
+.army-row.engaged.selected {
+  box-shadow:
+    inset 0 0 0 2px var(--gold),
+    inset 0 0 0 3px #1d1408,
+    inset 6px 0 0 3px var(--bad);
+}
+
+.army-row.engaged .count {
+  color: #ffb0a6;
+}
+
+.army-row.routing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--bad);
+  animation: pulse-edge 1.2s steps(2, jump-none) infinite;
+}
+
+@keyframes pulse-edge {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* -------------------------------------------------------------------- map */
 
 .map-wrap {
   position: relative;
   min-width: 0;
   min-height: 0;
+  box-shadow: inset 0 0 0 2px #0a0805;
 }
 
 #battlefield {
   display: block;
   width: 100%;
   height: 100%;
+  image-rendering: pixelated;
   cursor: crosshair;
 }
 
+/* ---------------------------------------------------------- field journal */
+
+/*
+ * The right column: the field, then whatever is selected, then the ground, then
+ * the oath. Everything with words on it is parchment; the frame around it is
+ * the same oak as the roster, so the two columns read as one rig.
+ */
+.field-journal {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.13) 0 1px, transparent 1px 7px),
+    var(--wood-dark);
+  box-shadow: inset 3px 0 0 0 #0a0805, inset 4px 0 0 0 var(--wood-light);
+}
+
+.journal-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 7px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.journal-block {
+  background: var(--parchment);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(90, 70, 40, 0.05) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(90, 70, 40, 0.04) 0 1px, transparent 1px 6px);
+  box-shadow:
+    inset 0 0 0 2px var(--parchment-dark),
+    inset 0 0 0 4px #4a3820,
+    0 2px 0 0 #0a0805;
+  color: var(--parchment-ink);
+  clip-path: polygon(
+    5px 0,
+    calc(100% - 5px) 0,
+    100% 5px,
+    100% calc(100% - 5px),
+    calc(100% - 5px) 100%,
+    5px 100%,
+    0 calc(100% - 5px),
+    0 5px
+  );
+  padding: 8px 10px 10px;
+}
+
+.journal-block h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -8px -10px 8px;
+  padding: 7px 10px 6px;
+  background: linear-gradient(180deg, var(--wood-light) 0 2px, var(--wood) 2px 100%);
+  box-shadow: inset 0 -2px 0 0 var(--iron-dark);
+  color: var(--gold);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.journal-block h2 .pixel-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* The minimap block keeps the parchment frame but seats the canvas in stone. */
+.minimap-block {
+  flex-shrink: 0;
+  margin: 8px 7px 7px;
+  padding-bottom: 8px;
+}
+
 .minimap-wrap {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  width: 232px;
-  height: 145px;
-  border: 1px solid #2f3d2b;
-  border-radius: 6px;
+  position: relative;
+  aspect-ratio: 8 / 5;
+  background: var(--stone-dark);
+  box-shadow: inset 0 0 0 2px #0b0906, inset 0 0 0 4px #4a3820;
   overflow: hidden;
-  background: var(--panel);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
 }
 
 #minimap {
   display: block;
   width: 100%;
   height: 100%;
+  image-rendering: pixelated;
   cursor: pointer;
 }
 
-/* ---------------------------------------------------------------- objective */
+.journal-empty,
+.journal-hint {
+  padding: 4px 0 2px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--parchment-ink-dim);
+}
+
+.journal-hint {
+  margin-top: 6px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+/* The selected regiment, led by its own silhouette on a stone plate. */
+.unit-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--parchment-dark);
+}
+
+.unit-portrait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  background: var(--stone-dark);
+  box-shadow: inset 0 0 0 2px #0b0906, inset 0 0 0 3px #6a5731;
+}
+
+.unit-portrait .pixel-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.unit-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.unit-name b {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unit-name small {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--parchment-ink-dim);
+}
+
+.unit-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 7px;
+}
+
+.unit-flags .flag {
+  padding: 2px 5px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #f4ecd6;
+  background: var(--iron);
+}
+
+.unit-flags .flag[data-tone='warn'] {
+  background: #8a6410;
+}
+
+.unit-flags .flag[data-tone='bad'] {
+  background: var(--crimson);
+}
+
+.journal-meter {
+  margin-top: 8px;
+}
+
+.meter-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--parchment-ink-dim);
+}
+
+.meter-label b {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--parchment-ink);
+  letter-spacing: 0;
+}
+
+/* Dark enough that a full bar of any of the three colours reads as full. */
+.meter-track {
+  display: block;
+  height: 8px;
+  margin-top: 3px;
+  background: #6d5c3a;
+  box-shadow: inset 0 0 0 2px #4a3820;
+}
+
+.meter-track i {
+  display: block;
+  height: 100%;
+  box-shadow: inset 0 -2px 0 0 rgba(0, 0, 0, 0.28);
+}
+
+.journal-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 2px solid var(--parchment-dark);
+  font-size: 10px;
+}
+
+.journal-facts dt {
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  padding-top: 2px;
+  color: var(--parchment-ink-dim);
+}
+
+.journal-facts dd {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.journal-facts dd small {
+  display: block;
+  margin-top: 1px;
+  font-size: 9px;
+  line-height: 1.35;
+  color: var(--parchment-ink-dim);
+}
+
+.ground-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ground-head b {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ground-kind {
+  flex-shrink: 0;
+  padding: 2px 5px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #f4ecd6;
+  background: #4d5f3a;
+}
+
+.ground-kind[data-terrain='hill'] {
+  background: #6d5a30;
+}
+
+.ground-kind[data-terrain='village'] {
+  background: #7a4630;
+}
+
+.ground-kind[data-terrain='crossing'] {
+  background: var(--gold-dark);
+  color: #1c1408;
+}
+
+.ground-kind[data-terrain='river'],
+.ground-kind[data-terrain='ridge'] {
+  background: #2f5670;
+}
+
+.ground-effect {
+  margin-top: 7px;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ground-lore {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 2px solid var(--parchment-dark);
+  font-size: 9.5px;
+  line-height: 1.45;
+  color: var(--parchment-ink-dim);
+}
+
+.journal-goal {
+  font-size: 10px;
+  line-height: 1.45;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--parchment-dark);
+}
+
+.king-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 5px 6px;
+  background: rgba(74, 56, 32, 0.14);
+  box-shadow: inset 0 0 0 2px var(--parchment-dark);
+}
+
+.king-row .pixel-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.king-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.king-body b {
+  font-size: 11px;
+}
+
+.king-body small {
+  font-size: 9px;
+  color: var(--parchment-ink-dim);
+}
+
+.king-row[data-status='threatened'] {
+  box-shadow: inset 0 0 0 2px #8a6410;
+}
+
+.king-row[data-status='besieged'] {
+  background: rgba(156, 47, 42, 0.2);
+  box-shadow: inset 0 0 0 2px var(--crimson);
+}
+
+.king-row[data-status='unseen'] {
+  opacity: 0.65;
+}
+
+/* -------------------------------------------------------------- objective */
 
 /*
- * Two chips, top centre, and nothing more. The objective has to be legible at a
- * glance without becoming a dashboard; when a king is actually under threat the
- * chip does the shouting, not a panel.
+ * Two plaques over the field, and nothing more. They only raise their voice
+ * when a king is actually being taken.
  */
 .objective-strip {
   position: absolute;
-  top: 12px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  gap: 6px;
   pointer-events: none;
+  max-width: calc(100% - 24px);
 }
 
 .objective {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-width: 210px;
-  padding: 6px 12px 8px;
-  background: rgba(12, 16, 12, 0.88);
-  border: 1px solid var(--line);
-  border-radius: 5px;
+  gap: 8px;
+  min-width: 190px;
+  padding: 6px 11px 9px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 7px),
+    var(--wood);
+  box-shadow:
+    inset 0 1px 0 0 var(--wood-lit),
+    inset 0 0 0 2px rgba(0, 0, 0, 0.4),
+    0 2px 0 0 #0a0805;
   overflow: hidden;
 }
 
-.objective .crown {
-  font-size: 17px;
-  line-height: 1;
-  color: var(--king);
+.objective .crown .pixel-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .objective .body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 
 .objective small {
-  font-size: 9px;
-  letter-spacing: 0.09em;
-  color: var(--text-faint);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
 }
 
 .objective b {
-  font-size: 11.5px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1937,8 +1032,8 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.06);
+  height: 4px;
+  background: var(--stone-dark);
 }
 
 .objective .capture i {
@@ -1946,19 +1041,18 @@ body {
   height: 100%;
   width: 0;
   background: var(--king);
-  transition: width 0.2s linear;
+  transition: width 0.2s steps(8);
 }
 
 .objective[data-status='threatened'] {
-  border-color: var(--warn);
+  box-shadow: inset 0 0 0 2px var(--warn), 0 2px 0 0 #0a0805;
 }
 
 .objective[data-status='besieged'] {
-  border-color: var(--king-danger);
-  animation: beset 1.1s ease-in-out infinite;
+  box-shadow: inset 0 0 0 2px var(--king-danger), 0 2px 0 0 #0a0805;
+  animation: beset 1.1s steps(2, jump-none) infinite;
 }
 
-.objective[data-status='besieged'] .crown,
 .objective[data-status='besieged'] b {
   color: var(--king-danger);
 }
@@ -1968,95 +1062,26 @@ body {
 }
 
 .objective[data-status='unseen'] {
-  opacity: 0.6;
+  opacity: 0.62;
 }
 
 @keyframes beset {
   50% {
-    border-color: rgba(255, 122, 61, 0.35);
+    box-shadow: inset 0 0 0 2px rgba(255, 122, 61, 0.3), 0 2px 0 0 #0a0805;
   }
 }
 
-/* ------------------------------------------------------------------ outcome */
-
-.outcome {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(6, 9, 7, 0.82);
-  backdrop-filter: blur(2px);
-  animation: fade-in 0.4s ease-out;
-}
-
-.outcome[hidden] {
-  display: none;
-}
-
-.outcome-card {
-  text-align: center;
-  padding: 34px 54px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  max-width: 560px;
-}
-
-.outcome-card small {
-  font-size: 10px;
-  letter-spacing: 0.22em;
-  color: var(--text-faint);
-}
-
-.outcome-card h1 {
-  margin: 8px 0 12px;
-  font-size: 40px;
-  letter-spacing: 0.1em;
-  color: var(--king);
-}
-
-.outcome-card.defeat h1 {
-  color: var(--bad);
-}
-
-.outcome-card p {
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-dim);
-}
-
-.outcome-card button {
-  margin-top: 22px;
-  padding: 9px 22px;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  color: var(--text);
-  background: var(--panel-raised);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.outcome-card button:hover {
-  border-color: var(--king);
-  color: var(--king);
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-}
+/* ---------------------------------------------------------------- alerts */
 
 .alert-feed {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 290px;
+  top: 10px;
+  right: 10px;
+  width: 264px;
+  max-width: calc(100% - 20px);
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   pointer-events: none;
 }
 
@@ -2069,21 +1094,28 @@ body {
   display: block;
   width: 100%;
   text-align: left;
-  background: rgba(14, 20, 13, 0.92);
+  padding: 6px 9px 6px 10px;
+  background: var(--wood);
   border: 0;
-  border-left: 3px solid var(--text-faint);
-  border-radius: 4px;
-  padding: 7px 10px;
-  color: var(--text);
+  box-shadow:
+    inset 4px 0 0 0 var(--iron-light),
+    inset 0 1px 0 0 var(--wood-lit),
+    0 2px 0 0 #0a0805;
+  color: var(--ink);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 10.5px;
+  line-height: 1.35;
   cursor: pointer;
   pointer-events: auto;
-  animation: slide-in 0.18s ease-out;
+  animation: slide-in 0.16s steps(3);
 }
 
 .alert:hover {
-  background: rgba(28, 39, 26, 0.96);
+  background: var(--wood-light);
+  box-shadow:
+    inset 4px 0 0 0 var(--gold),
+    inset 0 1px 0 0 var(--wood-lit),
+    0 2px 0 0 #0a0805;
 }
 
 .alert.no-target {
@@ -2092,34 +1124,34 @@ body {
 }
 
 .alert.warning {
-  border-left-color: var(--warn);
+  box-shadow: inset 4px 0 0 0 var(--warn), inset 0 1px 0 0 var(--wood-lit), 0 2px 0 0 #0a0805;
 }
 
 .alert.critical {
-  border-left-color: var(--bad);
+  background: #4a2019;
+  box-shadow: inset 4px 0 0 0 var(--bad), inset 0 1px 0 0 #6d3226, 0 2px 0 0 #0a0805;
 }
 
 @keyframes slide-in {
   from {
     opacity: 0;
-    transform: translateX(14px);
+    transform: translateX(12px);
   }
 }
 
 .toast {
   position: absolute;
-  bottom: 16px;
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(14, 20, 13, 0.95);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 8px 15px;
-  font-size: 11.5px;
+  max-width: min(620px, calc(100% - 32px));
+  padding: 8px 14px;
+  background: var(--wood);
+  box-shadow: inset 0 0 0 2px var(--wood-lit), inset 0 0 0 3px #0a0805, 0 2px 0 0 #0a0805;
+  font-size: 11px;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.15s steps(3);
   pointer-events: none;
-  max-width: 620px;
 }
 
 .toast.visible {
@@ -2128,29 +1160,27 @@ body {
 
 /* A Marshal order looks different from your own, so a demo reads clearly. */
 .toast.marshal {
-  border-color: var(--plan);
   color: #e9dcff;
+  box-shadow: inset 0 0 0 2px var(--plan), inset 0 0 0 3px #0a0805, 0 2px 0 0 #0a0805;
 }
 
+/* ------------------------------------------------------------ control tab */
+
 /*
- * The control legend folds away.
- *
- * It used to sit open over the top-left of the field for the whole battle, which
- * is prime ground: that corner is where a flank march is watched from. Folded it
- * costs one small tab, and it opens on click or keyboard without any script.
+ * The legend folds away. Open, it costs prime ground: the top-left corner is
+ * where a flank march is watched from.
  */
 .hint {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 10px;
+  left: 10px;
   width: max-content;
-  max-width: 400px;
+  max-width: min(400px, calc(100% - 20px));
   font-size: 10px;
-  color: var(--text-faint);
-  background: rgba(10, 14, 11, 0.82);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  overflow: hidden;
+  color: var(--ink-faint);
+  background: var(--wood);
+  box-shadow: inset 0 0 0 2px var(--wood-dark), inset 0 1px 0 2px var(--wood-lit), 0 2px 0 0 #0a0805;
+  line-height: 1.5;
 }
 
 .hint > summary {
@@ -2158,8 +1188,9 @@ body {
   cursor: pointer;
   padding: 5px 10px;
   font-size: 9px;
-  letter-spacing: 0.16em;
-  color: var(--text-faint);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--ink-dim);
 }
 
 .hint > summary::-webkit-details-marker {
@@ -2168,20 +1199,16 @@ body {
 
 .hint > summary::after {
   content: ' ▾';
-  color: #46563f;
+  color: var(--gold-dark);
 }
 
 .hint > summary:hover {
-  color: var(--text-dim);
-}
-
-.hint[open] {
-  background: rgba(10, 14, 11, 0.94);
+  color: var(--gold);
 }
 
 .hint[open] > summary {
-  border-bottom: 1px solid var(--line);
-  color: var(--text-dim);
+  box-shadow: inset 0 -2px 0 0 var(--wood-dark);
+  color: var(--gold);
 }
 
 .hint[open] > summary::after {
@@ -2199,308 +1226,42 @@ body {
   font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #4d5f4e;
+  color: var(--gold-dark);
 }
 
 .hint dd {
   margin: 0;
-  line-height: 1.5;
 }
 
 .hint b {
-  color: var(--text-dim);
-  font-weight: 600;
+  color: var(--ink-dim);
+  font-weight: 700;
 }
 
-/* -------------------------------------------------------------- command bar */
-
-.command-bar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 0 16px;
-  background: var(--panel);
-  border-top: 1px solid var(--line);
-}
-
-.selection-readout {
-  width: 218px;
-  flex-shrink: 0;
-  padding-right: 20px;
-  border-right: 1px solid var(--line);
-  line-height: 1.35;
-}
-
-.selection-readout small {
-  display: block;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  color: var(--text-faint);
-}
-
-.selection-readout b {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-dim);
-}
-
-.commands {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-}
+/* ------------------------------------------------------- opening orders */
 
 /*
- * An order that can be given and one that cannot must not look alike. Enabled
- * buttons carry the full border and the brighter glyph; a disabled one drops to
- * a flat plate with no edge at all.
- */
-.commands button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 76px;
-  padding: 9px 10px;
-  background: var(--panel-raised);
-  border: 1px solid #2f3d2b;
-  border-radius: 6px;
-  color: var(--text);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
-}
-
-.commands button span {
-  font-size: 16px;
-  line-height: 1;
-  color: var(--text-dim);
-  transition: color 0.12s;
-}
-
-.commands button:hover:not(:disabled) {
-  background: #202d1c;
-  border-color: #4a6b3f;
-  color: #f0f7ee;
-  transform: translateY(-1px);
-}
-
-.commands button:hover:not(:disabled) span {
-  color: var(--good);
-}
-
-.commands button:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.commands button:disabled {
-  background: #121810;
-  border-color: transparent;
-  color: var(--text-faint);
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.commands button:disabled span {
-  color: #3c4a3a;
-}
-
-/* Attack is the one order that starts a fight; it reads warm, not neutral. */
-.commands button[data-command='attack']:hover:not(:disabled) {
-  border-color: #7d4034;
-  color: #ffd8d1;
-}
-
-.commands button[data-command='attack']:hover:not(:disabled) span {
-  color: var(--bad);
-}
-
-.formation-menu {
-  position: absolute;
-  bottom: 82px;
-  left: 254px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  width: 430px;
-  background: var(--panel-raised);
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: 9px;
-}
-
-.formation-menu[hidden] {
-  display: none;
-}
-
-.formation-menu button {
-  flex: 1 1 130px;
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  color: var(--text-dim);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 10px;
-  padding: 7px;
-  text-align: left;
-}
-
-.formation-menu button:hover {
-  background: #1d281a;
-  color: var(--text);
-}
-
-.formation-menu button small {
-  display: block;
-  color: var(--text-faint);
-  font-size: 9px;
-  margin-top: 2px;
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #24301f;
-  border-radius: 4px;
-}
-
-
-/* ------------------------------------------------- troop role, added later */
-
-/*
- * The three-letter troop token.
- *
- * The counter matrix decides most fights and was, until this chip existed,
- * entirely invisible in the interface: a roster row named a regiment and its
- * formation and never said whether it carried spears or bows.
- */
-.army-row .role {
-  flex-shrink: 0;
-  min-width: 30px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: #1b2519;
-  border: 1px solid var(--line);
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-align: center;
-}
-
-.army-row[data-role='cavalry'] .role,
-.army-row[data-role='scout'] .role {
-  color: #9ecbff;
-  border-color: #2f4a63;
-}
-
-.army-row[data-role='archer'] .role {
-  color: #cfe08d;
-  border-color: #46532c;
-}
-
-.army-row[data-role='spearman'] .role {
-  color: #e0c48d;
-  border-color: #574627;
-}
-
-.army-row[data-role='heavy_infantry'] .role,
-.army-row[data-role='siege'] .role {
-  color: #d3b7ff;
-  border-color: #45385c;
-}
-
-/* A regiment currently taking losses. The roster should shout before the map. */
-.army-row.engaged {
-  border-color: #6d3a2c;
-}
-
-.army-row.engaged::before {
-  background: var(--bad);
-}
-
-.army-row.routing::before {
-  background: var(--bad);
-  animation: pulse-edge 1.1s ease-in-out infinite;
-}
-
-@keyframes pulse-edge {
-  50% {
-    opacity: 0.25;
-  }
-}
-
-.army-row.engaged .count {
-  color: var(--bad);
-}
-
-.command-divider {
-  width: 1px;
-  align-self: stretch;
-  margin: 6px 3px;
-  background: var(--line);
-}
-
-.selection-readout {
-  width: 272px;
-}
-
-/*
- * The counter matrix, in words, for whatever is selected.
- *
- * It sits after the orders rather than under the selection, because the room to
- * the right of the command row was empty and the line was being cut in half
- * inside a 300px column — a truncated "strong vs …" teaches nothing.
- */
-.matchup-note {
-  flex: 1;
-  min-width: 0;
-  align-self: center;
-  padding-left: 20px;
-  border-left: 1px solid var(--line);
-  font-style: normal;
-  font-size: 10.5px;
-  line-height: 1.5;
-  color: var(--text-faint);
-}
-
-.matchup-note:empty {
-  border-left: 0;
-}
-
-.stance-menu {
-  width: 300px;
-  left: 304px;
-}
-
-/* --------------------------------------------------------- opening orders */
-
-/*
- * What to do, on the battlefield itself. The War Council explains the
- * operation and then hands the player eight thousand men with no reminder of
- * what winning looks like. This carries that across the cut, and leaves the
- * moment the first order is given.
+ * What to do, on the battlefield itself. The War Council explains the operation
+ * and then hands the player eight thousand men with no reminder of what winning
+ * looks like. This carries that across the cut, and leaves on the first order.
  */
 .first-orders {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
-  width: 330px;
-  padding: 12px 14px 11px;
-  background: rgba(12, 17, 12, 0.94);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--king);
-  border-radius: 6px;
+  left: 10px;
+  bottom: 10px;
+  width: min(330px, calc(100% - 20px));
+  padding: 10px 12px 11px;
+  background: var(--parchment);
+  background-image: repeating-linear-gradient(0deg, rgba(90, 70, 40, 0.05) 0 1px, transparent 1px 4px);
+  box-shadow:
+    inset 0 0 0 2px var(--parchment-dark),
+    inset 0 0 0 4px #4a3820,
+    inset 6px 0 0 4px var(--gold-dark),
+    0 2px 0 0 #0a0805;
+  color: var(--parchment-ink);
   /* It sits over the battlefield, so it must never swallow an order. */
   pointer-events: none;
-  animation: slide-in 0.28s ease-out;
+  animation: slide-in 0.24s steps(4);
 }
 
 .first-orders.leaving {
@@ -2512,23 +1273,21 @@ body {
 .first-orders small {
   display: block;
   font-size: 9px;
-  letter-spacing: 0.18em;
-  color: var(--king);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #7a5a20;
 }
 
 .first-orders h3 {
   margin-top: 3px;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .first-orders > p {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 10.5px;
   line-height: 1.45;
-  color: var(--text-dim);
 }
 
 .first-orders ul {
@@ -2537,63 +1296,391 @@ body {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .first-orders li {
   position: relative;
   padding-left: 11px;
-  font-size: 10.5px;
+  font-size: 10px;
   line-height: 1.45;
-  color: var(--text-faint);
+  color: var(--parchment-ink-dim);
 }
 
 .first-orders li::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 6px;
+  top: 5px;
   width: 4px;
   height: 4px;
-  border-radius: 1px;
-  background: #3c4c38;
+  background: var(--gold-dark);
 }
 
 .first-orders li b {
-  color: var(--text-dim);
-  font-weight: 600;
+  color: var(--parchment-ink);
+  font-weight: 700;
 }
 
 .first-orders .dismiss {
   pointer-events: auto;
   position: absolute;
-  top: 8px;
-  right: 9px;
+  top: 6px;
+  right: 7px;
   width: 20px;
   height: 20px;
   background: transparent;
   border: 0;
-  border-radius: 4px;
-  color: var(--text-faint);
+  color: var(--parchment-ink-dim);
   cursor: pointer;
   font-size: 15px;
   line-height: 1;
 }
 
 .first-orders .dismiss:hover {
-  background: var(--panel-raised);
-  color: var(--text);
+  background: var(--parchment-dark);
+  color: var(--parchment-ink);
+}
+
+/* ---------------------------------------------------------- command bar */
+
+/*
+ * The command panel: an oak beam of inventory slots. An order that can be given
+ * and one that cannot must never look alike, so a live button is a lit slot
+ * with a full bevel and a disabled one is a dark hole with no edge at all.
+ */
+.command-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 66px;
+  padding: 7px 12px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 7px),
+    linear-gradient(180deg, var(--wood-light) 0 2px, var(--wood) 2px 100%);
+  box-shadow: inset 0 3px 0 0 var(--iron-dark), 0 -2px 0 0 #0a0805;
+  z-index: 3;
+}
+
+.selection-readout {
+  width: 262px;
+  flex-shrink: 0;
+  padding: 6px 12px 6px 10px;
+  background: var(--stone-dark);
+  box-shadow: inset 0 0 0 1px #0b0906, inset 3px 0 0 1px var(--gold-dark);
+  line-height: 1.35;
+}
+
+.selection-readout small {
+  display: block;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selection-readout b {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.commands {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.commands button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 68px;
+  padding: 7px 8px;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 220, 160, 0.03) 0 1px, transparent 1px 5px),
+    var(--wood);
+  border: 0;
+  box-shadow:
+    inset 0 0 0 2px var(--wood-dark),
+    inset 0 1px 0 2px var(--wood-lit),
+    inset 0 -2px 0 2px rgba(0, 0, 0, 0.35);
+  clip-path: polygon(
+    4px 0,
+    calc(100% - 4px) 0,
+    100% 4px,
+    100% calc(100% - 4px),
+    calc(100% - 4px) 100%,
+    4px 100%,
+    0 calc(100% - 4px),
+    0 4px
+  );
+  color: var(--ink-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  transition: background 0.1s steps(2), color 0.1s steps(2), transform 0.1s steps(2);
+}
+
+.commands button .pixel-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.commands button:hover:not(:disabled) {
+  background: var(--wood-light);
+  color: var(--ink);
+  transform: translateY(-2px);
+}
+
+/* An order under the cursor lights its slot in gold, exactly like a selection. */
+.commands button:hover:not(:disabled),
+.commands button:focus-visible:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 2px var(--gold),
+    inset 0 0 0 3px #1d1408,
+    inset 0 1px 0 3px #ffdf94;
+}
+
+.commands button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.commands button:disabled {
+  background: #1a1610;
+  box-shadow: inset 0 0 0 2px #0d0b07, inset 0 2px 0 2px rgba(0, 0, 0, 0.5);
+  color: #55503f;
+  cursor: not-allowed;
+}
+
+.commands button:disabled .pixel-icon {
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+
+/* Attack is the one order that starts a fight; it lights red, not gold. */
+.commands button[data-command='attack']:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 2px #d8564a,
+    inset 0 0 0 3px #1d1408,
+    inset 0 1px 0 3px #ff9d92;
+  color: #ffd8d1;
+}
+
+.command-divider {
+  width: 2px;
+  align-self: stretch;
+  margin: 4px 3px;
+  background: var(--wood-dark);
+  box-shadow: 1px 0 0 0 var(--wood-lit);
 }
 
 /*
- * The control hint is a long line now that panning, attack-move and the jump
- * keys are all bound, so it wraps rather than running under the objective.
+ * The counter matrix, in words, for whatever is selected. It sits after the
+ * orders because the room to the right of the command row was empty, and a
+ * truncated "strong vs …" inside a narrow column teaches nothing.
  */
-.hint {
-  line-height: 1.5;
+.matchup-note {
+  flex: 1;
+  min-width: 0;
+  align-self: center;
+  padding: 5px 0 5px 14px;
+  border-left: 2px solid var(--wood-dark);
+  font-style: normal;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--ink-faint);
 }
 
-/* ------------------------------------------------ production resilience */
+.matchup-note:empty {
+  border-left: 0;
+}
+
+/* ------------------------------------------------------- order sub-menus */
+
+.formation-menu {
+  position: absolute;
+  bottom: 76px;
+  left: 286px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 430px;
+  max-width: calc(100vw - 40px);
+  padding: 8px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 7px),
+    var(--wood);
+  box-shadow:
+    inset 0 0 0 2px var(--wood-dark),
+    inset 0 1px 0 2px var(--wood-lit),
+    0 3px 0 0 #0a0805;
+  z-index: 4;
+}
+
+.formation-menu[hidden] {
+  display: none;
+}
+
+.formation-menu button {
+  flex: 1 1 130px;
+  padding: 7px 8px;
+  background: var(--stone-dark);
+  border: 0;
+  box-shadow: inset 0 0 0 1px #0b0906, inset 0 1px 0 1px #37322a;
+  color: var(--ink-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  text-align: left;
+}
+
+.formation-menu button:hover,
+.formation-menu button:focus-visible {
+  background: var(--wood-light);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+
+.formation-menu button strong {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+}
+
+.formation-menu button small {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  line-height: 1.35;
+  color: var(--ink-faint);
+}
+
+.stance-menu {
+  width: 320px;
+  left: 286px;
+}
+
+/* ---------------------------------------------------------------- outcome */
+
+.outcome {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 6, 3, 0.86);
+  animation: fade-in 0.35s steps(6);
+  z-index: 10;
+}
+
+.outcome[hidden] {
+  display: none;
+}
+
+.outcome-card {
+  max-width: 560px;
+  padding: 30px 50px;
+  text-align: center;
+  background: var(--parchment);
+  background-image: repeating-linear-gradient(0deg, rgba(90, 70, 40, 0.05) 0 1px, transparent 1px 4px);
+  box-shadow:
+    inset 0 0 0 3px var(--parchment-dark),
+    inset 0 0 0 6px #4a3820,
+    inset 0 0 0 8px var(--gold-dark);
+  color: var(--parchment-ink);
+  clip-path: polygon(
+    8px 0,
+    calc(100% - 8px) 0,
+    100% 8px,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    8px 100%,
+    0 calc(100% - 8px),
+    0 8px
+  );
+}
+
+.outcome-card small {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: #7a5a20;
+}
+
+.outcome-card h1 {
+  margin: 8px 0 12px;
+  font-size: 38px;
+  letter-spacing: 0.14em;
+  color: #6b4a10;
+  text-shadow: 2px 2px 0 rgba(255, 255, 255, 0.35);
+}
+
+.outcome-card.defeat h1 {
+  color: var(--crimson);
+}
+
+.outcome-card p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--parchment-ink-dim);
+}
+
+.outcome-card button {
+  margin-top: 22px;
+  padding: 10px 22px;
+  background: var(--wood);
+  border: 0;
+  box-shadow: inset 0 0 0 2px var(--gold-dark), inset 0 1px 0 2px var(--wood-lit);
+  color: var(--gold);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.outcome-card button:hover {
+  background: var(--wood-light);
+  box-shadow: inset 0 0 0 2px var(--gold), inset 0 1px 0 2px #ffdf94;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* -------------------------------------------------------------- scrollbars */
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--stone-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--wood-light);
+  box-shadow: inset 0 0 0 1px var(--wood-dark), inset 0 1px 0 1px var(--wood-lit);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-dark);
+}
+
+/* ------------------------------------------------------------ resilience */
 
 .sr-only {
   position: absolute;
@@ -2614,8 +1701,8 @@ body {
 button:focus-visible,
 canvas:focus-visible,
 [tabindex='-1']:focus-visible {
-  outline: 2px solid var(--king);
-  outline-offset: 2px;
+  outline: 3px solid var(--gold);
+  outline-offset: 1px;
 }
 
 .fatal-screen,
@@ -2626,8 +1713,8 @@ canvas:focus-visible,
   display: grid;
   place-items: center;
   padding: 32px;
-  color: var(--text);
-  background: rgba(5, 8, 6, 0.97);
+  color: var(--parchment-ink);
+  background: rgba(8, 6, 3, 0.97);
   font-family: var(--mono);
 }
 
@@ -2639,53 +1726,177 @@ canvas:focus-visible,
 .fatal-screen > div,
 .viewport-warning > div {
   width: min(520px, 100%);
-  padding: 30px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--bad);
-  background: var(--panel);
+  padding: 28px;
+  background: var(--parchment);
+  box-shadow:
+    inset 0 0 0 3px var(--parchment-dark),
+    inset 0 0 0 6px #4a3820,
+    inset 10px 0 0 6px var(--crimson);
 }
 
 .viewport-warning > div {
-  border-left-color: var(--king);
+  box-shadow:
+    inset 0 0 0 3px var(--parchment-dark),
+    inset 0 0 0 6px #4a3820,
+    inset 10px 0 0 6px var(--gold-dark);
 }
 
 .fatal-screen small {
   display: block;
   margin-bottom: 8px;
-  color: var(--bad);
+  color: var(--crimson);
   font-size: 9px;
-  letter-spacing: 0.18em;
+  font-weight: 700;
+  letter-spacing: 0.2em;
 }
 
 .fatal-screen strong,
 .viewport-warning strong {
   display: block;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 28px;
-  font-weight: 400;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .fatal-screen p,
 .viewport-warning p {
   margin-top: 10px;
-  color: var(--text-dim);
+  color: var(--parchment-ink-dim);
   line-height: 1.6;
 }
 
 .fatal-screen button {
   margin-top: 22px;
-  padding: 12px 16px;
-  color: #171b12;
-  background: var(--king);
+  padding: 11px 16px;
+  color: #1c1408;
+  background: var(--gold);
   border: 0;
+  box-shadow: inset 0 0 0 2px #7a5a20;
   cursor: pointer;
   font-family: inherit;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
 }
 
-@media (max-width: 1099px), (max-height: 619px) {
+/* ------------------------------------------------------------ responsive */
+
+/*
+ * The screen folds inwards, never away. The map is the last thing to give up
+ * room: at 1180 the journal drops to an overlay on the field, at 940 the roster
+ * follows it, and below that the two panels stack under a short map.
+ */
+@media (max-width: 1420px) {
+  .stage {
+    grid-template-columns: 226px minmax(0, 1fr) 262px;
+  }
+
+  .commands button {
+    min-width: 60px;
+  }
+
+  .selection-readout {
+    width: 220px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .stage {
+    grid-template-columns: 218px minmax(0, 1fr);
+  }
+
+  .field-journal {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 262px;
+    z-index: 5;
+    background:
+      repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.13) 0 1px, transparent 1px 7px),
+      rgba(20, 15, 8, 0.96);
+  }
+
+  .alert-feed {
+    right: 274px;
+  }
+
+  .matchup-note {
+    display: none;
+  }
+}
+
+@media (max-width: 940px) {
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .army-list {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 210px;
+    z-index: 5;
+    background:
+      repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.13) 0 1px, transparent 1px 7px),
+      rgba(20, 15, 8, 0.96);
+  }
+
+  .hint,
+  .first-orders {
+    left: 220px;
+  }
+
+  /* The map runs under both panels here, so a centred strip lands on top of
+     the control tab. Drop it below the tab rather than shrinking it. */
+  .objective-strip {
+    top: 42px;
+  }
+
+  .top-bar {
+    height: auto;
+    flex-wrap: wrap;
+    padding-bottom: 6px;
+  }
+
+  .stat-cluster {
+    order: 3;
+    flex-basis: 100%;
+    overflow-x: auto;
+  }
+
+  .command-bar {
+    flex-wrap: wrap;
+  }
+
+  .commands {
+    flex-wrap: wrap;
+  }
+
+  .formation-menu,
+  .stance-menu {
+    left: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .army-list,
+  .field-journal {
+    width: 190px;
+  }
+
+  .selection-readout {
+    width: 100%;
+  }
+
+  .objective-strip {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 759px), (max-height: 479px) {
   .viewport-warning {
     display: grid;
   }
@@ -2704,8 +1915,8 @@ canvas:focus-visible,
 
 @media (prefers-contrast: more) {
   :root {
-    --line: #62715f;
-    --text-dim: #b6c7b2;
-    --text-faint: #91a68e;
+    --ink-dim: #ded2b2;
+    --ink-faint: #bcae8b;
+    --parchment-ink-dim: #3d2f1c;
   }
 }

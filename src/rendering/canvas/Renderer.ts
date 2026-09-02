@@ -1,7 +1,5 @@
 import { MAP_HEIGHT, MAP_WIDTH } from '../../game/config/battle';
-import type { TerrainKind } from '../../game/config/maps';
 import type { GameState } from '../../game/simulation/GameState';
-import { ZONES } from '../../game/simulation/Zones';
 import type { BattlePlan, ZoneId } from '../../game/types/domain';
 import { Camera } from './Camera';
 import { EffectsLayer } from './EffectsLayer';
@@ -11,6 +9,7 @@ import { PALETTE } from './palette';
 import { PlanLayer } from './PlanLayer';
 import { TerrainLayer } from './TerrainLayer';
 import { UnitLayer } from './UnitLayer';
+import type { RenderSnapshot } from './RenderSnapshot';
 
 export interface DragBox {
   startX: number;
@@ -51,6 +50,11 @@ export class Renderer {
     this.resize();
   }
 
+  /** The baked battlefield art, so the minimap can draw the same ground. */
+  public get terrainArtwork(): HTMLCanvasElement {
+    return this.terrain.artwork;
+  }
+
   public resize(): void {
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     const width = this.canvas.clientWidth;
@@ -61,7 +65,12 @@ export class Renderer {
     this.camera.setViewport(width, height);
   }
 
-  public render(state: GameState, plan: BattlePlan | undefined): void {
+  public render(
+    state: GameState,
+    plan: BattlePlan | undefined,
+    previous?: RenderSnapshot,
+    interpolation = 1,
+  ): void {
     const context = this.context;
     const ratio = this.devicePixelRatioCache;
     // Rebuilds the ground only when the battle is somewhere else; ordinarily free.
@@ -70,7 +79,7 @@ export class Renderer {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     // Letterboxing at whole-map command zoom should read as the edge of the
     // campaign table, not as two black holes beside the battlefield.
-    context.fillStyle = '#111a14';
+    context.fillStyle = '#141109';
     context.fillRect(0, 0, this.camera.viewportWidth, this.camera.viewportHeight);
 
     // World space from here on: the camera transform includes the pixel ratio.
@@ -83,11 +92,18 @@ export class Renderer {
       -this.camera.y * this.camera.zoom * ratio,
     );
 
-    this.terrain.draw(context, this.camera);
-    this.terrain.drawLabels(context, this.camera, this.hoveredZone);
+    // The tick, not the frame clock, drives every animated thing on the ground.
+    // Pausing the battle has to still the water and the banners with it.
+    this.terrain.draw(context, this.camera, state.currentTick);
     this.fog.draw(context, this.camera, state);
-    this.units.draw(context, this.camera, state, this.selection);
-    this.effects.draw(context, this.camera, state);
+    // Place names are handed to the unit layer so they land between the troops
+    // and their labels: over a regiment's blocks, which would otherwise erase
+    // the name of the ground it is standing on, and under the regiment's own
+    // label, which the commander needs more than the name of the field.
+    this.units.draw(context, this.camera, state, this.selection, previous, interpolation, () => {
+      this.terrain.drawLabels(context, this.camera, this.hoveredZone);
+    });
+    this.effects.draw(context, this.camera, state, interpolation);
     // Above the armies: the objective must never be buried under a melee.
     this.objective.draw(context, this.camera, state);
     this.plan.draw(context, this.camera, state, plan);
@@ -102,43 +118,7 @@ export class Renderer {
     // Screen space for the marquee and the plan legend.
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     this.plan.drawLegend(context, this.camera, state, plan);
-    this.drawTerrainCard(context);
     this.drawDragBox(context);
-  }
-
-  private drawTerrainCard(context: CanvasRenderingContext2D): void {
-    const id = this.hoveredZone;
-    if (id === undefined || this.dragBox !== undefined) return;
-    const zone = ZONES[id];
-    const tips: Record<TerrainKind, string> = {
-      open: 'Fast movement · exposed to missiles and cavalry',
-      forest: 'Concealment · blunts cavalry and ranged fire',
-      hill: 'High ground · stronger defense and missile reach',
-      village: 'Hard cover · excellent ground to hold',
-      crossing: 'Choke point · columns move through fastest',
-      river: 'Impassable except at marked crossings',
-      ridge: 'Impassable rock except through a gap',
-    };
-    const width = Math.min(360, this.camera.viewportWidth - 32);
-    const x = this.camera.viewportWidth - width - 18;
-    const y = 18;
-    context.fillStyle = 'rgba(7, 15, 10, 0.92)';
-    context.strokeStyle = zone.crossing ? PALETTE.crossingLabel : PALETTE.zoneRing;
-    context.lineWidth = 1;
-    context.fillRect(x, y, width, 82);
-    context.strokeRect(x + 0.5, y + 0.5, width - 1, 81);
-
-    context.textAlign = 'left';
-    context.textBaseline = 'top';
-    context.font = '700 12px ui-monospace, "SF Mono", Menlo, monospace';
-    context.fillStyle = zone.crossing ? PALETTE.crossingLabel : PALETTE.zoneLabel;
-    context.fillText(`${zone.name.toUpperCase()}  ·  ${zone.terrain.toUpperCase()}`, x + 13, y + 11);
-    context.font = '500 11px ui-monospace, "SF Mono", Menlo, monospace';
-    context.fillStyle = '#b7c9b9';
-    context.fillText(tips[zone.terrain], x + 13, y + 31);
-    context.fillStyle = '#7f9784';
-    const description = zone.description.length > 52 ? `${zone.description.slice(0, 51)}…` : zone.description;
-    context.fillText(description, x + 13, y + 52);
   }
 
   private drawDragBox(context: CanvasRenderingContext2D): void {
@@ -151,10 +131,22 @@ export class Renderer {
     const height = Math.abs(box.currentY - box.startY);
     if (width < 3 && height < 3) return;
 
+    // A marching pixel marquee rather than a hairline rectangle, so the drag
+    // belongs to the same drawing as the rest of the field.
     context.fillStyle = PALETTE.selectionFill;
-    context.strokeStyle = PALETTE.selection;
-    context.lineWidth = 1.5;
     context.fillRect(x, y, width, height);
-    context.strokeRect(x, y, width, height);
+
+    context.fillStyle = PALETTE.selection;
+    const block = 3;
+    for (let offset = 0; offset < width; offset += block * 2) {
+      const run = Math.min(block, width - offset);
+      context.fillRect(x + offset, y, run, block);
+      context.fillRect(x + offset, y + height - block, run, block);
+    }
+    for (let offset = 0; offset < height; offset += block * 2) {
+      const run = Math.min(block, height - offset);
+      context.fillRect(x, y + offset, block, run);
+      context.fillRect(x + width - block, y + offset, block, run);
+    }
   }
 }

@@ -197,7 +197,11 @@ function advanceUnits(state: GameState, group: ArmyGroup): void {
     // staring at a target ninety paces away. The stance sets the leash: men
     // holding ground stay dressed in line, aggressive troops charge out.
     const target = group.routing ? -1 : units.targetIdx[index] ?? -1;
-    if (target >= 0 && units.alive[target] === 1) {
+    if (
+      target >= 0 &&
+      units.alive[target] === 1 &&
+      units.owner[target] !== units.owner[index]
+    ) {
       const reach = UNIT_STATS[units.categoryOf(index)].range;
       const enemyX = units.x[target] ?? 0;
       const enemyY = units.y[target] ?? 0;

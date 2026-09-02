@@ -41,6 +41,8 @@ let pressureY = new Float32Array(64);
 /** Friendly neighbours counted this tick, and how many men were asked. */
 let crowdSum = new Int32Array(64);
 let crowdSamples = new Int32Array(64);
+/** Damage is committed after every living unit has had its turn this tick. */
+let pendingDamage = new Float32Array(10_000);
 
 /** Minimum real body of troops that must press from one arc for it to count. */
 const MIN_ARC_CONTACT = 4;
@@ -63,6 +65,11 @@ function ensureContactBuffers(groupCount: number): void {
   pressureY = new Float32Array(capacity);
   crowdSum = new Int32Array(capacity);
   crowdSamples = new Int32Array(capacity);
+}
+
+function prepareDamageBuffer(capacity: number): void {
+  if (pendingDamage.length < capacity) pendingDamage = new Float32Array(capacity);
+  else pendingDamage.fill(0, 0, capacity);
 }
 
 const ARC_WIDTH = (Math.PI * 2) / CONTACT.arcCount;
@@ -240,7 +247,7 @@ function applyDamage(state: GameState, defender: number, damage: number): void {
 }
 
 /** Siege shells splash, and dense formations suffer badly for it. */
-function applySplash(
+function queueSplash(
   state: GameState,
   attacker: number,
   defender: number,
@@ -267,7 +274,8 @@ function applySplash(
     const dx = (units.x[victim] ?? 0) - centerX;
     const dy = (units.y[victim] ?? 0) - centerY;
     const falloff = 1 - Math.min(1, Math.hypot(dx, dy) / radius);
-    applyDamage(state, victim, baseDamage * 0.55 * falloff * vulnerability);
+    pendingDamage[victim] =
+      (pendingDamage[victim] ?? 0) + baseDamage * 0.55 * falloff * vulnerability;
   });
 
   void attacker;
@@ -283,6 +291,7 @@ export function advanceCombat(state: GameState): void {
   enemyHash.build(units, FACTION_ENEMY);
 
   ensureContactBuffers(state.groups.length);
+  prepareDamageBuffer(units.count);
 
   for (let index = 0; index < units.count; index += 1) {
     if (units.alive[index] !== 1) continue;
@@ -307,7 +316,13 @@ export function advanceCombat(state: GameState): void {
     }
 
     const stored = units.targetIdx[index] ?? -1;
-    const hasLiveTarget = stored >= 0 && units.alive[stored] === 1;
+    // A dead pool slot can be recycled by reinforcements. Its old pursuer must
+    // never accept the new occupant blindly, especially when it now belongs to
+    // the pursuer's own faction.
+    const hasLiveTarget =
+      stored >= 0 &&
+      units.alive[stored] === 1 &&
+      units.owner[stored] !== units.owner[index];
     let target = stored;
     const targetLost =
       !hasLiveTarget ||
@@ -392,9 +407,18 @@ export function advanceCombat(state: GameState): void {
     });
 
     if (stats.splashRadius > 0) {
-      applySplash(state, index, target, damage, stats.splashRadius);
+      queueSplash(state, index, target, damage, stats.splashRadius);
     }
-    applyDamage(state, target, damage);
+    pendingDamage[target] = (pendingDamage[target] ?? 0) + damage;
+  }
+
+  // Resolve the round simultaneously. Previously low-index units could kill
+  // their opponents before those opponents were visited, giving the faction
+  // spawned first an invisible initiative advantage. Everyone alive at the
+  // start of this combat pass now gets the blow they earned.
+  for (let index = 0; index < units.count; index += 1) {
+    const damage = pendingDamage[index] ?? 0;
+    if (damage > 0 && units.alive[index] === 1) applyDamage(state, index, damage);
   }
 
   summariseContact(state);

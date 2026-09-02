@@ -11,18 +11,22 @@ import { activeZoneIds } from '../game/simulation/Zones';
 import { Input } from '../rendering/canvas/Input';
 import { Minimap } from '../rendering/canvas/Minimap';
 import { Renderer } from '../rendering/canvas/Renderer';
+import { RenderSnapshot } from '../rendering/canvas/RenderSnapshot';
 import { AlertFeed, Toast } from '../ui/AlertFeed';
+import { FieldJournal } from '../ui/FieldJournal';
 import { ArmyList } from '../ui/ArmyList';
 import { CommandBar } from '../ui/CommandBar';
 import { FirstOrders } from '../ui/FirstOrders';
 import { ObjectiveBanner } from '../ui/ObjectiveBanner';
 import { TopBar } from '../ui/TopBar';
 import { showLobby } from '../ui/Lobby';
+import { mountIcons } from '../ui/icons';
 import {
   getWebMcpCapabilityMessage,
   registerWebMcpTools,
 } from '../integrations/webmcp/registry';
 import { createWebMcpToolHandlers } from '../integrations/webmcp/tools';
+import { isApplicationRuntimeError } from './runtimeErrors';
 
 /**
  * Application wiring.
@@ -89,7 +93,11 @@ async function bootstrap(): Promise<void> {
 
   const alertFeed = new AlertFeed((x, y) => renderer.camera.centerOn(x, y));
   const toast = new Toast();
+  // Pixel glyphs replace every placeholder in the shell before it is shown,
+  // so no Unicode stand-in is ever on screen even for a frame.
+  mountIcons();
   const objectiveBanner = new ObjectiveBanner();
+  const fieldJournal = new FieldJournal();
   const firstOrders = new FirstOrders(selection.scenarioId);
 
   let speed = 1;
@@ -144,6 +152,8 @@ async function bootstrap(): Promise<void> {
   let accumulator = 0;
   let previous = performance.now();
   const stepMs = 1000 / TICKS_PER_SECOND;
+  const renderSnapshot = new RenderSnapshot(engine.getState().units.capacity);
+  renderSnapshot.capture(engine.getState());
 
   const frame = (now: number): void => {
     const elapsed = Math.min(now - previous, 250);
@@ -154,6 +164,7 @@ async function bootstrap(): Promise<void> {
       // Bound the catch-up so a background tab cannot stall the page on return.
       let steps = 0;
       while (accumulator >= stepMs && steps < 12) {
+        renderSnapshot.capture(engine.getState());
         engine.step();
         accumulator -= stepMs;
         steps += 1;
@@ -168,12 +179,30 @@ async function bootstrap(): Promise<void> {
     input.update();
 
     const state = engine.getState();
-    renderer.render(state, queries.getPlanForOverlay('player'));
-    minimap.draw(state, renderer.camera);
+    const interpolation = speed === 0 ? 1 : Math.max(0, Math.min(1, accumulator / stepMs));
+    renderer.render(state, queries.getPlanForOverlay('player'), renderSnapshot, interpolation);
+    minimap.draw(state, renderer.camera, renderer.terrainArtwork);
 
-    topBar.update(queries.getBattleOverview('player'));
-    objectiveBanner.update(queries.getObjective('player'));
-    armyList.render(queries.getArmies('player'), renderer.selection);
+    const armies = queries.getArmies('player');
+    const objective = queries.getObjective('player');
+    topBar.update(queries.getBattleOverview('player'), armies);
+    objectiveBanner.update(objective);
+    armyList.render(armies, renderer.selection);
+    fieldJournal.update({
+      armies,
+      selection: renderer.selection,
+      hoveredZone: renderer.hoveredZone,
+      objective,
+      // A regiment can be destroyed between selection and the next frame, and
+      // the panel must not take the battle down with it.
+      detailsFor: (groupId) => {
+        try {
+          return queries.getArmyDetails('player', groupId);
+        } catch {
+          return undefined;
+        }
+      },
+    });
     alertFeed.push(queries.getAlerts('player', 6));
     commandBar.update();
 
@@ -223,7 +252,15 @@ async function bootstrap(): Promise<void> {
 }
 
 document.getElementById('fatal-reload')?.addEventListener('click', () => window.location.reload());
-window.addEventListener('error', (event) => showFatalError(event.error ?? event.message));
-window.addEventListener('unhandledrejection', (event) => showFatalError(event.reason));
+window.addEventListener('error', (event) => {
+  if (isApplicationRuntimeError(event.error ?? event.message, event.filename, window.location.origin)) {
+    showFatalError(event.error ?? event.message);
+  }
+});
+window.addEventListener('unhandledrejection', (event) => {
+  if (isApplicationRuntimeError(event.reason, undefined, window.location.origin)) {
+    showFatalError(event.reason);
+  }
+});
 
 void bootstrap().catch(showFatalError);

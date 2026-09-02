@@ -1,6 +1,7 @@
 import { CATEGORY_TOKEN, UNIT_STATS } from '../game/config/battle';
 import type { ArmySummary } from '../game/queries/GameQueries';
 import { moraleColor } from '../rendering/canvas/palette';
+import { iconMarkup } from './icons';
 
 /**
  * The roster.
@@ -60,9 +61,14 @@ export class ArmyList {
     const head = document.createElement('div');
     head.className = 'row-head';
 
+    // The troop type as a silhouette first and three letters second. A player
+    // who has not yet learned the abbreviations can still read the roster.
     const role = document.createElement('span');
     role.className = 'role';
-    role.textContent = CATEGORY_TOKEN[army.primaryRole];
+    role.innerHTML = iconMarkup(army.primaryRole);
+    const token = document.createElement('i');
+    token.textContent = CATEGORY_TOKEN[army.primaryRole];
+    role.append(token);
 
     const name = document.createElement('span');
     name.className = 'name';

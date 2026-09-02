@@ -1,0 +1,610 @@
+import { PALETTE } from './palette';
+
+/**
+ * The pixel-art vocabulary.
+ *
+ * Every drawn thing in the game — the ground, the woods, the keeps, the troop
+ * icons in the roster, the glyphs on the command buttons — comes out of this
+ * one file, so the map and the interface cannot drift apart stylistically.
+ *
+ * Art is authored as rows of characters on a fixed grid. A character indexes
+ * `INK`; a dot is transparent. That keeps sprites diffable, keeps them out of
+ * the asset pipeline entirely, and lets the same source emit either canvas
+ * pixels for the battlefield or SVG rectangles for the DOM.
+ */
+
+/**
+ * The one font the drawn map uses.
+ *
+ * A true bitmap face would suit the art better, but the production headers
+ * allow no third-party font source, and a hand-rolled one would cost more
+ * legibility than it bought. A crisp monospace, set in caps on a plate, holds
+ * up over a dithered field at every zoom the camera reaches.
+ */
+export const LABEL_FONT = 'ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace';
+
+export interface Sprite {
+  readonly rows: readonly string[];
+  /** Where the sprite's origin sits, in sprite pixels. Defaults to bottom centre. */
+  readonly anchorX?: number;
+  readonly anchorY?: number;
+}
+
+/** The full ink set. Two characters never share a colour, so art reads clearly. */
+export const INK: Record<string, string> = {
+  '#': PALETTE.shadow,
+  k: PALETTE.stoneDark,
+  s: PALETTE.stone,
+  S: PALETTE.stoneLight,
+  w: PALETTE.timberDark,
+  W: PALETTE.timber,
+  V: PALETTE.timberLight,
+  e: PALETTE.earthDark,
+  E: PALETTE.earth,
+  n: PALETTE.sandDark,
+  N: PALETTE.sand,
+  g: PALETTE.forest,
+  G: PALETTE.forestCanopy,
+  l: PALETTE.grass,
+  L: PALETTE.grassAlt,
+  r: PALETTE.villageRoof,
+  R: PALETTE.bannerRed,
+  o: PALETTE.bannerGold,
+  b: PALETTE.bannerBlue,
+  y: PALETTE.kingGold,
+  f: PALETTE.flame,
+  F: PALETTE.flameCore,
+  i: PALETTE.river,
+  I: PALETTE.riverEdge,
+  a: PALETTE.foam,
+  m: PALETTE.smoke,
+  /* Interface inks. Used by the roster and command glyphs, never by the map. */
+  A: PALETTE.selection,
+  B: PALETTE.selectionDark,
+  C: PALETTE.player,
+  D: PALETTE.enemy,
+  P: '#e6e0cb',
+  Q: '#9aa294',
+};
+
+export function spriteWidth(sprite: Sprite): number {
+  return sprite.rows.reduce((widest, row) => Math.max(widest, row.length), 0);
+}
+
+export function spriteHeight(sprite: Sprite): number {
+  return sprite.rows.length;
+}
+
+/**
+ * Paints a sprite onto a canvas at one canvas pixel per art pixel.
+ *
+ * Runs of one colour are merged into a single fill, which matters because the
+ * battlefield bake paints a few thousand sprites in one pass at load.
+ */
+export function paintSprite(
+  context: CanvasRenderingContext2D,
+  sprite: Sprite,
+  originX: number,
+  originY: number,
+  scale = 1,
+  inks: Record<string, string> = INK,
+): void {
+  const width = spriteWidth(sprite);
+  const height = spriteHeight(sprite);
+  const anchorX = sprite.anchorX ?? width / 2;
+  const anchorY = sprite.anchorY ?? height;
+  const left = Math.round(originX - anchorX * scale);
+  const top = Math.round(originY - anchorY * scale);
+
+  for (let row = 0; row < height; row += 1) {
+    const line = sprite.rows[row] ?? '';
+    let column = 0;
+    while (column < line.length) {
+      const character = line[column] ?? '.';
+      if (character === '.') {
+        column += 1;
+        continue;
+      }
+      let run = 1;
+      while (line[column + run] === character) run += 1;
+      const fill = inks[character];
+      if (fill !== undefined) {
+        context.fillStyle = fill;
+        context.fillRect(left + column * scale, top + row * scale, run * scale, scale);
+      }
+      column += run;
+    }
+  }
+}
+
+/** Bakes a sprite once into its own canvas, for anything drawn every frame. */
+export function bakeSprite(sprite: Sprite, scale = 1): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, spriteWidth(sprite) * scale);
+  canvas.height = Math.max(1, spriteHeight(sprite) * scale);
+  const context = canvas.getContext('2d');
+  if (context !== null) {
+    context.imageSmoothingEnabled = false;
+    paintSprite(
+      context,
+      { ...sprite, anchorX: 0, anchorY: 0 },
+      0,
+      0,
+      scale,
+    );
+  }
+  return canvas;
+}
+
+/**
+ * A stable hash for cosmetic scatter.
+ *
+ * Deliberately not the simulation PRNG: art must never consume that stream, or
+ * two players on the same seed would fight different battles because one of
+ * them had a wider window.
+ */
+export function artHash(a: number, b: number): number {
+  let value = (Math.imul(a | 0, 0x27d4_eb2d) ^ Math.imul(b | 0, 0x1656_67b1)) >>> 0;
+  value ^= value >>> 15;
+  value = Math.imul(value, 0x2c1b_3c6d) >>> 0;
+  value ^= value >>> 12;
+  return value / 0x1_0000_0000;
+}
+
+/* ------------------------------------------------------------------ terrain */
+
+export const TREE_PINE: Sprite = {
+  rows: [
+    '...G...',
+    '..GGG..',
+    '..GgG..',
+    '.GGGGG.',
+    '.GGgGG.',
+    'GGGGGGG',
+    '.GggGG.',
+    '...W...',
+    '...w...',
+    '..###..',
+  ],
+};
+
+export const TREE_OAK: Sprite = {
+  rows: [
+    '..GGG..',
+    '.GGGGG.',
+    'GGGGgGG',
+    'GGgGGGG',
+    'GGGGGgG',
+    '.GgGGG.',
+    '..GWG..',
+    '...w...',
+    '..###..',
+  ],
+};
+
+export const TREE_DEAD: Sprite = {
+  rows: [
+    '..w.w..',
+    '..www..',
+    '.w.W.w.',
+    '...W...',
+    '..wWw..',
+    '...W...',
+    '...W...',
+    '...w...',
+    '..###..',
+  ],
+};
+
+export const BUSH: Sprite = {
+  rows: ['.GG.', 'GGGG', '.gg.'],
+};
+
+/** A thatched cottage. The commonest thing on any of these maps. */
+export const COTTAGE: Sprite = {
+  rows: [
+    '...rrr...',
+    '..rrrrr..',
+    '.rrrrrrr.',
+    'rrrrrrrrr',
+    '#WWWWWWW#',
+    '.WeWWWeW.',
+    '.WWWeWWW.',
+    '.##ee##..',
+  ],
+};
+
+/** A larger hall, so a village is not nine copies of one building. */
+export const HALL: Sprite = {
+  rows: [
+    '..rrrrrrr..',
+    '.rrrrrrrrr.',
+    'rrrrrrrrrrr',
+    '#WWWWWWWWW#',
+    '.WeWWWWWeW.',
+    '.WWWWeWWWW.',
+    '.WeWWeWWeW.',
+    '.###eeee##.',
+  ],
+};
+
+/** A stone keep. Marks the ground a king actually stands on. */
+export const KEEP: Sprite = {
+  rows: [
+    '.s.s.s.s.s.',
+    '.sssssssss.',
+    '.skssssssk.',
+    '.sssssssss.',
+    'sssssssssss',
+    'sskssssskss',
+    'sssssssssss',
+    'sskssssskss',
+    'ssssEEEssss',
+    'ssssEEEssss',
+    'kkkkEEEkkkk',
+    '###########',
+  ],
+};
+
+/** A watchtower, for high ground. */
+export const WATCHTOWER: Sprite = {
+  rows: [
+    '.s.s.s.',
+    '.sssss.',
+    '.skkks.',
+    'sssssss',
+    '.sssss.',
+    '.sksks.',
+    '.sssss.',
+    '.ssess.',
+    '.ssess.',
+    '.kkkkk.',
+    '.#####.',
+  ],
+};
+
+/** A mine head: cut timber frame, spoil heap, dark adit. */
+export const MINE: Sprite = {
+  rows: [
+    '..WWWWW..',
+    '.WwwwwwW.',
+    '.W##..#W.',
+    '.W#####W.',
+    'nW#####Wn',
+    'nn#####nn',
+    'nnnnnnnnn',
+    '.nn###nn.',
+  ],
+};
+
+/** A signpost with a hanging shield. Marks a road junction. */
+export const WAYPOST: Sprite = {
+  rows: ['.ooo.', 'oRoRo', '.ooo.', '..W..', '..W..', '..w..', '.###.'],
+};
+
+/** Broken rock along an impassable spine. */
+export const CRAG: Sprite = {
+  rows: ['..SS...', '.SsssS.', 'Sssksss', 'ssksskk', '#kk##k#'],
+};
+
+/* ---------------------------------------------------------------- unit roles */
+
+/**
+ * Troop icons.
+ *
+ * Eight by eight, one silhouette each, and readable at that size — which is the
+ * whole point, since the roster shows them at 16 CSS pixels and the map draws
+ * them over a moving battle.
+ */
+export const ROLE_SPRITES: Record<string, Sprite> = {
+  infantry: {
+    rows: [
+      '....PP..',
+      '...PPP..',
+      '..PPP...',
+      '.PPP.Q..',
+      'PPP..Q..',
+      '.B..QQQ.',
+      '.B......',
+      '........',
+    ],
+  },
+  spearman: {
+    rows: [
+      '.....P..',
+      '....PP..',
+      '...PPP..',
+      '..P.P...',
+      '.QQQ....',
+      'QQQQQ...',
+      '.QQQ....',
+      '..W.....',
+    ],
+  },
+  heavy_infantry: {
+    rows: [
+      '.QQQQQQ.',
+      'QPPPPPPQ',
+      'QPBBBBPQ',
+      'QPBPPBPQ',
+      'QPBBBBPQ',
+      '.QPPPPQ.',
+      '..QPPQ..',
+      '...QQ...',
+    ],
+  },
+  archer: {
+    rows: [
+      '..Q.....',
+      '.Q.Q....',
+      'Q...Q...',
+      'Q...PPPP',
+      'Q...Q...',
+      '.Q.Q....',
+      '..Q.....',
+      '........',
+    ],
+  },
+  scout: {
+    rows: [
+      '........',
+      '..QQQQ..',
+      '.QPPPPQ.',
+      'QPPAAPPQ',
+      '.QPPPPQ.',
+      '..QQQQ..',
+      '........',
+      '........',
+    ],
+  },
+  cavalry: {
+    rows: [
+      '..QQ....',
+      '.QQQQ...',
+      'QQQQQQ..',
+      '.QQQQQQ.',
+      '..QQQQQQ',
+      '..QQ.QQ.',
+      '..Q...Q.',
+      '..Q...Q.',
+    ],
+  },
+  siege: {
+    rows: [
+      '.....W..',
+      '....WW..',
+      '...WW...',
+      'WWWW....',
+      '.W..W...',
+      '.W...W..',
+      'kWWWWWk.',
+      '.k...k..',
+    ],
+  },
+};
+
+/* ------------------------------------------------------------ command glyphs */
+
+/** Crossed swords: two full blades, two guards, two grips. */
+export const ICON_ATTACK: Sprite = {
+  rows: [
+    '.P....P.',
+    '.PP..PP.',
+    '..PPPP..',
+    '...PP...',
+    '..QPPQ..',
+    '.Q.PP.Q.',
+    'B..PP..B',
+    'BB.QQ.BB',
+  ],
+};
+
+/** A planted standard: stand and do not move. */
+export const ICON_HOLD: Sprite = {
+  rows: [
+    '..oooo..',
+    '..oRRo..',
+    '..oooo..',
+    '..W.....',
+    '..W.....',
+    '..W.....',
+    '.QQQQQ..',
+    'QQQQQQQ.',
+  ],
+};
+
+/** A kite shield. */
+export const ICON_DEFEND: Sprite = {
+  rows: [
+    'QQQQQQQQ',
+    'QPPPPPPQ',
+    'QPAAAAPQ',
+    'QPAPPAPQ',
+    'QPAAAAPQ',
+    '.QPPPPQ.',
+    '..QPPQ..',
+    '...QQ...',
+  ],
+};
+
+/** A column turning about. */
+export const ICON_RETREAT: Sprite = {
+  rows: [
+    '........',
+    '..P.....',
+    '.PP.....',
+    'PPPPPPP.',
+    '.PP...P.',
+    '..P...P.',
+    '......P.',
+    '....QQQ.',
+  ],
+};
+
+/** Ranks and files. */
+export const ICON_FORMATION: Sprite = {
+  rows: [
+    'PP.PP.PP',
+    'PP.PP.PP',
+    '........',
+    'PP.PP.PP',
+    'PP.PP.PP',
+    '........',
+    'QQ.QQ.QQ',
+    'QQ.QQ.QQ',
+  ],
+};
+
+/** An eye over the line these men hold: how far they will leave it. */
+export const ICON_STANCE: Sprite = {
+  rows: [
+    '..QQQQ..',
+    '.Q....Q.',
+    'Q..PP..Q',
+    'Q.PAAP.Q',
+    'Q..PP..Q',
+    '.Q....Q.',
+    '..QQQQ..',
+    'QQQQQQQQ',
+  ],
+};
+
+/** One body becoming two. */
+export const ICON_SPLIT: Sprite = {
+  rows: [
+    'PPP.....',
+    'PPP.PP..',
+    '..P.PP..',
+    '..PP....',
+    '..PP....',
+    '..P.PP..',
+    'PPP.PP..',
+    'PPP.....',
+  ],
+};
+
+/** Two bodies becoming one. */
+export const ICON_MERGE: Sprite = {
+  rows: [
+    'PP.....P',
+    'PP...PPP',
+    '..PPP..P',
+    '....PPPP',
+    '....PPPP',
+    '..PPP..P',
+    'PP...PPP',
+    'PP.....P',
+  ],
+};
+
+/* ------------------------------------------------------------- status glyphs */
+
+export const ICON_CROWN: Sprite = {
+  rows: [
+    'y.....y',
+    'y.y.y.y',
+    'y.y.y.y',
+    'yyyyyyy',
+    'yoRoRoy',
+    'yyyyyyy',
+    '.#####.',
+  ],
+};
+
+export const ICON_STRENGTH: Sprite = {
+  rows: [
+    '..CC..',
+    '.CCCC.',
+    'CC..CC',
+    'CC..CC',
+    '.CCCC.',
+    '..CC..',
+  ],
+};
+
+export const ICON_ENEMY: Sprite = {
+  rows: [
+    'D....D',
+    '.D..D.',
+    '..DD..',
+    '..DD..',
+    '.D..D.',
+    'D....D',
+  ],
+};
+
+export const ICON_REINFORCE: Sprite = {
+  rows: [
+    '..PP..',
+    '.PPPP.',
+    'PPPPPP',
+    '..PP..',
+    '..PP..',
+    '..PP..',
+  ],
+};
+
+export const ICON_CLOCK: Sprite = {
+  rows: [
+    '.QQQQ.',
+    'QPPPPQ',
+    'QPAPPQ',
+    'QPAAPQ',
+    'QPPPPQ',
+    '.QQQQ.',
+  ],
+};
+
+export const ICON_MORALE: Sprite = {
+  rows: [
+    '.A..A.',
+    'AAAAAA',
+    'AAAAAA',
+    '.AAAA.',
+    '..AA..',
+    '...A..',
+  ],
+};
+
+export const ICON_BANNER: Sprite = {
+  rows: [
+    'oooooo',
+    'oRRRRo',
+    'oRooRo',
+    'oooooo',
+    '..W...',
+    '..W...',
+  ],
+};
+
+export const ICON_TERRAIN: Sprite = {
+  rows: [
+    '...G..',
+    '..GGG.',
+    '.GGGGG',
+    '..lLl.',
+    '.lLlLl',
+    'llllll',
+  ],
+};
+
+/** Every glyph the interface can ask for, by name. */
+export const UI_SPRITES: Record<string, Sprite> = {
+  attack: ICON_ATTACK,
+  hold: ICON_HOLD,
+  defend: ICON_DEFEND,
+  retreat: ICON_RETREAT,
+  formation: ICON_FORMATION,
+  stance: ICON_STANCE,
+  split: ICON_SPLIT,
+  merge: ICON_MERGE,
+  crown: ICON_CROWN,
+  strength: ICON_STRENGTH,
+  enemy: ICON_ENEMY,
+  reinforce: ICON_REINFORCE,
+  clock: ICON_CLOCK,
+  morale: ICON_MORALE,
+  banner: ICON_BANNER,
+  terrain: ICON_TERRAIN,
+  ...ROLE_SPRITES,
+};

@@ -1,4 +1,5 @@
-import type { BattleOverview } from '../game/queries/GameQueries';
+import type { ArmySummary, BattleOverview } from '../game/queries/GameQueries';
+import { moraleColor } from '../rendering/canvas/palette';
 
 /** The status strip: force totals, the clock, speed, and WebMCP availability. */
 export class TopBar {
@@ -6,6 +7,7 @@ export class TopBar {
   private readonly enemy = document.getElementById('stat-enemy');
   private readonly reinforcements = document.getElementById('stat-reinforcements');
   private readonly clock = document.getElementById('stat-clock');
+  private readonly morale = document.getElementById('stat-morale');
   private readonly status = document.getElementById('webmcp-status');
   private readonly statusLabel = document.getElementById('webmcp-label');
 
@@ -41,7 +43,22 @@ export class TopBar {
       status === 'connected' ? 'WEBMCP READY' : status === 'failed' ? 'WEBMCP ERROR' : 'WEBMCP OFF';
   }
 
-  public update(overview: BattleOverview): void {
+  public update(overview: BattleOverview, armies: readonly ArmySummary[] = []): void {
+    // Morale weighted by how many men actually hold it: a broken ten-man
+    // remnant should not drag the reading down as far as a broken regiment.
+    if (this.morale !== null) {
+      let men = 0;
+      let total = 0;
+      for (const army of armies) {
+        men += army.strength;
+        total += army.morale * army.strength;
+      }
+      const average = men === 0 ? 0 : Math.round(total / men);
+      this.morale.textContent = men === 0 ? '—' : `${average}%`;
+      this.morale.style.color = men === 0 ? '' : moraleColor(average);
+      this.morale.title = `Weighted average morale across ${armies.length} regiments.`;
+    }
+
     if (this.strength !== null) this.strength.textContent = overview.playerUnits.toLocaleString();
     if (this.enemy !== null) {
       this.enemy.textContent = overview.enemyVisibleStrength.toLocaleString();

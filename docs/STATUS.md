@@ -1,11 +1,93 @@
 # Current Milestone
 
-Massed-attack pass complete: numbers alone no longer decide a battle. Men packed
-into one gap are crushed and fight badly, troops in prolonged contact wear out,
-an assault still fighting from a crossing strikes at little more than half
-weight, and the enemy commander refuses to be farmed — he declines hopeless
-assaults and marches on the player's sovereign the moment the player's army
-commits itself to one place.
+Combat correctness and presentation pass complete, and the command screen has
+been redrawn as medieval pixel art end to end — see the Medieval Pixel-Art Pass
+below for what changed and what deliberately did not. Every unit alive at the
+start of a combat tick now resolves its blow before casualties are committed,
+removing the hidden initiative advantage previously held by low pool indices.
+Recycled target slots are faction-validated so reinforcements can never turn a
+stale target into friendly fire. The renderer keeps a compact previous-tick
+snapshot and interpolates units, regiment markers and combat effects at display
+refresh rate, while the authoritative simulation remains deterministic at 20 Hz.
+
+# Runtime Error Isolation
+
+- Global browser error channels are now filtered by source ownership. Errors
+  from `chrome-extension://`, `moz-extension://` and Safari extension scripts —
+  including rejected MetaMask connections — remain visible in DevTools but no
+  longer open Siege's fatal screen or stop its animation loop.
+- Same-origin script errors and promise rejections whose stack identifies the
+  Siege bundle still fail loudly. Direct bootstrap failures keep their explicit
+  fatal handler, so filtering extensions does not hide a real startup fault.
+- Four node regressions cover same-origin errors, extension errors, unattributed
+  rejections and application-owned asynchronous failures.
+
+# Smooth Combat Pass
+
+- **Fair rounds.** Damage and siege splash accumulate in a reusable typed-array
+  buffer and commit together after target resolution. Two troops landing lethal
+  blows on the same tick can now kill one another; spawn order no longer grants
+  one side a free unanswered attack.
+- **Safe targets.** Combat and chase movement both require a stored target to be
+  alive and hostile. This closes the free-list edge case where a dead enemy's
+  index was recycled for a friendly reinforcement while another unit still held
+  that index as its target.
+- **Display-rate motion.** A render-only snapshot captures the state immediately
+  before each fixed simulation step. Unit positions, regiment blobs and labels
+  interpolate between snapshots, and arrows, sparks and siege impacts use a
+  fractional visual age. Simulation state, checksums and command timing are not
+  affected.
+- **Verification.** Combat regression tests cover simultaneous lethal blows and
+  recycled friendly targets. The combat suite, typecheck and production build
+  pass; the 7,950-unit performance probe remains well inside budget at roughly
+  7.5 ms per 50 ms simulation tick on this machine.
+
+# Medieval Pixel-Art Pass
+
+The whole command screen was redrawn as a single medieval pixel-art game. Every
+mark on it — the ground, the woods, the keeps, the troop icons in the roster and
+the glyphs on the command buttons — now comes out of one sprite vocabulary in
+`rendering/canvas/pixelart.ts`, so the field and the interface cannot drift
+apart. No simulation, command, query or WebMCP behaviour changed.
+
+- **The ground is baked, not stroked.** `TerrainLayer` builds one 1334 × 834
+  material bitmap per map — grass, tilled field, woodland floor, hillsides with
+  contours, rock, river, bridge decking and worn tracks — resolves it to pixels
+  through a two-tone dither, paints trees, cottages, halls, watchtowers, mine
+  heads, waymarks and crags into it, and then draws it with a single
+  nearest-neighbour `drawImage`. That replaces several hundred culled shape
+  fills a frame, so the new look is also the cheaper one.
+- **The map moves on the tick clock.** Water crests, torch flicker, chimney
+  smoke and waving standards are drawn in world space from `currentTick`, never
+  from wall-clock time, so the field freezes exactly when the battle is paused.
+  Cosmetic scatter uses an index hash and never touches the simulation PRNG.
+- **The minimap draws the same bitmap.** It is literally the same picture as the
+  battlefield, reduced, with block markers, a pixel crown for each objective and
+  a corner bracket for the camera. Several hundred lines of duplicated terrain
+  drawing came out of `Minimap` with it.
+- **Selection is gold and dithered.** A selected regiment gets a four-cornered
+  gold bracket that breathes on the tick clock, a dithered gold field showing
+  ten seconds of marching, and — for anything that shoots — a dithered crimson
+  field at its true weapon range. Order paths are marching blocks and end in a
+  gold pixel target.
+- **A war journal, on parchment.** The right column is new: the minimap, then
+  the selected regiment's strength, morale, vigour, orders, formation, stance,
+  losses and known threats, then the ground under the cursor and what it is
+  worth, then the objective. The terrain card that used to be drawn onto the
+  battlefield, over the ground it described, is gone.
+- **Real icons, no Unicode stand-ins.** Every glyph is emitted as crisp SVG
+  rectangles from the same sprite sheet the map uses. The production headers
+  allow no third-party font or image source, so the whole set ships inside the
+  bundle. The one thing not converted is type: a hand-rolled bitmap face would
+  have cost more legibility than it bought, so labels are a crisp monospace set
+  in caps on a hard plate.
+- **Place names survive the armies.** Zone labels are drawn between the troops
+  and their labels: over a regiment's blocks, which used to erase the name of
+  the ground it stood on, and under the regiment's own label.
+- **It folds instead of refusing.** The old gate turned the game away below
+  1100 px. The journal now lifts out of the grid and floats over the field at
+  1180, the roster follows at 940, and only below 760 × 480 is the window
+  genuinely too small to draw a battlefield in.
 
 # Massed Attack Pass
 
