@@ -117,6 +117,33 @@ export const PLAYER_GROUPS: readonly GroupSpec[] = [
     composition: [['siege', 40]],
   },
   {
+    id: 'arquebusiers',
+    name: 'Arquebusiers',
+    ownerId: 'player',
+    anchor: { x: 4560, y: 3420 },
+    formation: 'double_line',
+    stance: 'defensive',
+    composition: [['handgunner', 260]],
+  },
+  {
+    id: 'culverins',
+    name: 'Culverin Battery',
+    ownerId: 'player',
+    anchor: { x: 3450, y: 3600 },
+    formation: 'loose',
+    stance: 'hold_ground',
+    composition: [['cannon', 26]],
+  },
+  {
+    id: 'field_hospital',
+    name: 'Field Hospital',
+    ownerId: 'player',
+    anchor: { x: 3600, y: 4650 },
+    formation: 'loose',
+    stance: 'hold_ground',
+    composition: [['surgeon', 70]],
+  },
+  {
     id: 'scouts',
     name: 'Scouts',
     ownerId: 'player',
@@ -210,6 +237,33 @@ export const ENEMY_GROUPS: readonly GroupSpec[] = [
     composition: [['siege', 45]],
   },
   {
+    id: 'ash_shot',
+    name: 'Ashen Shot',
+    ownerId: 'enemy',
+    anchor: { x: 3700, y: 1420 },
+    formation: 'double_line',
+    stance: 'defensive',
+    composition: [['handgunner', 280]],
+  },
+  {
+    id: 'black_guns',
+    name: 'Black Guns',
+    ownerId: 'enemy',
+    anchor: { x: 4450, y: 1050 },
+    formation: 'loose',
+    stance: 'hold_ground',
+    composition: [['cannon', 28]],
+  },
+  {
+    id: 'ashen_surgeons',
+    name: 'Ashen Surgeons',
+    ownerId: 'enemy',
+    anchor: { x: 4400, y: 640 },
+    formation: 'loose',
+    stance: 'hold_ground',
+    composition: [['surgeon', 70]],
+  },
+  {
     id: 'outriders',
     name: 'Outriders',
     ownerId: 'enemy',
@@ -295,6 +349,9 @@ const RIVERWATCH_SCRIPT: readonly ScriptedAiOrder[] = [
   { atSeconds: 22, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
   { atSeconds: 28, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
   { atSeconds: 34, groupId: 'black_arrows', order: 'move', targetZone: 'central_bridge', formation: 'column' },
+  { atSeconds: 46, groupId: 'black_guns', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose', stance: 'hold_ground' },
+  { atSeconds: 58, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
+  { atSeconds: 78, groupId: 'ashen_surgeons', order: 'move', targetZone: 'enemy_outer_defense', formation: 'loose' },
   { atSeconds: 85, groupId: 'iron_host', order: 'attack_zone', targetZone: 'central_field', formation: 'line' },
   { atSeconds: 92, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_field', formation: 'line' },
   { atSeconds: 100, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'central_field', formation: 'double_line' },
@@ -310,6 +367,12 @@ const RIVERWATCH_SCRIPT: readonly ScriptedAiOrder[] = [
 ];
 
 const BRIDGEHEAD_PLAYER = redeploy(PLAYER_GROUPS, {
+  // The shot crosses with the vanguard; the guns and the surgeons do not. A
+  // hospital on the wrong bank means every wounded regiment has to come back
+  // over the bridge the whole operation depends on keeping open.
+  arquebusiers: { anchor: { x: 4350, y: 1950 }, stance: 'aggressive' },
+  culverins: { anchor: { x: 4750, y: 2250 } },
+  field_hospital: { anchor: { x: 4000, y: 3450 } },
   legion_i: { anchor: { x: 3450, y: 2050 }, stance: 'aggressive' },
   legion_ii: { anchor: { x: 4650, y: 2080 }, stance: 'aggressive' },
   spearwall: { anchor: { x: 4020, y: 2280 }, formation: 'line' },
@@ -322,6 +385,9 @@ const BRIDGEHEAD_PLAYER = redeploy(PLAYER_GROUPS, {
 });
 
 const BRIDGEHEAD_ENEMY = redeploy(ENEMY_GROUPS, {
+  ash_shot: { anchor: { x: 4450, y: 1100 } },
+  black_guns: { anchor: { x: 3800, y: 800 } },
+  ashen_surgeons: { anchor: { x: 4300, y: 620 } },
   iron_host: { anchor: { x: 3400, y: 1220 }, stance: 'aggressive' },
   ash_legion: { anchor: { x: 4800, y: 1240 }, stance: 'aggressive' },
   northern_spears: { anchor: { x: 4100, y: 1480 } },
@@ -335,6 +401,8 @@ const BRIDGEHEAD_SCRIPT: readonly ScriptedAiOrder[] = [
   { atSeconds: 24, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_bridge', formation: 'line', stance: 'aggressive' },
   { atSeconds: 32, groupId: 'northern_spears', order: 'defend_zone', targetZone: 'enemy_outer_defense', formation: 'double_line' },
   { atSeconds: 42, groupId: 'black_arrows', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose' },
+  { atSeconds: 52, groupId: 'black_guns', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose', stance: 'hold_ground' },
+  { atSeconds: 58, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'enemy_outer_defense', formation: 'double_line' },
   { atSeconds: 65, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'west_crossing', formation: 'wedge' },
   { atSeconds: 72, groupId: 'night_riders', order: 'attack_zone', targetZone: 'east_crossing', formation: 'wedge' },
   { atSeconds: 115, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'enemy_outer_defense', formation: 'line' },
@@ -344,6 +412,9 @@ const BRIDGEHEAD_SCRIPT: readonly ScriptedAiOrder[] = [
 ];
 
 const LAST_LIGHT_PLAYER = redeploy(PLAYER_GROUPS, {
+  arquebusiers: { anchor: { x: 4550, y: 3950 } },
+  culverins: { anchor: { x: 3500, y: 4350 } },
+  field_hospital: { anchor: { x: 4000, y: 4700 } },
   legion_i: { anchor: { x: 3050, y: 3850 }, formation: 'double_line' },
   legion_ii: { anchor: { x: 5000, y: 3850 }, formation: 'double_line' },
   spearwall: { anchor: { x: 4000, y: 3550 }, formation: 'square' },
@@ -356,6 +427,9 @@ const LAST_LIGHT_PLAYER = redeploy(PLAYER_GROUPS, {
 });
 
 const LAST_LIGHT_ENEMY = redeploy(ENEMY_GROUPS, {
+  ash_shot: { anchor: { x: 4600, y: 2750 } },
+  black_guns: { anchor: { x: 4500, y: 2300 } },
+  ashen_surgeons: { anchor: { x: 3600, y: 1850 } },
   iron_host: { anchor: { x: 3450, y: 2850 }, stance: 'aggressive' },
   ash_legion: { anchor: { x: 4700, y: 2900 }, stance: 'aggressive' },
   northern_spears: { anchor: { x: 4050, y: 3050 }, stance: 'aggressive' },
@@ -378,6 +452,11 @@ const LAST_LIGHT_ENEMY = redeploy(ENEMY_GROUPS, {
  * doubled, because the only way to soften a held gap is to shoot into it.
  */
 const CINDER_ROAD_PLAYER = redeploy(PLAYER_GROUPS, {
+  // One arm to each gap. Whichever the commander is only pretending to mean,
+  // he has already committed a battery to it that cannot be recalled in time.
+  arquebusiers: { anchor: { x: 5700, y: 3700 }, stance: 'aggressive' },
+  culverins: { anchor: { x: 2600, y: 4100 } },
+  field_hospital: { anchor: { x: 4000, y: 4400 } },
   legion_i: { anchor: { x: 2400, y: 3450 }, formation: 'column', stance: 'aggressive' },
   legion_ii: { anchor: { x: 5750, y: 3550 }, formation: 'column', stance: 'aggressive' },
   spearwall: { anchor: { x: 2300, y: 3850 }, formation: 'line' },
@@ -395,6 +474,9 @@ const CINDER_ROAD_PLAYER = redeploy(PLAYER_GROUPS, {
 });
 
 const CINDER_ROAD_ENEMY = redeploy(ENEMY_GROUPS, {
+  ash_shot: { anchor: { x: 5900, y: 2050 } },
+  black_guns: { anchor: { x: 2400, y: 1600 } },
+  ashen_surgeons: { anchor: { x: 4000, y: 1000 } },
   iron_host: {
     anchor: { x: 2400, y: 2050 },
     formation: 'double_line',
@@ -430,6 +512,8 @@ const CINDER_ROAD_SCRIPT: readonly ScriptedAiOrder[] = [
   { atSeconds: 40, groupId: 'night_riders', order: 'attack_zone', targetZone: 'slag_flats', formation: 'wedge', stance: 'aggressive' },
   { atSeconds: 55, groupId: 'storm_riders', order: 'defend_zone', targetZone: 'obsidian_wood', formation: 'wedge' },
   { atSeconds: 120, groupId: 'night_riders', order: 'defend_zone', targetZone: 'emberhold', formation: 'wedge' },
+  { atSeconds: 70, groupId: 'black_guns', order: 'attack_zone', targetZone: 'cinder_gap', formation: 'loose', stance: 'hold_ground' },
+  { atSeconds: 88, groupId: 'ash_shot', order: 'defend_zone', targetZone: 'emberhold', formation: 'double_line', stance: 'hold_ground' },
   { atSeconds: 100, groupId: 'siege_train', order: 'attack_zone', targetZone: 'ashfall_gate', formation: 'loose', stance: 'hold_ground' },
   { atSeconds: 130, groupId: 'ashen_reserve', order: 'move', targetZone: 'upper_terrace' },
   // Once the assault is committed in the defile, the horse goes into it.
@@ -455,6 +539,9 @@ const CINDER_ROAD_SCRIPT: readonly ScriptedAiOrder[] = [
  * were the hardest thing to get through the gate.
  */
 const ASHEN_GATE_PLAYER = redeploy(PLAYER_GROUPS, {
+  arquebusiers: { anchor: { x: 6000, y: 2000 }, stance: 'aggressive' },
+  culverins: { anchor: { x: 5900, y: 2400 } },
+  field_hospital: { anchor: { x: 6350, y: 2300 } },
   legion_i: { anchor: { x: 5900, y: 2100 }, stance: 'aggressive' },
   legion_ii: { anchor: { x: 6250, y: 1900 }, stance: 'aggressive' },
   spearwall: { anchor: { x: 5750, y: 2300 }, formation: 'line' },
@@ -468,6 +555,9 @@ const ASHEN_GATE_PLAYER = redeploy(PLAYER_GROUPS, {
 });
 
 const ASHEN_GATE_ENEMY = redeploy(ENEMY_GROUPS, {
+  ash_shot: { anchor: { x: 4500, y: 1000 } },
+  black_guns: { anchor: { x: 3700, y: 750 } },
+  ashen_surgeons: { anchor: { x: 4400, y: 450 } },
   iron_host: { anchor: { x: 4000, y: 1250 }, stance: 'aggressive' },
   ash_legion: { anchor: { x: 4800, y: 1150 }, stance: 'aggressive' },
   northern_spears: { anchor: { x: 4300, y: 900 }, stance: 'aggressive' },
@@ -487,6 +577,8 @@ const ASHEN_GATE_SCRIPT: readonly ScriptedAiOrder[] = [
   { atSeconds: 33, groupId: 'black_arrows', order: 'attack_zone', targetZone: 'upper_terrace', formation: 'loose' },
   { atSeconds: 48, groupId: 'night_riders', order: 'attack_zone', targetZone: 'ashfall_gate', formation: 'wedge', stance: 'aggressive' },
   { atSeconds: 75, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'cinder_gap', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 40, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'emberhold', formation: 'double_line', stance: 'aggressive' },
+  { atSeconds: 96, groupId: 'black_guns', order: 'attack_zone', targetZone: 'upper_terrace', formation: 'loose', stance: 'hold_ground' },
   { atSeconds: 115, groupId: 'siege_train', order: 'attack_zone', targetZone: 'emberhold', formation: 'loose', stance: 'hold_ground' },
   { atSeconds: 150, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'upper_terrace', formation: 'column' },
   { atSeconds: 205, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'south_orchard', formation: 'wedge' },
@@ -505,6 +597,11 @@ const ASHEN_GATE_SCRIPT: readonly ScriptedAiOrder[] = [
  * punishes a line that lets one develop.
  */
 const GOLDMERE_PLAYER = redeploy(PLAYER_GROUPS, {
+  // Open country is the one place a battery can see everything it wants to
+  // shoot at, and the one place nothing stops horse getting behind it.
+  arquebusiers: { anchor: { x: 4600, y: 3650 } },
+  culverins: { anchor: { x: 3700, y: 4000 } },
+  field_hospital: { anchor: { x: 4000, y: 4400 } },
   legion_i: { anchor: { x: 3300, y: 3450 }, composition: [['infantry', 560], ['heavy_infantry', 200]] },
   legion_ii: { anchor: { x: 4900, y: 3450 } },
   spearwall: { anchor: { x: 4100, y: 3250 } },
@@ -518,6 +615,9 @@ const GOLDMERE_PLAYER = redeploy(PLAYER_GROUPS, {
 });
 
 const GOLDMERE_ENEMY = redeploy(ENEMY_GROUPS, {
+  ash_shot: { anchor: { x: 4600, y: 1750 } },
+  black_guns: { anchor: { x: 4000, y: 1300 } },
+  ashen_surgeons: { anchor: { x: 4000, y: 900 } },
   iron_host: { anchor: { x: 3500, y: 2000 }, composition: [['infantry', 640], ['heavy_infantry', 240]] },
   ash_legion: { anchor: { x: 5000, y: 1950 }, composition: [['infantry', 680]] },
   northern_spears: { anchor: { x: 4250, y: 2250 }, composition: [['spearman', 400]] },
@@ -539,6 +639,8 @@ const GOLDMERE_SCRIPT: readonly ScriptedAiOrder[] = [
   { atSeconds: 64, groupId: 'night_riders', order: 'attack_zone', targetZone: 'east_pasture', formation: 'wedge', stance: 'aggressive' },
   { atSeconds: 112, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'millbrook', formation: 'wedge' },
   { atSeconds: 128, groupId: 'night_riders', order: 'attack_zone', targetZone: 'hollow_wood', formation: 'wedge' },
+  { atSeconds: 48, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'double_line' },
+  { atSeconds: 140, groupId: 'black_guns', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'loose', stance: 'hold_ground' },
   { atSeconds: 168, groupId: 'siege_train', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'loose', stance: 'hold_ground' },
   { atSeconds: 195, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'south_downs', formation: 'column' },
   { atSeconds: 245, groupId: 'iron_host', order: 'attack_zone', targetZone: 'south_downs', formation: 'line' },
@@ -557,6 +659,9 @@ const GOLDMERE_SCRIPT: readonly ScriptedAiOrder[] = [
  * divided attack this plainly.
  */
 const LONG_CAUSEWAY_PLAYER = redeploy(PLAYER_GROUPS, {
+  arquebusiers: { anchor: { x: 5500, y: 3300 }, stance: 'aggressive' },
+  culverins: { anchor: { x: 3400, y: 4150 } },
+  field_hospital: { anchor: { x: 2900, y: 4400 } },
   legion_i: { anchor: { x: 3150, y: 3350 }, formation: 'column', stance: 'aggressive' },
   legion_ii: { anchor: { x: 5600, y: 3050 }, stance: 'aggressive' },
   spearwall: { anchor: { x: 3300, y: 3700 }, formation: 'line' },
@@ -570,6 +675,9 @@ const LONG_CAUSEWAY_PLAYER = redeploy(PLAYER_GROUPS, {
 });
 
 const LONG_CAUSEWAY_ENEMY = redeploy(ENEMY_GROUPS, {
+  ash_shot: { anchor: { x: 3300, y: 1750 } },
+  black_guns: { anchor: { x: 3800, y: 1400 } },
+  ashen_surgeons: { anchor: { x: 5600, y: 950 } },
   iron_host: { anchor: { x: 3100, y: 2200 }, formation: 'double_line', stance: 'hold_ground' },
   ash_legion: { anchor: { x: 6250, y: 1700 }, formation: 'double_line', stance: 'hold_ground' },
   northern_spears: { anchor: { x: 2700, y: 1900 } },
@@ -589,6 +697,8 @@ const LONG_CAUSEWAY_SCRIPT: readonly ScriptedAiOrder[] = [
   { atSeconds: 42, groupId: 'ash_legion', order: 'defend_zone', targetZone: 'salt_ford', formation: 'double_line', stance: 'hold_ground' },
   { atSeconds: 72, groupId: 'night_riders', order: 'attack_zone', targetZone: 'salt_ford', formation: 'wedge', stance: 'aggressive' },
   { atSeconds: 104, groupId: 'storm_riders', order: 'defend_zone', targetZone: 'north_strand', formation: 'wedge' },
+  { atSeconds: 36, groupId: 'ash_shot', order: 'defend_zone', targetZone: 'long_causeway', formation: 'double_line', stance: 'hold_ground' },
+  { atSeconds: 118, groupId: 'black_guns', order: 'attack_zone', targetZone: 'long_causeway', formation: 'loose', stance: 'hold_ground' },
   { atSeconds: 145, groupId: 'siege_train', order: 'attack_zone', targetZone: 'long_causeway', formation: 'loose', stance: 'hold_ground' },
   { atSeconds: 180, groupId: 'outriders', order: 'move', targetZone: 'beacon_tower', formation: 'loose' },
   { atSeconds: 225, groupId: 'ashen_reserve', order: 'move', targetZone: 'beacon_tower' },
@@ -604,7 +714,10 @@ const LAST_LIGHT_SCRIPT: readonly ScriptedAiOrder[] = [
   { atSeconds: 28, groupId: 'black_arrows', order: 'attack_zone', targetZone: 'central_field', formation: 'loose' },
   { atSeconds: 38, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'village', formation: 'wedge' },
   { atSeconds: 44, groupId: 'night_riders', order: 'attack_zone', targetZone: 'east_field', formation: 'wedge' },
+  { atSeconds: 34, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'central_field', formation: 'double_line', stance: 'aggressive' },
+  { atSeconds: 62, groupId: 'black_guns', order: 'attack_zone', targetZone: 'central_field', formation: 'loose', stance: 'hold_ground' },
   { atSeconds: 70, groupId: 'siege_train', order: 'attack_zone', targetZone: 'central_field', formation: 'loose' },
+  { atSeconds: 110, groupId: 'ashen_surgeons', order: 'move', targetZone: 'central_hill', formation: 'loose' },
   { atSeconds: 95, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'central_field', formation: 'column' },
   { atSeconds: 145, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'player_base', formation: 'wedge' },
   { atSeconds: 175, groupId: 'iron_host', order: 'attack_zone', targetZone: 'player_base', formation: 'column' },
@@ -624,7 +737,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
     location: 'Three Crossings',
     briefingLine: 'Hold the three crossings before the Ashen Host envelops the valley.',
     battleOrders: ['Break the northern line', 'Take the Ashen King'],
-    battleFacts: ['~4,000 enemy', '3 crossings', '6–15 min'],
+    battleFacts: ['~4,400 enemy', '3 crossings', '6–15 min'],
     playerArmyName: 'Crownlands',
     enemyArmyName: 'Ashen Host',
     playerGroups: PLAYER_GROUPS,
@@ -645,7 +758,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
     location: 'Northern Bank',
     briefingLine: 'Hold the northern foothold before the counterattack cuts your road home.',
     battleOrders: ['Hold the bridgehead', 'Keep the central span open'],
-    battleFacts: ['~4,000 enemy', '1 retreat route', '5–12 min'],
+    battleFacts: ['~4,400 enemy', '1 retreat route', '5–12 min'],
     playerArmyName: 'Crown Vanguard',
     enemyArmyName: 'Ashen Host',
     playerGroups: BRIDGEHEAD_PLAYER,
@@ -666,7 +779,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
     location: 'Crown Encampment',
     briefingLine: 'The crossings are lost. Keep the Ashen Host from reaching King Aldric.',
     battleOrders: ['Hold the Crown encampment', 'Break the Ashen pursuit'],
-    battleFacts: ['~4,000 enemy', 'King exposed', '5–10 min'],
+    battleFacts: ['~4,400 enemy', 'King exposed', '5–10 min'],
     playerArmyName: 'Crown Remnant',
     enemyArmyName: 'Ashen Pursuit',
     playerGroups: LAST_LIGHT_PLAYER,
@@ -688,7 +801,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
     location: 'Ashfall Pass',
     briefingLine: 'The spine cannot be crossed. Force Cinder Gap or the Ashfall Gate.',
     battleOrders: ['Force one of the two gaps', 'Take the Ashen King'],
-    battleFacts: ['~4,000 enemy', '2 gaps, held', '8–16 min'],
+    battleFacts: ['~4,600 enemy', '2 gaps, held', '8–16 min'],
     playerArmyName: 'Crown Vanguard',
     enemyArmyName: 'Ashen Wardens',
     playerGroups: CINDER_ROAD_PLAYER,
@@ -710,7 +823,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
     location: 'Emberhold',
     briefingLine: 'You are across the spine. Keep the gate behind you open.',
     battleOrders: ['Hold Emberhold', 'Keep the Ashfall Gate open'],
-    battleFacts: ['~4,000 enemy', '1 road home', '6–12 min'],
+    battleFacts: ['~4,400 enemy', '1 road home', '6–12 min'],
     playerArmyName: 'Crown Vanguard',
     enemyArmyName: 'Ashen Host',
     playerGroups: ASHEN_GATE_PLAYER,
@@ -732,7 +845,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
     location: 'Goldmere',
     briefingLine: 'Open country. Nothing here protects a flank but the men on it.',
     battleOrders: ['Hold Goldmere Town', 'Turn a flank and take their king'],
-    battleFacts: ['~4,200 enemy', '660 enemy horse', '7–14 min'],
+    battleFacts: ['~4,400 enemy', '660 enemy horse', '7–14 min'],
     playerArmyName: 'Crownlands',
     enemyArmyName: 'Ashen Host',
     playerGroups: GOLDMERE_PLAYER,
@@ -754,7 +867,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
     location: 'The Sunken Coast',
     briefingLine: 'One causeway, one ford, and a long march between them. Choose.',
     battleOrders: ['Take the Long Causeway or the Salt Ford', 'Take the Ashen King'],
-    battleFacts: ['~4,000 enemy', '2 crossings, far apart', '9–18 min'],
+    battleFacts: ['~4,400 enemy', '2 crossings, far apart', '9–18 min'],
     playerArmyName: 'Crown Landing',
     enemyArmyName: 'Ashen Coastguard',
     playerGroups: LONG_CAUSEWAY_PLAYER,
@@ -858,6 +971,8 @@ export function createGroupFromSpec(state: GameState, spec: GroupSpec): ArmyGrou
     morale: 100,
     moraleState: 'confident',
     path: [],
+    stallTicks: 0,
+    lastReplanTick: -1,
     initialStrength: total,
     homeZone: zoneAt(deployment.x, deployment.y) as ZoneId,
     lastCasualtyTick: -1,
@@ -867,6 +982,7 @@ export function createGroupFromSpec(state: GameState, spec: GroupSpec): ArmyGrou
     encirclement: 0,
     crowding: 0,
     fatigue: 0,
+    succour: 0,
   };
 
   const faction = factionOf(spec.ownerId);

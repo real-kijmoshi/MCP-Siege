@@ -61,6 +61,8 @@ export function deployWave(state: GameState, playerId: PlayerId, name: string): 
     morale: 100,
     moraleState: 'confident',
     path: [],
+    stallTicks: 0,
+    lastReplanTick: -1,
     initialStrength: total,
     homeZone: zoneAt(anchor.x, anchor.y),
     lastCasualtyTick: -1,
@@ -70,6 +72,7 @@ export function deployWave(state: GameState, playerId: PlayerId, name: string): 
     encirclement: 0,
     crowding: 0,
     fatigue: 0,
+    succour: 0,
   };
 
   const xs = new Float32Array(total);

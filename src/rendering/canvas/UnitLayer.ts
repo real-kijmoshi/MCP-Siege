@@ -72,9 +72,12 @@ const SHAPE: Record<UnitCategory, 'square' | 'circle' | 'triangle' | 'diamond'> 
   spearman: 'square',
   heavy_infantry: 'square',
   archer: 'circle',
+  handgunner: 'circle',
   scout: 'circle',
+  surgeon: 'circle',
   cavalry: 'triangle',
   siege: 'diamond',
+  cannon: 'diamond',
 };
 
 const SIZE: Record<UnitCategory, number> = {
@@ -82,20 +85,35 @@ const SIZE: Record<UnitCategory, number> = {
   spearman: 9,
   heavy_infantry: 11,
   archer: 8,
+  handgunner: 9,
   scout: 7,
+  surgeon: 7,
   cavalry: 13,
   siege: 17,
+  // The largest thing on the field, and it should be: a battery is a landmark
+  // rather than a formation, and the player has to be able to find his own.
+  cannon: 20,
 };
 
-/** Three shades per side keep categories distinguishable without a rainbow. */
+/**
+ * Three shades per side keep categories distinguishable without a rainbow.
+ *
+ * Shape carries the arm and shade carries its weight: the dark tone is what a
+ * commander must go round rather than through, the light tone is what dies if
+ * he lets it be caught. Adding a fourth colour for every new troop type would
+ * cost more legibility at command zoom than it bought.
+ */
 function colorFor(faction: number, category: UnitCategory): string {
   const player = faction === FACTION_PLAYER;
   switch (category) {
     case 'heavy_infantry':
     case 'siege':
+    case 'cannon':
       return player ? PALETTE.playerDark : PALETTE.enemyDark;
     case 'archer':
+    case 'handgunner':
     case 'scout':
+    case 'surgeon':
     case 'cavalry':
       return player ? PALETTE.playerLight : PALETTE.enemyLight;
     default:
@@ -777,3 +795,4 @@ export class UnitLayer {
     context.restore();
   }
 }
+

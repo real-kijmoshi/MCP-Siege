@@ -1,5 +1,5 @@
 import { approachPoint, computePath } from '../../simulation/Navigation';
-import { formationRadius } from '../../simulation/Formations';
+import { marchClearance } from '../../simulation/Formations';
 import { findGroup, type GameState } from '../../simulation/GameState';
 import { ZONES, homeZoneOf, isActiveZone, isPassable } from '../../simulation/Zones';
 import type {
@@ -178,7 +178,7 @@ export function prepareOrderToGroup(
   }
 
   const formation = options.formation ?? group.formation;
-  const clearance = Math.min(75, formationRadius(formation, group.members.length) * 0.16);
+  const clearance = marchClearance(formation, group.members.length);
   const pathStart = options.append ? group.path[group.path.length - 1] ?? group.anchor : group.anchor;
   const path = computePath(pathStart, resolved.position, clearance);
   return { group, order, options, position: resolved.position, path };

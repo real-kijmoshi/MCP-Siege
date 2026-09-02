@@ -135,6 +135,12 @@ function computeDamage(
     // Shaken troops fight poorly even before they break.
     damage *= 0.6 + 0.4 * (attackerGroup.morale / 100);
     if (stats.range < 100) damage *= FORMATION_PROFILES[attackerGroup.formation].meleeModifier;
+    else if (attackerCategory === 'archer' || attackerCategory === 'handgunner') {
+      // Bows and calivers both need clear files and room to loose together.
+      // This makes the formation choice matter on both sides of a missile
+      // exchange instead of affecting only how easy the regiment is to hit.
+      damage *= FORMATION_PROFILES[attackerGroup.formation].rangedModifier;
+    }
     // Men jammed shoulder to shoulder cannot use their weapons, and men who
     // have been fighting for a quarter of an hour swing short. Together these
     // stop one enormous mass of troops from being the answer to everything: it
@@ -315,6 +321,26 @@ export function advanceCombat(state: GameState): void {
       crowdSamples[ownSlot] = (crowdSamples[ownSlot] ?? 0) + 1;
     }
 
+    // Surgeons carry nothing to fight with. They are still counted in the crowd
+    // above, because a hospital jammed into a defile crushes the men around it
+    // exactly as any other body of troops would, but from here on they take no
+    // part: they acquire nobody, hold nobody, and shove nobody.
+    if (stats.attack <= 0) continue;
+
+    // A gun has to be unlimbered before it will fire, and putting it back on
+    // its team throws that away. Every tick the piece is still rolling, the
+    // wait starts again -- so artillery walked forward with the advance shoots
+    // at nothing at all, and where a battery is placed is a decision made
+    // several minutes before it pays.
+    if (
+      stats.deployTicks > 0 &&
+      Math.hypot(units.velocityX[index] ?? 0, units.velocityY[index] ?? 0) >
+        stats.speed * 0.2
+    ) {
+      units.cooldown[index] = stats.deployTicks;
+      continue;
+    }
+
     const stored = units.targetIdx[index] ?? -1;
     // A dead pool slot can be recycled by reinforcements. Its old pursuer must
     // never accept the new occupant blindly, especially when it now belongs to
@@ -356,26 +382,27 @@ export function advanceCombat(state: GameState): void {
     // in place by standing there.
     if (attackerGroup?.routing === true) continue;
 
-    // Contact is recorded for everyone within reach of an enemy, not only for
-    // the men whose blow happens to land this tick. A regiment attacks once
-    // every second or so, and sampling only those few strikes made the picture
-    // of who was pressing where flicker far too much to steer on.
+    // Physical contact is recorded for every melee fighter within reach, not
+    // only for the men whose blow happens to land this tick. A regiment attacks
+    // once every second or so, and sampling only those few strikes made the
+    // picture of who was pressing where flicker far too much to steer on.
     // Men who have broken hold nobody in place, so chasing them does not pin
     // the pursuit. Without this exception cavalry sent after a rout were slowed
     // to a crawl by the very men they were riding down, and the rout escaped.
+    const isMelee = stats.range < 100;
     const attackerSlot = units.group[index] ?? -1;
-    if (attackerSlot >= 0 && defenderGroup?.routing !== true) {
+    if (isMelee && attackerSlot >= 0 && defenderGroup?.routing !== true) {
       contactCounts[attackerSlot] = (contactCounts[attackerSlot] ?? 0) + 1;
     }
 
     const defenderSlot = units.group[target] ?? -1;
-    if (defenderSlot >= 0 && defenderGroup !== undefined) {
+    if (isMelee && defenderSlot >= 0 && defenderGroup !== undefined) {
       const arc = arcIndex(x - defenderGroup.anchor.x, y - defenderGroup.anchor.y);
       const bucket = defenderSlot * CONTACT.arcCount + arc;
       arcCounts[bucket] = (arcCounts[bucket] ?? 0) + 1;
     }
 
-    if (defenderSlot >= 0 && stats.range < 100) {
+    if (defenderSlot >= 0 && isMelee) {
       const distance = Math.hypot(dx, dy);
       if (distance > 0.001) {
         const speedShare = Math.min(
@@ -534,3 +561,4 @@ export function rebuildHashes(pool: UnitPool): void {
   hashes[FACTION_PLAYER]?.build(pool, FACTION_PLAYER);
   hashes[FACTION_ENEMY]?.build(pool, FACTION_ENEMY);
 }
+

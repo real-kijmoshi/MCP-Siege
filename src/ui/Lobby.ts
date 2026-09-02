@@ -45,7 +45,7 @@ export function showLobby(): Promise<MatchSelection> {
   };
 
   const updateDifficultySelection = (): void => {
-    for (const other of difficultyList.querySelectorAll<HTMLButtonElement>('.commander-choice')) {
+    for (const other of difficultyList.querySelectorAll<HTMLButtonElement>('.difficulty-option')) {
       const selected = other.dataset.difficulty === difficultyId;
       other.classList.toggle('selected', selected);
       other.setAttribute('aria-pressed', String(selected));
@@ -107,9 +107,16 @@ export function showLobby(): Promise<MatchSelection> {
     const difficulty = DIFFICULTIES[id];
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'commander-choice';
+    button.className = 'difficulty-option';
     button.dataset.difficulty = id;
-    button.textContent = difficulty.name;
+    // The commander's title, and under it which of the three this actually is.
+    // The titles alone told a first-time player nothing about which to pick.
+    const title = document.createElement('strong');
+    title.textContent = difficulty.name;
+    const tier = document.createElement('small');
+    tier.textContent = difficulty.tier;
+    button.append(title, tier);
+    button.setAttribute('aria-label', `${difficulty.name} — ${difficulty.tier}`);
     button.addEventListener('click', () => {
       difficultyId = id;
       updateDifficultySelection();

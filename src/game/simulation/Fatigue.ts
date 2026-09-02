@@ -1,4 +1,4 @@
-import { CONTACT, FATIGUE } from '../config/battle';
+import { CONTACT, FATIGUE, FIELD_SUPPORT } from '../config/battle';
 import { activeGroups, type GameState } from './GameState';
 
 /**
@@ -26,7 +26,12 @@ export function advanceFatigue(state: GameState): void {
     if (marching) delta += FATIGUE.marchPerTick;
 
     // Only troops that are both out of contact and standing still recover.
-    if (pressed < 0.05 && !marching) delta -= FATIGUE.restPerTick;
+    // Men with surgeons among them recover faster: hot food, dressed wounds and
+    // somewhere to lie down are the difference between a regiment that can be
+    // sent back in and one that can only be sent home.
+    if (pressed < 0.05 && !marching) {
+      delta -= FATIGUE.restPerTick + FIELD_SUPPORT.restPerTick * group.succour;
+    }
 
     group.fatigue = Math.max(0, Math.min(1, group.fatigue + delta));
   }

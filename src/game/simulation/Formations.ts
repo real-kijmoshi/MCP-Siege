@@ -158,3 +158,19 @@ export function formationRadius(formation: Formation, count: number): number {
   const halfDepth = (rows * profile.spacing) / 2;
   return Math.max(halfWidth, halfDepth, profile.spacing);
 }
+
+/**
+ * The width of ground a marching regiment reserves for itself.
+ *
+ * Route searches use it to reject a defile the ranks could not actually use.
+ * It is deliberately a fraction of the formation's own radius and capped: a
+ * body of men crossing a bridge compresses, so demanding its full parade width
+ * along every leg would reject the crossings the map is built around.
+ *
+ * Defined once here because the order handlers, the movement system and any
+ * re-route must all reserve the same width, or a group would be re-planned onto
+ * a route its original order would have refused.
+ */
+export function marchClearance(formation: Formation, count: number): number {
+  return Math.min(75, formationRadius(formation, count) * 0.16);
+}

@@ -118,7 +118,12 @@ export function handleChangeFormation(
   );
 }
 
-/** Siege is slow and fragile, so committing it is its own decision. */
+/**
+ * Siege and artillery are slow and fragile, so committing them is its own
+ * decision. Both arms answer to this: what they have in common is that they are
+ * ordered at ground rather than at troops, and that getting them there is most
+ * of the work of using them.
+ */
 export function handleFocusSiege(
   command: GameCommand & FocusSiegePayload,
   state: GameState,
@@ -140,20 +145,25 @@ export function handleFocusSiege(
     return failure(command, tick, 'GROUP_NOT_FOUND', 'Siege group is unavailable.', []);
   }
 
-  const hasSiege = group.members.some((index) => state.units.categoryOf(index) === 'siege');
-  if (!hasSiege) {
+  const hasEngines = group.members.some((index) => {
+    const category = state.units.categoryOf(index);
+    return category === 'siege' || category === 'cannon';
+  });
+  if (!hasEngines) {
     return failure(
       command,
       tick,
       'NOT_A_SIEGE_GROUP',
-      `${group.name} contains no siege engines.`,
+      `${group.name} contains no siege engines or guns.`,
       ['Call get_army_details to inspect composition.'],
     );
   }
 
   const outcome = applyOrderToGroup(state, group, 'attack_zone', {
     targetZone: command.targetZone,
-    // Dispersed and stationary: siege wants range, not contact.
+    // Dispersed and stationary: engines want range, not contact. It matters
+    // more for guns than for anything else on the field, because a piece that
+    // is still moving has not been unlimbered and cannot fire at all.
     formation: 'loose',
     stance: 'hold_ground',
   });

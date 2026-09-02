@@ -56,6 +56,16 @@ export function optionalString(
   return input[key] === undefined ? undefined : requireString(input, key, maxLength);
 }
 
+export function optionalBoolean(
+  input: Record<string, unknown>,
+  key: string,
+): boolean | undefined {
+  const value = input[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') throw new InputError(`"${key}" must be a boolean.`);
+  return value;
+}
+
 export function requireEnum<T extends string>(
   input: Record<string, unknown>,
   key: string,

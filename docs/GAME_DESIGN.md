@@ -9,10 +9,10 @@ demonstration.
 
 ## The fantasy
 
-You command regiments, not soldiers. Around 7,950 men in twenty formations hold
-a river line. Reading the battle is meant to be possible at a glance: colour is
-faction, shape is troop type, and zoomed out each regiment collapses to a blob
-with a name and a morale bar.
+You command regiments, not soldiers. Around 8,700 men in twenty-six formations
+hold a river line. Reading the battle is meant to be possible at a glance:
+colour is faction, shape is troop type, and zoomed out each regiment collapses
+to a blob with a name and a morale bar.
 
 ## How the battle is won
 
@@ -44,8 +44,28 @@ Three things follow from it:
 
 ## What makes decisions interesting
 
-- **Counters.** Spearmen break cavalry; cavalry ride down archers and siege;
-  heavy infantry grind ordinary infantry; siege devastates anything packed tight.
+- **Counters.** Spearmen break cavalry; cavalry ride down archers, shot, siege
+  and guns; heavy infantry grind ordinary infantry; siege devastates anything
+  packed tight. Handgunners are the one missile arm that goes through armour,
+  which is the only thing a bow has never been able to do — bought at half a
+  bow's reach and more than twice its reload, so archers standing off shoot
+  them to pieces without ever being shot at.
+- **The guns.** A battery outranges everything else on the field by half again,
+  and the only reliable answers to one are another battery or horse brought
+  round into its rear. It is not a longer-ranged siege engine: a gun has to be
+  *unlimbered* to fire, so a piece that has moved this second shoots at nothing.
+  Walking a battery forward with the advance is the standard mistake, and where
+  it is placed is a decision made minutes before it pays. It is also the slowest
+  thing on the map, and worse off a road than anything else.
+- **The surgeons.** Every other system takes something away and never gives it
+  back, so a regiment pulled out of the line used to be a regiment out of the
+  battle for good. A field hospital is the one thing that runs the other way: a
+  regiment withdrawn near it recovers its lightly wounded, its wind and its
+  nerve far faster than it would alone. It does nothing at all for men in
+  contact, so care is strictly what a commander buys by pulling a regiment
+  *out*, and it never returns a man who has actually fallen. The hospital
+  carries no weapon, holds no ground, and is the softest target on the field —
+  which is what makes a raid into an army's rear worth mounting.
 - **Formations.** Line for frontage, column for crossings, wedge to charge,
   square against cavalry, loose to survive bombardment. Each trades something.
 - **The press.** A regiment fights along its frontage, so men beyond what that
@@ -92,6 +112,14 @@ and the four maps all share one size, one fog grid and one camera. Non-goals:
 multiplayer, accounts, persistence, campaigns, base building, technology trees,
 heroes, diplomacy, procedural maps, mobile controls, per-soldier animation, and
 any embedded LLM infrastructure.
+
+Ten troop types, fixed at authoring time. The arms exist to make the counter
+matrix worth reading, and each one earns its place by being the answer to
+something no other arm answers: shot to armour, guns to anything that has to
+stand still, surgeons to attrition itself. A troop type that merely does what an
+existing one does slightly better does not belong here, and none of them is
+bought, upgraded or unlocked — the order of battle is written into the scenario
+exactly as the ground is.
 
 Reinforcements are a manpower counter and timed waves — enough to give the top
 bar something true to show and to supply the "reinforcements arrive" beat. They
