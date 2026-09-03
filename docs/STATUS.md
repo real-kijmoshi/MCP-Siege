@@ -7,7 +7,58 @@ for each battlefield — and an external Marshal can now design an operation of
 its own, on ground of its own choosing, and fight it. No simulation rule
 changed: combat, morale, fog, the objective and the command queue are untouched.
 A teaching battle now stands in front of the four, written the same way and
-fought by the same engine.
+fought by the same engine. The ground under all of it has since been redrawn in
+detail, and again no simulation rule changed.
+
+# The Ground, In Detail
+
+The battlefield bake was carrying the shape of the ground but very little of
+its texture. It now carries both, and nothing outside `rendering/canvas/`
+changed to get there: the same one bitmap, baked once per map at load in under
+a tenth of a second, and the same single `drawImage` a frame.
+
+## What the ground gained
+
+- **Moss and loose stone.** A three-octave hash decides where a patch of moss
+  sits, what shape it takes and where its edge frays. Two octaves alone spread
+  it over the whole field as static. Pebbles are scattered a pixel at a time
+  over grass, track and hillside.
+- **Woods that grow in stands.** Trees are placed in stands of one dominant
+  species with a fifth of them off-species, sized from each stand's own area
+  rather than from a flat count, so a wood is a canopy rather than a sprinkle.
+  Every wood carries two cart tracks in from the side facing the nearest open
+  ground, each ending in a felled clearing with stumps and stacked timber. A
+  pair of deer stand deep inside, and birds over the canopy.
+- **A woodland floor darker than its trees.** The forest ground was dithered
+  between the same two greens the canopy is drawn in, which made every tree
+  inside a wood invisible. The floor is now shadow and deep green.
+- **High ground with age on it.** Five contour rings rather than three, each
+  drawn twice so the line survives the dither and each offset from its own
+  centre so the rings read as a slope instead of a target. Rock breaks through
+  at the crown and in outcrops down the sides, scree spills over the turf, and
+  ancient walls and a standing arch sit in it. A ridge gets the same treatment
+  in bands, lighter uphill.
+- **Water with a bottom.** Deep water is the darkest thing on the map, the
+  shallows within five pixels of either bank the palest, and every bridge
+  throws a broken reflection downstream. The crests on the surface brighten,
+  drift and die away behind themselves on the tick clock.
+- **A village rather than a cluster.** Houses stand along five lanes off a
+  cobbled square, thatched and tiled, with sheds between them, a well and three
+  stalls on the square, and fenced kitchen gardens behind the houses.
+- **Camps, and the works in front of them.** Each home zone is a camp: a
+  continuous palisade across the face toward the middle of the map, the
+  pavilion behind it flying its own colour, four dressed tent lines, fires
+  between them, engines forward and the baggage behind, all on trodden earth
+  with lanes worn between the rows. Every zone bordering a camp gets crossed
+  stakes and a strip of spoil instead, which is what an outer defence is.
+
+## One colour bug, found on the way
+
+Every map authors its own ground colour, but only one of the two shades the
+ground is dithered between was being read from it: the second came from the
+palette default. Ash country was therefore dithered against spring grass and
+carried a green static over the whole map. Both shades, and now the water and
+the moss too, are derived from the map's own colour.
 
 # The Teaching Battle
 
