@@ -3,6 +3,7 @@ import {
   CROWDING,
   FATIGUE,
   FIELD_SUPPORT,
+  FIRE,
   FORMATION_PROFILES,
   OBJECTIVE,
   TICKS_PER_SECOND,
@@ -122,6 +123,18 @@ export interface ArmySummary {
    * nothing else the commander can see would tell him.
    */
   limbered: boolean;
+  /**
+   * True while this regiment's own army is standing in the lane it is shooting
+   * down.
+   *
+   * Missile troops behind a melee are shooting into their own backs: guns and
+   * handgunners hold their fire entirely rather than do it, and bows and engines
+   * loft over at a heavy cost in accuracy. Nothing else a commander can see
+   * would tell him — a masked battery looks exactly like one that is winning the
+   * battle — so it is reported rather than inferred. The answers are the obvious
+   * ones: move the guns to a flank, put them on a ridge, or clear the lane.
+   */
+  masked: boolean;
   /**
    * True while a field hospital within reach is tending this regiment.
    *
@@ -437,6 +450,7 @@ export class GameQueries {
       fatigue: Math.round(group.fatigue * 100),
       spent: group.fatigue >= FATIGUE.reportThreshold,
       limbered: isLimbered(state, group),
+      masked: group.blockedFire >= FIRE.reportThreshold,
       tended: group.succour >= FIELD_SUPPORT.reportThreshold,
     };
     if (group.order.targetZone !== undefined) summary.targetZone = group.order.targetZone;
@@ -726,6 +740,10 @@ export class GameQueries {
         attention.push(`${group.name} is packed too tightly to fight; give it room.`);
       } else if (group.fatigue >= FATIGUE.reportThreshold) {
         attention.push(`${group.name} is spent and should be relieved.`);
+      } else if (group.blockedFire >= FIRE.reportThreshold) {
+        attention.push(
+          `${group.name} has no clear shot; your own line is in its way. Move it to a flank or onto high ground.`,
+        );
       }
     }
     if (visibleContacts.length === 0) {

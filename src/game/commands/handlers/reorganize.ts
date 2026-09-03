@@ -87,6 +87,8 @@ function registerDetachment(
     crowding: 0,
     fatigue: source.fatigue,
     succour: 0,
+    shock: 0,
+    blockedFire: 0,
   };
   for (const index of members) state.units.group[index] = slot;
   registerGroup(state, detachment);

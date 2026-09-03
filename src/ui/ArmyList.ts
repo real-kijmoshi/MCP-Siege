@@ -62,7 +62,9 @@ export class ArmyList {
             army.engaged ? 'e' : '-'
           }:${army.surrounded ? 's' : '-'}:${army.pinned ? 'p' : '-'}:${
             army.crowded ? 'c' : '-'
-          }:${army.limbered ? 'l' : '-'}:${army.tended ? 't' : '-'}:${
+          }:${army.limbered ? 'l' : '-'}:${army.masked ? 'm' : '-'}:${
+            army.tended ? 't' : '-'
+          }:${
             Math.round(army.fatigue / 10)
           }:${selection.has(army.id) ? 1 : 0}`,
       )
@@ -203,6 +205,18 @@ export class ArmyList {
         'The guns are on their teams and cannot fire. They need a few seconds standing ' +
         'still before they will shoot at anything.';
       activity.append(' ', limbered);
+    } else if (army.masked) {
+      // A regiment shooting into the back of its own line looks, from the
+      // roster, exactly like one winning a firefight. This is the only place
+      // that says otherwise.
+      const masked = document.createElement('span');
+      masked.className = 'contact masked';
+      masked.textContent = 'MASKED';
+      masked.title =
+        'Your own line is standing in the way. Guns and handgunners hold their fire ' +
+        'rather than shoot through it; bows and engines loft over it and hit far less. ' +
+        'Move these men to a flank or onto high ground, or clear the lane in front of them.';
+      activity.append(' ', masked);
     } else if (army.tended) {
       const tended = document.createElement('span');
       tended.className = 'contact tended';

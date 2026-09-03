@@ -75,7 +75,12 @@ export async function registerWebMcpTools(
         'and how spent it is, from 0 fresh to 100 exhausted. Crowded troops lose half their ' +
         'damage and are far easier to shoot; spent troops hit softer and give ground. Both ' +
         'are answered by manoeuvre: give a crushed regiment room, and relieve a spent one ' +
-        'with a fresh formation. Read-only.',
+        'with a fresh formation. A missile regiment also reports whether it is masked — its ' +
+        'own army standing in the lane it is shooting down. Guns and handgunners will not ' +
+        'fire through their own infantry at all, and bows and engines that loft over it hit ' +
+        'far less hard, so a masked battery is a battery contributing nothing. Answer it by ' +
+        'moving those men to a flank or onto high ground, from which they shoot over their ' +
+        'own line freely, or by clearing the ground in front of them. Read-only.',
       inputSchema: EMPTY_INPUT_SCHEMA,
       annotations: { readOnlyHint: true },
       execute: () => handlers.getArmies(),

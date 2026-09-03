@@ -73,6 +73,8 @@ export function deployWave(state: GameState, playerId: PlayerId, name: string): 
     crowding: 0,
     fatigue: 0,
     succour: 0,
+    shock: 0,
+    blockedFire: 0,
   };
 
   const xs = new Float32Array(total);

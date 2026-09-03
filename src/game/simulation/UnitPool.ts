@@ -30,6 +30,15 @@ export class UnitPool {
   public readonly cooldown: Float32Array;
   /** Index of the current target, or -1. */
   public readonly targetIdx: Int32Array;
+  /**
+   * 1 while this man still has a charge in hand.
+   *
+   * A charge is delivered once. It is spent the moment its owner lands a blow
+   * at speed, and only comes back once he is clear of everyone and moving at
+   * pace again — which is what makes withdrawing horse and sending it in a
+   * second time a manoeuvre rather than a waste of the ground it gives up.
+   */
+  public readonly chargeReady: Uint8Array;
   public readonly alive: Uint8Array;
 
   /** Recycled slots, consumed from the end for deterministic reuse order. */
@@ -49,6 +58,7 @@ export class UnitPool {
     this.hp = new Float32Array(capacity);
     this.cooldown = new Float32Array(capacity);
     this.targetIdx = new Int32Array(capacity).fill(-1);
+    this.chargeReady = new Uint8Array(capacity);
     this.alive = new Uint8Array(capacity);
   }
 
@@ -75,6 +85,9 @@ export class UnitPool {
     this.hp[index] = UNIT_STATS[category].maxHitPoints;
     this.cooldown[index] = 0;
     this.targetIdx[index] = -1;
+    // Men come onto the field with their charge in hand, whether they are the
+    // opening deployment or a wave that has just marched up.
+    this.chargeReady[index] = 1;
     this.velocityX[index] = 0;
     this.velocityY[index] = 0;
     this.alive[index] = 1;
@@ -87,6 +100,7 @@ export class UnitPool {
     this.hp[index] = 0;
     this.group[index] = -1;
     this.targetIdx[index] = -1;
+    this.chargeReady[index] = 0;
     this.freeSlots.push(index);
   }
 
@@ -129,6 +143,7 @@ export class UnitPool {
       mix(Math.round((this.velocityY[index] ?? 0) * 64));
       mix(Math.round((this.hp[index] ?? 0) * 16));
       mix(Math.round(this.cooldown[index] ?? 0));
+      mix(this.chargeReady[index] ?? 0);
     }
     return hash >>> 0;
   }

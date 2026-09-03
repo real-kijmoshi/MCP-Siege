@@ -126,6 +126,13 @@ export function advanceMorale(state: GameState): void {
     // Exhaustion tells on troops whether they are fighting or running.
     delta -= FATIGUE.moralePenalty * group.fatigue;
 
+    // The impact. A charge kills fewer men than the melee that follows it and
+    // decides far more fights, because what it actually does is shake the
+    // formation it lands on. Applied to broken men as well as steady ones: a
+    // squadron riding down a rout is the reason routs do not rally, which is
+    // what makes pursuit worth ordering rather than a courtesy.
+    delta -= MORALE.shockPenalty * group.shock;
+
     // The sovereign. Men steady in sight of him, and every regiment in the army
     // feels it when he is beset — which is what makes a raid on a lightly held
     // base a real threat rather than a distraction to be ignored.

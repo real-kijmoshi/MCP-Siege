@@ -1,4 +1,11 @@
-import { MAP_HEIGHT, MAP_WIDTH, PHYSICS, SPATIAL_CELL_SIZE, UNIT_STATS } from '../config/battle';
+import {
+  FIRE,
+  MAP_HEIGHT,
+  MAP_WIDTH,
+  PHYSICS,
+  SPATIAL_CELL_SIZE,
+  UNIT_STATS,
+} from '../config/battle';
 import type { UnitPool } from './UnitPool';
 
 /**
@@ -165,6 +172,88 @@ export class SpatialHash {
       }
     }
     return found;
+  }
+
+  /**
+   * Weighted count of indexed bodies standing in the lane between a shooter and
+   * his target, ignoring everyone in `excludeGroup`.
+   *
+   * Called only on the tick a missile weapon is actually ready to loose, which
+   * for a bow is once a second and for a gun once every seven and a half, so the
+   * corridor trace costs a small fraction of what target acquisition already
+   * does. Cells whose whole footprint lies clear of the lane are rejected before
+   * any body in them is examined.
+   *
+   * A blocker at the muzzle counts for less than one standing among the men
+   * being shot at: the first is an obstacle, the second is where a volley falls
+   * short. Iteration follows the grid, so the sum is reproducible.
+   */
+  public weightedBlockersAlong(
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    pool: UnitPool,
+    excludeGroup: number,
+  ): number {
+    const spanX = x1 - x0;
+    const spanY = y1 - y0;
+    const length = Math.hypot(spanX, spanY);
+    if (length <= FIRE.muzzleClearance) return 0;
+    const unitX = spanX / length;
+    const unitY = spanY / length;
+
+    const halfWidth = FIRE.corridorHalfWidth;
+    const minColumn = Math.max(
+      0,
+      Math.floor((Math.min(x0, x1) - halfWidth) / SPATIAL_CELL_SIZE),
+    );
+    const maxColumn = Math.min(
+      this.columns - 1,
+      Math.floor((Math.max(x0, x1) + halfWidth) / SPATIAL_CELL_SIZE),
+    );
+    const minRow = Math.max(0, Math.floor((Math.min(y0, y1) - halfWidth) / SPATIAL_CELL_SIZE));
+    const maxRow = Math.min(
+      this.rows - 1,
+      Math.floor((Math.max(y0, y1) + halfWidth) / SPATIAL_CELL_SIZE),
+    );
+
+    // A cell whose centre is further from the lane than its own half-diagonal
+    // plus the corridor cannot hold a blocker, and most cells in the bounding
+    // box of a long shot are exactly that.
+    const cellReach = halfWidth + SPATIAL_CELL_SIZE * 0.7072;
+    const overrun = length + FIRE.targetClearance;
+
+    let blockers = 0;
+    for (let row = minRow; row <= maxRow; row += 1) {
+      const rowOffset = row * this.columns;
+      const cellY = (row + 0.5) * SPATIAL_CELL_SIZE;
+      for (let column = minColumn; column <= maxColumn; column += 1) {
+        const cellX = (column + 0.5) * SPATIAL_CELL_SIZE;
+        const centreOffset = Math.abs((cellX - x0) * -unitY + (cellY - y0) * unitX);
+        if (centreOffset > cellReach) continue;
+
+        const cell = rowOffset + column;
+        const end = this.starts[cell + 1] ?? 0;
+        for (let slot = this.starts[cell] ?? 0; slot < end; slot += 1) {
+          const candidate = this.items[slot] ?? -1;
+          if (candidate < 0 || pool.alive[candidate] !== 1) continue;
+          // A regiment never masks itself. Its own ranks shoot as one body, and
+          // what that costs is already priced by the formation's ranged profile.
+          if (pool.group[candidate] === excludeGroup) continue;
+
+          const dx = (pool.x[candidate] ?? 0) - x0;
+          const dy = (pool.y[candidate] ?? 0) - y0;
+          const along = dx * unitX + dy * unitY;
+          if (along <= FIRE.muzzleClearance || along >= overrun) continue;
+          if (Math.abs(dx * -unitY + dy * unitX) > halfWidth) continue;
+
+          const share = along >= length ? 1 : along / length;
+          blockers += FIRE.nearMuzzleWeight + (1 - FIRE.nearMuzzleWeight) * share;
+        }
+      }
+    }
+    return blockers;
   }
 
   /**
