@@ -185,6 +185,7 @@ describe('combat', () => {
 
   it('rewards an archer line with a stronger volley than a column', () => {
     expect(archerShot('line').damage).toBeGreaterThan(archerShot('column').damage * 1.4);
+  });
 
   it('resolves a combat tick simultaneously instead of favouring the first pool slots', () => {
     const state = createEmptyState(101);
