@@ -7,6 +7,32 @@ for each battlefield — and an external Marshal can now design an operation of
 its own, on ground of its own choosing, and fight it. No simulation rule
 changed: combat, morale, fog, the objective and the command queue are untouched.
 
+# The Art Hash Returned Half a Number
+
+`artHash` is the deterministic hash every drawn thing on the map uses for
+cosmetic scatter, and it was returning values in **(-0.5, 0.5)** rather than the
+`[0, 1)` its name and all twenty-odd call sites assume: the final `value ^=
+value >>> 12` yields a *signed* int32 in JavaScript, and nothing put it back
+into unsigned range before the divide. One `>>> 0` fixes it. What it was
+costing, all of it silent:
+
+- **Every threshold above 0.5 was unreachable.** `artHash(x, y) > 0.985`,
+  `> 0.92`, `> 0.76`, `> 0.74`, `> 0.62`, `> 0.55` — the speckle, the bright
+  flecks, the larger crags, the lobby portrait's grain — none of it had ever
+  drawn a single pixel.
+- **Half the scattered trees and rocks were placed at NaN.**
+  `Math.sqrt(artHash(...))` is NaN for a negative input, so every woodland and
+  crag zone silently dropped about half the trees it meant to plant.
+- **Every wobble leaned one way.** `(artHash(...) - 0.5) * k` was meant to
+  scatter about zero and instead only ever went negative, so river banks, road
+  wander and hill edges were all biased in one direction.
+
+The effect on the battlefield is large: hillsides that were a flat brown wash
+now carry the two-tone dither this document has described since the pixel-art
+pass, and the woods are as dense as they were written to be. The simulation
+never touches this function — it is rendering and lobby art only — so no
+behaviour, checksum or test moves.
+
 # Pixel-Art Soldiers
 
 Every man on the battlefield was a flat single-colour block — a square, circle,

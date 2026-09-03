@@ -148,7 +148,12 @@ export function artHash(a: number, b: number): number {
   value ^= value >>> 15;
   value = Math.imul(value, 0x2c1b_3c6d) >>> 0;
   value ^= value >>> 12;
-  return value / 0x1_0000_0000;
+  // The final XOR yields a *signed* int32, so without this the result landed in
+  // (-0.5, 0.5) rather than [0, 1). Every caller reads it as a fraction: it made
+  // `> 0.55` and every threshold above it unreachable, so a whole class of
+  // speckle never drew at all, turned `Math.sqrt(artHash(...))` into NaN for
+  // half the scattered trees and rocks, and biased every `- 0.5` wobble one way.
+  return (value >>> 0) / 0x1_0000_0000;
 }
 
 /* ------------------------------------------------------------------ terrain */
