@@ -17,6 +17,7 @@ export const AUTHORED_SCENARIO_IDS = [
   'ember_gate',
   'salt_tide',
   'open_hand',
+  'old_vale',
 ] as const;
 export type AuthoredScenarioId = (typeof AUTHORED_SCENARIO_IDS)[number];
 

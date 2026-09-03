@@ -193,9 +193,10 @@ describe('reading the council table', () => {
       'ember_gate',
       'salt_tide',
       'open_hand',
+      'old_vale',
       'custom',
     ]);
-    expect(operations[4]?.origin).toBe('designed');
+    expect(operations[5]?.origin).toBe('designed');
     expect((data.difficulties as unknown[]).length).toBe(3);
     expect((data.battlefields as unknown[]).length).toBe(4);
     expect(data.table).toEqual(

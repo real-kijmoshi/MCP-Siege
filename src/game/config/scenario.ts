@@ -373,6 +373,13 @@ export interface ScenarioDefinition {
   kingSpecs: readonly KingSpec[];
   aiScript: readonly ScriptedAiOrder[];
   origin: ScenarioOrigin;
+  /**
+   * Which battlefield renderer the operation is drawn with. Presentation only —
+   * it never touches simulation state, commands or queries. The tactical style
+   * is the default; `legacy` keeps the archived full-detail renderer alive as
+   * an authored option.
+   */
+  terrainStyle?: 'tactical' | 'legacy';
 }
 
 type GroupChanges = Partial<
@@ -846,6 +853,37 @@ export const SCENARIOS: Record<AuthoredScenarioId, ScenarioDefinition> = {
     kingSpecs: KING_SPECS,
     aiScript: OPEN_HAND_SCRIPT,
     origin: 'authored',
+  },
+  old_vale: {
+    id: 'old_vale',
+    mapId: 'river_vale',
+    numeral: 'V',
+    name: 'Old Vale',
+    location: 'The Vale Water',
+    summary:
+      'The same trap as Bridge of Knives, fought on the same ground and with the ' +
+      'same order of battle, but drawn in the old hand: the full detail of the ' +
+      'earlier field, with every wood, village and camp still standing in it.',
+    briefingLine: 'Let them cross. Then close both wings and kill them against their own river.',
+    twist: 'Identical to Bridge of Knives in every way but the look of the field.',
+    objective: 'Break the Ashen centre on the near bank, then take the Ashen King.',
+    pressure: 'Rising',
+    duration: '7–15 min',
+    tags: ['Legacy', 'Ambush', 'Patience', 'Three crossings'],
+    battleOrders: [
+      'Hold the bridge screen — do not reinforce it early',
+      'Close both wings once the crossing is packed',
+      'Take the Ashen King',
+    ],
+    battleFacts: ['~1,600 Ashen', '6 regiments a side', 'Trap sprung at your word'],
+    playerArmyName: 'Crownlands',
+    enemyArmyName: 'Ashen Host',
+    playerGroups: KNIVES_PLAYER,
+    enemyGroups: KNIVES_ENEMY,
+    kingSpecs: KING_SPECS,
+    aiScript: KNIVES_SCRIPT,
+    origin: 'authored',
+    terrainStyle: 'legacy',
   },
 };
 

@@ -121,14 +121,17 @@ describe('scenario', () => {
   it('gives each operation a materially different opening deployment', () => {
     // Four operations, one order of battle, four genuinely different
     // problems. If two of them stood the same regiment in the same place they
-    // would be one operation with two names.
-    const anchors = AUTHORED_SCENARIO_IDS.map((scenarioId) => {
-      const state = new SimulationEngine({ scenarioId }).getState();
-      const index = state.groupIndexById.get('vanguard') ?? -1;
-      const group = state.groups[index];
-      expect(group, `${scenarioId} raises no vanguard`).toBeDefined();
-      return { scenarioId, anchor: group?.anchor ?? { x: 0, y: 0 } };
-    });
+    // would be one operation with two names. The legacy clone of the first is
+    // excluded: it is the same battle on purpose, differing only in renderer.
+    const anchors = AUTHORED_SCENARIO_IDS.filter((scenarioId) => scenarioId !== 'old_vale').map(
+      (scenarioId) => {
+        const state = new SimulationEngine({ scenarioId }).getState();
+        const index = state.groupIndexById.get('vanguard') ?? -1;
+        const group = state.groups[index];
+        expect(group, `${scenarioId} raises no vanguard`).toBeDefined();
+        return { scenarioId, anchor: group?.anchor ?? { x: 0, y: 0 } };
+      },
+    );
 
     for (let firstIndex = 0; firstIndex < anchors.length; firstIndex += 1) {
       for (let secondIndex = firstIndex + 1; secondIndex < anchors.length; secondIndex += 1) {

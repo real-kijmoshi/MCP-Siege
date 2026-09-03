@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Shell(git:*)",
-      "Shell(npm:*)"
+      "Shell(npm:*)",
+      "Shell(findstr:*)",
+      "Shell(npx vitest run tests/scenarios.test.ts -t \"fights a designed operation to a decision like any other\")"
     ],
     "deny": [],
     "defaultMode": "default"

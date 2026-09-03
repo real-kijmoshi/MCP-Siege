@@ -1,4 +1,5 @@
 import { MAP_HEIGHT, MAP_WIDTH } from '../../game/config/battle';
+import type { BattleMapId } from '../../game/config/maps';
 import type { GameState } from '../../game/simulation/GameState';
 import type { BattlePlan, ZoneId } from '../../game/types/domain';
 import { Camera } from './Camera';
@@ -33,9 +34,14 @@ export class Renderer {
   public hoveredZone: ZoneId | undefined;
 
   private readonly context: CanvasRenderingContext2D;
-  // The tactical style uses the authored pixel terrain without the hundreds
-  // of decorative props and animated flourishes of the archived full style.
-  private readonly terrain = new DetailedTerrainLayer(undefined, 'terrain');
+  // Two ground renderings share one class: the tactical style draws the authored
+  // pixel terrain without the hundreds of decorative props and animated
+  // flourishes of the archived full style, which an operation may still ask for
+  // through `terrainStyle: 'legacy'`. Both bake once per map and read the same
+  // geometry, so the two looks can never disagree about where the river is.
+  private readonly tacticalTerrain = new DetailedTerrainLayer(undefined, 'terrain');
+  private readonly legacyTerrain = new DetailedTerrainLayer(undefined, 'full');
+  private terrain = this.tacticalTerrain;
   private readonly fog = new FogLayer();
   private readonly units = new UnitLayer();
   private readonly effects = new EffectsLayer();
@@ -57,6 +63,12 @@ export class Renderer {
     return this.terrain.artwork;
   }
 
+  /** Chooses the ground style the operation asks for before anything is drawn. */
+  private syncTerrainStyle(mapId: BattleMapId, legacy: boolean): void {
+    this.terrain = legacy ? this.legacyTerrain : this.tacticalTerrain;
+    this.terrain.syncTo(mapId);
+  }
+
   public resize(): void {
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     const width = this.canvas.clientWidth;
@@ -76,7 +88,7 @@ export class Renderer {
     const context = this.context;
     const ratio = this.devicePixelRatioCache;
     // Rebuilds the ground only when the battle is somewhere else; ordinarily free.
-    this.terrain.syncTo(state.mapId);
+    this.syncTerrainStyle(state.mapId, state.scenario.terrainStyle === 'legacy');
 
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     // Letterboxing at whole-map command zoom should read as the edge of the
