@@ -291,6 +291,26 @@ export interface ArmyGroup {
    * while they are still fighting.
    */
   succour: number;
+  /**
+   * How badly the formation has just been shaken by a charge, 0 for men nobody
+   * has ridden into and 1 for a body that has taken a full-weight impact.
+   * Written by `Combat` from the charges actually delivered against it and read
+   * by `Morale`, where it decays over a few seconds.
+   *
+   * This is what makes horse decisive rather than merely expensive. A charge
+   * kills fewer men than the melee that follows it; what it does is break the
+   * line it lands on, and before this term existed the simulation had no way of
+   * saying so.
+   */
+  shock: number;
+  /**
+   * Share of this regiment's attempted shots that were obstructed by its own
+   * army, 0 for a clear field of fire and 1 for a lane completely masked.
+   * Written by `Combat`, smoothed, and reported to the roster and the Marshal —
+   * it is otherwise entirely invisible, and a battery that is shooting at
+   * nothing looks exactly like one that is winning the battle.
+   */
+  blockedFire: number;
 }
 
 /* ------------------------------------------------------------- conditions */

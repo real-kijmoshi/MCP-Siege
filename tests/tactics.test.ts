@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CROWDING,
   FATIGUE,
+  FIRE,
   FORMATION_PROFILES,
   TICKS_PER_SECOND,
   UNIT_STATS,
@@ -973,3 +974,343 @@ describe('terrain and navigation', () => {
   });
 });
 
+
+/* ------------------------------------------------------------ line of fire */
+
+/**
+ * One shot, traced past a chosen number of friendly bodies standing in the lane.
+ *
+ * The blockers are placed exactly on the line between the shooter and his
+ * target and given a long reload, so they are bodies in the way and nothing
+ * else: whatever the target loses came from the one man being measured.
+ */
+function volley(options: {
+  category: 'archer' | 'handgunner' | 'siege' | 'cannon';
+  blockers: number;
+  /** Put the blocking men in the shooter's own regiment rather than another. */
+  sameRegiment?: boolean;
+  from?: { x: number; y: number };
+  at?: { x: number; y: number };
+}): { damage: number; cooldown: number } {
+  useBattleMap('river_vale');
+  const state = createEmptyState(7373, SCENARIOS.bridge_of_knives);
+  const from = options.from ?? { x: 4000, y: 3000 };
+  const at = options.at ?? { x: 4000, y: 3160 };
+  const inLane = options.blockers;
+
+  createGroupFromSpec(state, {
+    id: 'shooters',
+    name: 'Shooters',
+    ownerId: 'player',
+    anchor: from,
+    formation: 'line',
+    stance: 'defensive',
+    composition: [[options.category, 1 + (options.sameRegiment === true ? inLane : 0)]],
+  });
+  if (inLane > 0 && options.sameRegiment !== true) {
+    createGroupFromSpec(state, {
+      id: 'screen',
+      name: 'Screen',
+      ownerId: 'player',
+      anchor: { x: from.x, y: from.y + 40 },
+      formation: 'line',
+      stance: 'defensive',
+      composition: [['infantry', inLane]],
+    });
+  }
+  createGroupFromSpec(state, {
+    id: 'target',
+    name: 'Target',
+    ownerId: 'enemy',
+    anchor: at,
+    formation: 'block',
+    stance: 'defensive',
+    composition: [['infantry', 1]],
+  });
+
+  const shooters = findGroup(state, 'shooters')!;
+  const shooter = shooters.members[0]!;
+  state.units.x[shooter] = from.x;
+  state.units.y[shooter] = from.y;
+
+  // Everyone in the lane, evenly spread over the middle of the shot, where a
+  // blocker weighs most.
+  const blocking =
+    options.sameRegiment === true
+      ? shooters.members.slice(1)
+      : (findGroup(state, 'screen')?.members ?? []);
+  blocking.forEach((index, n) => {
+    const share = 0.55 + (blocking.length === 1 ? 0.15 : (0.3 * n) / (blocking.length - 1));
+    state.units.x[index] = from.x + (at.x - from.x) * share;
+    state.units.y[index] = from.y + (at.y - from.y) * share;
+    // Bodies in the way, not a second volley.
+    state.units.cooldown[index] = 400;
+  });
+
+  const defender = findGroup(state, 'target')!.members[0]!;
+  state.units.x[defender] = at.x;
+  state.units.y[defender] = at.y;
+  state.units.targetIdx[shooter] = defender;
+
+  advanceCombat(state);
+
+  return {
+    damage: UNIT_STATS.infantry.maxHitPoints - (state.units.hp[defender] ?? 0),
+    cooldown: state.units.cooldown[shooter] ?? 0,
+  };
+}
+
+describe('the line of fire', () => {
+  it('lets a missile regiment with a clear lane shoot at full weight', () => {
+    expect(volley({ category: 'archer', blockers: 0 }).damage).toBeGreaterThan(0);
+  });
+
+  it('never lets a regiment mask itself', () => {
+    // A regiment's own ranks are drilled to shoot as one body, and what that
+    // costs is already priced by the formation's ranged profile. If its own men
+    // blocked it, no archer regiment could ever fire at all.
+    const alone = volley({ category: 'archer', blockers: 0 });
+    const ownRanks = volley({ category: 'archer', blockers: 12, sameRegiment: true });
+    expect(ownRanks.damage).toBeCloseTo(alone.damage, 5);
+  });
+
+  it('costs a bow most of its volley when another regiment stands in the lane', () => {
+    const clear = volley({ category: 'archer', blockers: 0 });
+    const masked = volley({ category: 'archer', blockers: 12 });
+    // A bow looses high, so it still shoots — but shooting over your own line
+    // is not the same as shooting past it.
+    expect(masked.damage).toBeGreaterThan(0);
+    expect(masked.damage).toBeLessThan(clear.damage * 0.8);
+  });
+
+  it('makes handgunners hold their fire rather than shoot through their own infantry', () => {
+    const at = { x: 4000, y: 3100 };
+    const clear = volley({ category: 'handgunner', blockers: 0, at });
+    expect(clear.damage).toBeGreaterThan(0);
+
+    const masked = volley({ category: 'handgunner', blockers: 12, at });
+    expect(masked.damage).toBe(0);
+    // The shot is held, not spent: the crew looks again in a fraction of a
+    // second rather than burning a full reload on a lane it cannot use.
+    expect(masked.cooldown).toBe(FIRE.holdTicks);
+    expect(masked.cooldown).toBeLessThan(UNIT_STATS.handgunner.cooldownTicks);
+  });
+
+  it('lets an engine lob its stone clean over the army in front of it', () => {
+    const at = { x: 4000, y: 3300 };
+    const clear = volley({ category: 'siege', blockers: 0, at });
+    const masked = volley({ category: 'siege', blockers: 12, at });
+    // This is what separates an engine from a gun: it is aimed at ground it
+    // need never see, so a friendly line in front of it costs it almost nothing.
+    expect(masked.damage).toBeGreaterThan(clear.damage * 0.8);
+  });
+
+  it('gives a battery on a ridge the clear field of fire it does not have on the flat', () => {
+    // Same shot, same distance, twice: once across level ground and once down
+    // off the central hill. The comparison is each battery against its own
+    // unobstructed shot, so the plain height bonus cancels out and what is left
+    // is the view.
+    const flat = {
+      clear: volley({ category: 'cannon', blockers: 0, from: { x: 4000, y: 3000 }, at: { x: 4000, y: 3500 } }),
+      masked: volley({ category: 'cannon', blockers: 12, from: { x: 4000, y: 3000 }, at: { x: 4000, y: 3500 } }),
+    };
+    const ridge = {
+      clear: volley({ category: 'cannon', blockers: 0, from: { x: 4950, y: 3050 }, at: { x: 4950, y: 3550 } }),
+      masked: volley({ category: 'cannon', blockers: 12, from: { x: 4950, y: 3050 }, at: { x: 4950, y: 3550 } }),
+    };
+
+    // On the flat the guns will not fire through their own men at all.
+    expect(flat.clear.damage).toBeGreaterThan(0);
+    expect(flat.masked.damage).toBe(0);
+    // From the high ground the same battery, behind the same regiment, shoots.
+    expect(ridge.masked.damage).toBeGreaterThan(0);
+    expect(ridge.masked.damage).toBeGreaterThan(ridge.clear.damage * 0.5);
+  });
+
+  it('tells the commander when a regiment has no shot, and only then', () => {
+    useBattleMap('river_vale');
+    const state = createEmptyState(3131, SCENARIOS.bridge_of_knives);
+    createGroupFromSpec(state, {
+      id: 'battery',
+      name: 'Battery',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3000 },
+      formation: 'line',
+      stance: 'defensive',
+      composition: [['handgunner', 1]],
+    });
+    createGroupFromSpec(state, {
+      id: 'screen',
+      name: 'Screen',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3060 },
+      formation: 'line',
+      stance: 'defensive',
+      composition: [['infantry', 12]],
+    });
+    createGroupFromSpec(state, {
+      id: 'target',
+      name: 'Target',
+      ownerId: 'enemy',
+      anchor: { x: 4000, y: 3100 },
+      formation: 'block',
+      stance: 'defensive',
+      composition: [['infantry', 1]],
+    });
+
+    const battery = findGroup(state, 'battery')!;
+    const shooter = battery.members[0]!;
+    const defender = findGroup(state, 'target')!.members[0]!;
+    state.units.x[shooter] = 4000;
+    state.units.y[shooter] = 3000;
+    state.units.x[defender] = 4000;
+    state.units.y[defender] = 3100;
+    findGroup(state, 'screen')!.members.forEach((index, n) => {
+      state.units.x[index] = 4000;
+      state.units.y[index] = 3060 + n;
+      state.units.cooldown[index] = 400;
+    });
+
+    expect(battery.blockedFire).toBe(0);
+    for (let tick = 0; tick < TICKS_PER_SECOND * 6; tick += 1) {
+      state.currentTick += 1;
+      advanceCombat(state);
+    }
+    // A masked battery looks exactly like one that is winning the battle, so
+    // this reading is the only thing that would ever tell a commander otherwise.
+    expect(battery.blockedFire).toBeGreaterThan(FIRE.reportThreshold);
+
+    // Clear the lane and the reading goes away again.
+    findGroup(state, 'screen')!.members.forEach((index) => {
+      state.units.y[index] = 2000;
+    });
+    for (let tick = 0; tick < TICKS_PER_SECOND * 20; tick += 1) {
+      state.currentTick += 1;
+      advanceCombat(state);
+    }
+    expect(battery.blockedFire).toBeLessThan(FIRE.reportThreshold);
+  });
+});
+
+/* ----------------------------------------------------------------- the charge */
+
+/** One squadron, one body of foot, and whatever the horse arrives at. */
+function chargeGround(options: { defenders: number; fromBehind?: boolean }): {
+  state: GameState;
+  horse: number;
+  foot: ArmyGroup;
+} {
+  useBattleMap('river_vale');
+  const state = createEmptyState(5151, SCENARIOS.bridge_of_knives);
+  const approach = options.fromBehind === true ? 2988 : 3012;
+  createGroupFromSpec(state, {
+    id: 'horse',
+    name: 'Horse',
+    ownerId: 'player',
+    anchor: { x: 4000, y: approach },
+    formation: 'wedge',
+    stance: 'aggressive',
+    composition: [['cavalry', 1]],
+  });
+  createGroupFromSpec(state, {
+    id: 'foot',
+    name: 'Foot',
+    ownerId: 'enemy',
+    anchor: { x: 4000, y: 3000 },
+    formation: 'line',
+    stance: 'aggressive',
+    composition: [['infantry', options.defenders]],
+  });
+
+  const foot = findGroup(state, 'foot')!;
+  const horse = findGroup(state, 'horse')!.members[0]!;
+  state.units.x[horse] = 4000;
+  state.units.y[horse] = approach;
+  // The nearest man of the body stands where the horse will reach him.
+  const struck = foot.members[0]!;
+  state.units.x[struck] = 4000;
+  state.units.y[struck] = 3000;
+  state.units.targetIdx[horse] = struck;
+  state.currentTick = 3;
+  return { state, horse, foot };
+}
+
+/** Damage from one blow at full pace, with the target's health restored first. */
+function strike(state: GameState, horse: number, struck: number): number {
+  state.units.hp[struck] = UNIT_STATS.infantry.maxHitPoints;
+  state.units.cooldown[horse] = 0;
+  state.units.velocityY[horse] = state.units.y[horse]! > 3000 ? -UNIT_STATS.cavalry.speed : UNIT_STATS.cavalry.speed;
+  advanceCombat(state);
+  return UNIT_STATS.infantry.maxHitPoints - (state.units.hp[struck] ?? 0);
+}
+
+describe('the charge', () => {
+  it('delivers its impact once and not for as long as the horse stands there', () => {
+    const { state, horse, foot } = chargeGround({ defenders: 1 });
+    const struck = foot.members[0]!;
+
+    const arrival = strike(state, horse, struck);
+    expect(state.units.chargeReady[horse]).toBe(0);
+
+    const melee = strike(state, horse, struck);
+    // A charge is an arrival, not a state. Men already fighting cannot arrive
+    // again, whatever their velocity says — otherwise the correct use of horse
+    // was to park it in a melee, the one thing cavalry has never been for.
+    expect(melee).toBeLessThan(arrival * 0.7);
+  });
+
+  it('gets the charge back only once the squadron is clear and up to pace', () => {
+    const { state, horse, foot } = chargeGround({ defenders: 1 });
+    strike(state, horse, foot.members[0]!);
+    expect(state.units.chargeReady[horse]).toBe(0);
+
+    // Off on its own, but at a walk: no charge in hand.
+    state.units.kill(foot.members[0]!);
+    state.units.targetIdx[horse] = -1;
+    state.units.velocityY[horse] = -UNIT_STATS.cavalry.speed * 0.2;
+    advanceCombat(state);
+    expect(state.units.chargeReady[horse]).toBe(0);
+
+    // Clear of everyone and riding: the squadron has re-formed.
+    state.units.velocityY[horse] = -UNIT_STATS.cavalry.speed;
+    advanceCombat(state);
+    expect(state.units.chargeReady[horse]).toBe(1);
+  });
+
+  it('shakes the formation it lands on, and standing still does not', () => {
+    const impact = chargeGround({ defenders: 40 });
+    strike(impact.state, impact.horse, impact.foot.members[0]!);
+    expect(impact.foot.shock).toBeGreaterThan(0);
+
+    const halted = chargeGround({ defenders: 40 });
+    halted.state.units.hp[halted.foot.members[0]!] = UNIT_STATS.infantry.maxHitPoints;
+    halted.state.units.velocityY[halted.horse] = 0;
+    advanceCombat(halted.state);
+    expect(halted.foot.shock).toBe(0);
+  });
+
+  it('shakes a formation harder when the charge comes in behind it', () => {
+    const front = chargeGround({ defenders: 40 });
+    strike(front.state, front.horse, front.foot.members[0]!);
+
+    const rear = chargeGround({ defenders: 40, fromBehind: true });
+    strike(rear.state, rear.horse, rear.foot.members[0]!);
+
+    // Not merely a heavier blow: the one nobody in the ranks saw coming.
+    expect(rear.foot.shock).toBeGreaterThan(front.foot.shock);
+  });
+
+  it('costs a shaken formation morale over and above the men it lost', () => {
+    const steady = chargeGround({ defenders: 40 });
+    const shaken = chargeGround({ defenders: 40 });
+    shaken.foot.shock = 1;
+
+    for (let tick = 0; tick < TICKS_PER_SECOND * 3; tick += 1) {
+      advanceMorale(steady.state);
+      advanceMorale(shaken.state);
+    }
+    // This is what makes horse decisive rather than merely expensive: a charge
+    // kills fewer men than the melee that follows it and breaks more lines.
+    expect(shaken.foot.morale).toBeLessThan(steady.foot.morale);
+  });
+});

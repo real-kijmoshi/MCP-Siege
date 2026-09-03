@@ -905,6 +905,10 @@ body {
   color: var(--warn);
 }
 
+.army-row .contact.masked {
+  color: var(--warn);
+}
+
 .army-row .contact.tended {
   color: #6fd5a8;
 }

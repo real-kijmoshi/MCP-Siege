@@ -4,11 +4,13 @@ import {
   CONTACT,
   CROWDING,
   FATIGUE,
+  FIRE,
   FORMATION_PROFILES,
   REACQUISITION_STRIDE,
   STANCE_PROFILES,
   UNIT_STATS,
   counterMultiplier,
+  type UnitStats,
 } from '../config/battle';
 import { FACTION_ENEMY, FACTION_PLAYER, type ArmyGroup, type CombatEvent } from '../types/domain';
 import type { GameState } from './GameState';
@@ -41,6 +43,11 @@ let pressureY = new Float32Array(64);
 /** Friendly neighbours counted this tick, and how many men were asked. */
 let crowdSum = new Int32Array(64);
 let crowdSamples = new Int32Array(64);
+/** Charges delivered against a group this tick, before it is spread over its men. */
+let shockImpulse = new Float32Array(64);
+/** How masked this group's shots were, and how many it tried to take. */
+let fireObstruction = new Float32Array(64);
+let fireSamples = new Int32Array(64);
 /** Damage is committed after every living unit has had its turn this tick. */
 let pendingDamage = new Float32Array(10_000);
 
@@ -55,6 +62,9 @@ function ensureContactBuffers(groupCount: number): void {
     pressureY.fill(0, 0, groupCount);
     crowdSum.fill(0, 0, groupCount);
     crowdSamples.fill(0, 0, groupCount);
+    shockImpulse.fill(0, 0, groupCount);
+    fireObstruction.fill(0, 0, groupCount);
+    fireSamples.fill(0, 0, groupCount);
     return;
   }
   let capacity = contactCounts.length;
@@ -65,6 +75,9 @@ function ensureContactBuffers(groupCount: number): void {
   pressureY = new Float32Array(capacity);
   crowdSum = new Int32Array(capacity);
   crowdSamples = new Int32Array(capacity);
+  shockImpulse = new Float32Array(capacity);
+  fireObstruction = new Float32Array(capacity);
+  fireSamples = new Int32Array(capacity);
 }
 
 function prepareDamageBuffer(capacity: number): void {
@@ -105,6 +118,75 @@ function groupOf(state: GameState, unitIndex: number): ArmyGroup | undefined {
 }
 
 /**
+ * Scratch for the one blow being resolved. Both are reset at the top of every
+ * `computeDamage` call and read by its caller immediately afterwards, so
+ * nothing survives the statement that produced it and two engines in one
+ * process cannot interfere.
+ *
+ * They exist because whether a charge was actually delivered is decided deep
+ * inside the damage calculation — it depends on the bearing, on what the
+ * defender is braced in, and on whether the man still had a charge in hand —
+ * and the caller is the one that has to spend it and record the shock.
+ */
+let chargeDelivered = false;
+let chargeShock = 0;
+
+/**
+ * Getting a charge back.
+ *
+ * Men who have hit a line are in a melee from the next second onward, and no
+ * amount of shoving turns that back into an impact. A body of horse recovers
+ * its charge only by breaking clean off and getting up to pace again — which is
+ * why cavalry parked in a fight is cavalry wasted, and why the ground behind
+ * your own horse is worth keeping open.
+ */
+function reformCharge(units: UnitPool, index: number, stats: UnitStats): void {
+  if (stats.chargePower <= 0 || units.chargeReady[index] === 1) return;
+  const speed = Math.hypot(units.velocityX[index] ?? 0, units.velocityY[index] ?? 0);
+  if (speed >= stats.speed * CONTACT.reformSpeedShare) units.chargeReady[index] = 1;
+}
+
+/**
+ * How much of a missile regiment's own army is standing in the lane it is about
+ * to shoot down, expressed as 0 for a clear field of fire and 1 for a lane it
+ * cannot use at all.
+ *
+ * Lofting arms — a bow, an engine — clear most of what is in front of them, and
+ * height clears more still, which is the second and larger reason a ridge is
+ * worth taking: not the twelve percent a shot gains from above, but that a
+ * battery on one can fire over its own army all day.
+ */
+function laneObstruction(
+  state: GameState,
+  shooter: number,
+  target: number,
+  stats: UnitStats,
+  friendly: SpatialHash,
+): number {
+  const units = state.units;
+  const x = units.x[shooter] ?? 0;
+  const y = units.y[shooter] ?? 0;
+  const targetX = units.x[target] ?? 0;
+  const targetY = units.y[target] ?? 0;
+
+  const blockers = friendly.weightedBlockersAlong(
+    x,
+    y,
+    targetX,
+    targetY,
+    units,
+    units.group[shooter] ?? -1,
+  );
+  if (blockers <= 0) return 0;
+
+  let clearance = stats.loft;
+  if (terrainAt(x, y) === 'hill' && terrainAt(targetX, targetY) !== 'hill') {
+    clearance += FIRE.elevationRelief;
+  }
+  return Math.min(1, blockers / FIRE.saturation) * (1 - Math.min(0.95, clearance));
+}
+
+/**
  * Damage for one blow, folding together the counter matrix, both formations,
  * both stances, terrain and the attacker's morale.
  */
@@ -115,6 +197,9 @@ function computeDamage(
   attackerGroup: ArmyGroup | undefined,
   defenderGroup: ArmyGroup | undefined,
 ): number {
+  chargeDelivered = false;
+  chargeShock = 0;
+
   const units = state.units;
   const attackerCategory = units.categoryOf(attacker);
   const defenderCategory = units.categoryOf(defender);
@@ -176,20 +261,43 @@ function computeDamage(
 
     // A moving body carries shock into its first blows. A steady spear front
     // or square braces that shock, but only when it arrives from the front.
-    if (stats.range < 100 && stats.chargePower > 0) {
+    //
+    // It carries that shock exactly once. A charge is an arrival, not a state:
+    // men who are already fighting cannot arrive again, and the impact only
+    // comes back to a squadron that has broken clean off and got up to pace.
+    if (
+      stats.range < 100 &&
+      stats.chargePower > 0 &&
+      units.chargeReady[attacker] === 1
+    ) {
       const velocity = Math.hypot(
         units.velocityX[attacker] ?? 0,
         units.velocityY[attacker] ?? 0,
       );
       const speedShare = Math.min(1, velocity / Math.max(0.001, stats.speed));
       const charge =
-        Math.max(0, (speedShare - 0.2) / 0.8) *
+        Math.max(0, (speedShare - CONTACT.chargeSpeedShare) / (1 - CONTACT.chargeSpeedShare)) *
         Math.min(CONTACT.maximumChargeDamage, stats.chargePower);
-      const braced =
-        offAxis <= CONTACT.frontArc &&
-        defenderGroup.stance !== 'aggressive' &&
-        (defenderGroup.formation === 'square' || defenderCategory === 'spearman');
-      damage *= 1 + charge * (braced ? 1 - CONTACT.braceReduction : 1);
+      if (charge > 0) {
+        const braced =
+          offAxis <= CONTACT.frontArc &&
+          defenderGroup.stance !== 'aggressive' &&
+          (defenderGroup.formation === 'square' || defenderCategory === 'spearman');
+        const delivered = charge * (braced ? 1 - CONTACT.braceReduction : 1);
+        damage *= 1 + delivered;
+
+        // What the impact does to the formation rather than to the men in it.
+        // A charge taken in the rear is not merely a heavier blow: it is the
+        // one nobody in the ranks saw coming.
+        chargeDelivered = true;
+        chargeShock =
+          delivered *
+          (offAxis > CONTACT.flankArc
+            ? CONTACT.rearDamage
+            : offAxis > CONTACT.frontArc
+              ? CONTACT.flankDamage
+              : 1);
+      }
     }
 
     // Being attacked from every quarter at once. Ranks cannot close, there is
@@ -369,11 +477,19 @@ export function advanceCombat(state: GameState): void {
       target = -1;
     }
 
-    if (target < 0 || units.alive[target] !== 1) continue;
+    // A man with nobody in reach is a man riding free, and that is the only
+    // state in which a squadron gets its charge back.
+    if (target < 0 || units.alive[target] !== 1) {
+      reformCharge(units, index, stats);
+      continue;
+    }
 
     const dx = (units.x[target] ?? 0) - x;
     const dy = (units.y[target] ?? 0) - y;
-    if (dx * dx + dy * dy > stats.range * stats.range) continue;
+    if (dx * dx + dy * dy > stats.range * stats.range) {
+      reformCharge(units, index, stats);
+      continue;
+    }
 
     const attackerGroup = groupOf(state, index);
     const defenderGroup = groupOf(state, target);
@@ -421,8 +537,42 @@ export function advanceCombat(state: GameState): void {
 
     if ((units.cooldown[index] ?? 0) > 0) continue;
 
-    const damage = computeDamage(state, index, target, attackerGroup, defenderGroup);
+    // The line of fire. Before a missile arm looses, it finds out whether its
+    // own army is standing in the lane. This is the term that makes where a
+    // regiment of bows or a battery *stands* the whole decision about it:
+    // behind the melee they are shooting into their own backs, on a flank or a
+    // ridge they are shooting into the enemy.
+    let obstruction = 0;
+    if (!isMelee) {
+      const friendly = units.owner[index] === FACTION_PLAYER ? playerHash : enemyHash;
+      obstruction = laneObstruction(state, index, target, stats, friendly);
+      if (attackerSlot >= 0) {
+        fireObstruction[attackerSlot] = (fireObstruction[attackerSlot] ?? 0) + obstruction;
+        fireSamples[attackerSlot] = (fireSamples[attackerSlot] ?? 0) + 1;
+      }
+
+      // A gun and a caliver are aimed along the barrel, so a masked lane is
+      // simply a lane they will not use; the crew waits for it to clear rather
+      // than firing into their own infantry. A bow or an engine throws its shot
+      // high and takes the shot anyway, paying for it in accuracy above.
+      if (stats.loft < FIRE.loftedTrajectory && obstruction >= FIRE.holdThreshold) {
+        units.cooldown[index] = FIRE.holdTicks;
+        continue;
+      }
+    }
+
+    let damage = computeDamage(state, index, target, attackerGroup, defenderGroup);
+    if (obstruction > 0) damage *= 1 - obstruction * FIRE.accuracyPenalty;
     units.cooldown[index] = stats.cooldownTicks;
+
+    // The charge is spent by the blow that delivered it, and what it did to the
+    // formation it landed on is carried to `Morale` through the group record.
+    if (chargeDelivered) {
+      units.chargeReady[index] = 0;
+      if (defenderSlot >= 0) {
+        shockImpulse[defenderSlot] = (shockImpulse[defenderSlot] ?? 0) + chargeShock;
+      }
+    }
 
     recordEvent(state, index, {
       x,
@@ -505,7 +655,33 @@ function summariseContact(state: GameState): void {
       group.engagement = 0;
       group.encirclement = 0;
       group.crowding = 0;
+      group.shock = 0;
+      group.blockedFire = 0;
       continue;
+    }
+
+    // What a charge did to the formation, spread over the men who have to
+    // absorb it and decaying over the few seconds a shaken line has to steady
+    // itself in. A second squadron arriving inside that window compounds with
+    // the first, which is what makes charges worth timing together.
+    group.shock = Math.min(
+      1,
+      group.shock * CONTACT.shockDecay +
+        ((shockImpulse[slot] ?? 0) / strength) * CONTACT.shockScale,
+    );
+
+    // Whether this regiment can see what it is shooting at. Smoothed over the
+    // shots it actually takes, because the lane in front of a battery opens and
+    // closes constantly in a moving battle and a badge that flickered every
+    // second would be unreadable. A tick carrying no shot is not evidence of a
+    // clear lane — for a masked regiment it is the opposite — so it only fades
+    // the reading rather than answering it.
+    const shots = fireSamples[slot] ?? 0;
+    if (shots > 0) {
+      const measuredFire = (fireObstruction[slot] ?? 0) / shots;
+      group.blockedFire += (measuredFire - group.blockedFire) * FIRE.smoothing;
+    } else {
+      group.blockedFire *= FIRE.idleDecay;
     }
 
     // Smoothed, because one tick's sample of a moving formation jitters far too

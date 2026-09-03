@@ -885,6 +885,8 @@ export function createGroupFromSpec(state: GameState, spec: GroupSpec): ArmyGrou
     crowding: 0,
     fatigue: 0,
     succour: 0,
+    shock: 0,
+    blockedFire: 0,
   };
 
   const faction = factionOf(spec.ownerId);

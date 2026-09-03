@@ -49,6 +49,18 @@ export interface UnitStats {
   /** Splash radius in world units. Only siege and the guns have one. */
   splashRadius: number;
   /**
+   * How high the weapon throws its shot, 0 for a flat trajectory and 1 for one
+   * that clears anything in the way.
+   *
+   * This is what decides whether a missile arm can shoot over the heads of its
+   * own army. An engine lobs its stone onto a target it cannot see; a bow looses
+   * high enough to drop a volley past a friendly line, at a cost in accuracy; a
+   * gun and a caliver are aimed along their barrels and want a clear lane. It is
+   * the difference between an arm you can park behind the line and one whose
+   * position is the whole decision.
+   */
+  loft: number;
+  /**
    * Ticks a piece must stand still before it can fire. Zero for everything a
    * man carries.
    *
@@ -81,6 +93,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.18,
     vision: 300,
     splashRadius: 0,
+    loft: 0,
     deployTicks: 0,
     strengthValue: 1,
   },
@@ -97,6 +110,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.1,
     vision: 300,
     splashRadius: 0,
+    loft: 0,
     deployTicks: 0,
     strengthValue: 1,
   },
@@ -113,6 +127,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0,
     vision: 500,
     splashRadius: 0,
+    loft: 0.6,
     deployTicks: 0,
     strengthValue: 1,
   },
@@ -129,6 +144,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.9,
     vision: 380,
     splashRadius: 0,
+    loft: 0,
     deployTicks: 0,
     strengthValue: 1.6,
   },
@@ -145,6 +161,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.3,
     vision: 280,
     splashRadius: 0,
+    loft: 0,
     deployTicks: 0,
     strengthValue: 1.8,
   },
@@ -161,6 +178,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0,
     vision: 360,
     splashRadius: 52,
+    loft: 0.85,
     deployTicks: 0,
     strengthValue: 6,
   },
@@ -177,6 +195,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0,
     vision: 360,
     splashRadius: 0,
+    loft: 0,
     deployTicks: 0,
     strengthValue: 1.2,
   },
@@ -193,6 +212,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0,
     vision: 400,
     splashRadius: 30,
+    loft: 0.25,
     deployTicks: TICKS_PER_SECOND * 4,
     strengthValue: 8,
   },
@@ -212,6 +232,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0,
     vision: 300,
     splashRadius: 0,
+    loft: 0,
     deployTicks: 0,
     strengthValue: 0.3,
   },
@@ -228,6 +249,7 @@ export const UNIT_STATS: Record<UnitCategory, UnitStats> = {
     chargePower: 0.12,
     vision: 720,
     splashRadius: 0,
+    loft: 0,
     deployTicks: 0,
     strengthValue: 0.4,
   },
@@ -445,6 +467,15 @@ export const MORALE = {
   nearbyRoutPenalty: 0.09,
   /** Penalty per tick while enemies are attacking from more than one arc. */
   flankedPenalty: 0.14,
+  /**
+   * Penalty per tick at full shock, decaying with it.
+   *
+   * Deliberately of the same order as being flanked: a charge that lands is one
+   * of the two things on the field that can break a formation outright, and it
+   * has to be able to do it in the few seconds the shock lasts rather than over
+   * the grinding minute a melee takes.
+   */
+  shockPenalty: 0.16,
   /** Bonus per tick while holding a hill or forest. */
   terrainBonus: 0.045,
   /** A routing group recovers to this value before accepting orders again. */
@@ -544,6 +575,44 @@ export const CONTACT = {
   maximumChargeDamage: 0.9,
   /** A braced spear front or square removes this share of incoming charge. */
   braceReduction: 0.72,
+
+  /**
+   * Share of its top pace a body of men must still carry for its arrival to
+   * count as a charge at all.
+   */
+  chargeSpeedShare: 0.2,
+  /**
+   * Share of its top pace a formation must get back up to, clear of everyone,
+   * before it has a charge in hand again.
+   *
+   * A charge is delivered once. Men who have hit a line are in a melee from the
+   * next second onward, and no amount of shoving turns that back into an
+   * impact. Without this a wedge of horse that rode into a flank kept collecting
+   * the shock bonus for as long as it stayed there, so the correct use of
+   * cavalry was to park it in a melee — the one thing cavalry has never been
+   * for. Pulling horse out, turning it round and sending it in again is now a
+   * real manoeuvre with a real reward, and it is the reason to keep a lane open
+   * behind your own horse.
+   */
+  reformSpeedShare: 0.55,
+
+  /**
+   * Shock carried into a formation by one delivered charge, before it is
+   * divided by the number of men who have to absorb it.
+   *
+   * A charge kills fewer men than the melee that follows it and decides far
+   * more battles, because what it actually does is break the formation it lands
+   * on. Damage alone could never express that: horse into a steady line came out
+   * as a slightly larger casualty figure. This is the term that makes the same
+   * impact felt as men giving way.
+   */
+  shockScale: 1.6,
+  /**
+   * Share of a formation's shock retained per tick. Slow enough that a regiment
+   * ridden into is still unsteady when the second squadron arrives, which is
+   * what makes charges worth timing together.
+   */
+  shockDecay: 0.99,
   /** Converts the press of bodies into ground yielded by a formation. */
   pressureScale: 4.5,
   /** Hard cap on group displacement from combat pressure in one tick. */
@@ -569,6 +638,93 @@ export const CONTACT = {
    * off the far end, whatever they were standing in.
    */
   crossingPressure: 0.4,
+} as const;
+
+/* ------------------------------------------------------------- line of fire */
+
+/**
+ * Where a missile arm can actually shoot.
+ *
+ * Until this existed a bow, a caliver, an engine and a gun all shot straight
+ * through whatever stood between them and the nearest enemy, which meant the
+ * only thing that mattered about a missile regiment was that it was somewhere
+ * within range. Archers parked behind the melee were strictly better than
+ * archers on a flank, a battery in the middle of the army was as good as one on
+ * a ridge, and "mask your own guns" — the oldest mistake in the arm — was not a
+ * mistake the game could make.
+ *
+ * A shot is now traced from the man to his target and the *other* friendly
+ * regiments standing in that corridor are counted. A regiment never masks
+ * itself: its own ranks are drilled to shoot as a body, which is what the
+ * formation `rangedModifier` already prices. What is new is one of your bodies
+ * of troops standing in front of another.
+ */
+export const FIRE = {
+  /** Half-width of the traced corridor, world units. About one man either side. */
+  corridorHalfWidth: 13,
+  /** Men this close to the shooter are beside him, not in front of him. */
+  muzzleClearance: 26,
+  /**
+   * Men this close to the target are the melee itself. They are the ones a
+   * short round lands among, so they are counted at full weight rather than
+   * excluded.
+   */
+  targetClearance: 6,
+  /** Weighted blockers at which a lane counts as completely masked. */
+  saturation: 7,
+  /**
+   * Weight given to a blocker right at the muzzle, rising to 1 at the target.
+   *
+   * A friendly regiment fifty paces in front of your archers is an obstacle; the
+   * one locked hand to hand with the men you are shooting at is where the volley
+   * falls short. Both matter, and they do not matter equally.
+   */
+  nearMuzzleWeight: 0.3,
+  /**
+   * Masking removed by shooting from high ground onto lower.
+   *
+   * This is the second, larger reason a hill is worth taking: not the twelve
+   * percent a shot gains from height, but that a battery on a ridge can fire
+   * over its own army all day.
+   */
+  elevationRelief: 0.4,
+  /**
+   * Loft at or above which a weapon is a lofting one, and will always take the
+   * shot rather than hold it.
+   */
+  loftedTrajectory: 0.5,
+  /**
+   * Obstruction at which a flat-trajectory weapon refuses the shot outright.
+   * A gun crew will not fire through their own infantry, whatever the target.
+   */
+  holdThreshold: 0.5,
+  /**
+   * Ticks a masked crew waits before looking again. Short: the lane in front of
+   * a battery opens and closes several times a minute in a moving battle.
+   */
+  holdTicks: 6,
+  /** Share of its damage a fully obstructed volley loses. */
+  accuracyPenalty: 0.8,
+  /**
+   * How far a group's reported obstruction moves toward each shot it takes.
+   *
+   * Measured per shot rather than per tick, because rate of fire varies by a
+   * factor of seven across the missile arms and a per-tick average would have
+   * made a gun look clearer than a bow simply for firing less often.
+   */
+  smoothing: 0.25,
+  /**
+   * Share of the reading retained on a tick where the regiment took no shot at
+   * all.
+   *
+   * A masked regiment is silent most of the time — that is what being masked
+   * means — so counting its silence as a clear lane made the one reading that
+   * says "this battery is contributing nothing" say the exact opposite. Silence
+   * now merely fades the report, over a few seconds, rather than denying it.
+   */
+  idleDecay: 0.997,
+  /** Obstruction at which the roster and the Marshal are told the lane is blocked. */
+  reportThreshold: 0.3,
 } as const;
 
 /* ----------------------------------------------------------------- crowding */

@@ -565,6 +565,59 @@ all. All four are fixed, and battles now reach a decision.
 
 # This Pass
 
+## The fighting: where a shot can go, and what a charge is
+
+Two things the battle had never modelled, both of which turned a *placement*
+decision into no decision at all.
+
+- **The line of fire.** Every missile arm shot straight through whatever stood
+  between it and the nearest enemy. Archers parked behind the melee were
+  strictly better than archers on a flank; a battery in the middle of the army
+  was as good as one on a ridge; and masking your own guns — the oldest mistake
+  in the arm — was not a mistake the game could make. A shot is now traced from
+  the man to his target and the *other* friendly regiments in that corridor are
+  counted, weighted so a blocker among the men being shot at counts for far more
+  than one at the muzzle. A regiment never masks itself: its own ranks shoot as
+  one body, which the formation's `rangedModifier` already prices.
+  - New `loft` stat per troop type decides what happens next. Flat-trajectory
+    arms (handgunners at 0, guns at 0.25) hold their fire rather than shoot
+    through their own infantry — a short six-tick wait, not a spent reload, so
+    the crew looks again four times a second. Lofting arms (bows at 0.6, engines
+    at 0.85) take the shot and pay for it: up to eighty percent of the volley at
+    full obstruction.
+  - Height clears the lane. A shooter on a hill firing onto lower ground gets
+    0.4 of clearance back, which is what makes a battery on a ridge able to fire
+    over its own army — the second and much larger reason to take high ground,
+    beside the twelve percent a shot already gained from it.
+  - Reported, because it is otherwise invisible: a masked battery looks exactly
+    like one winning the battle. `ArmySummary.masked`, a `MASKED` badge on the
+    roster row, and a line in the Marshal's battle overview naming the fix.
+    Smoothed per *shot taken* rather than per tick — an early version averaged
+    over ticks and so read a regiment holding its fire as one with a clear lane,
+    which is precisely backwards.
+- **The charge.** Impact damage was recomputed from instantaneous velocity on
+  every blow, so a wedge of horse that rode into a flank collected the shock
+  bonus for as long as it stayed there. The correct use of cavalry was to park
+  it in a melee — the one thing cavalry has never been for. A charge is now
+  carried by the man and spent by the blow that delivers it (`UnitPool.chargeReady`),
+  and comes back only to a rider who is clear of everyone and back above 55% of
+  his pace. Withdrawing horse, turning it and sending it in again is a real
+  manoeuvre with a real reward.
+  - And a charge now does what charges actually do. It kills fewer men than the
+    melee that follows it and decides far more fights, because what it does is
+    *break the formation it lands on*. `ArmyGroup.shock` accumulates delivered
+    impacts, scaled by flank and rear bearing, spread over the men who have to
+    absorb it, and decays over a few seconds; `Morale` reads it at a weight of
+    the same order as being flanked. It applies to broken men too, so a squadron
+    riding down a rout is why routs do not rally.
+- Both cost nothing measurable: the corridor trace runs only on the tick a
+  weapon is actually ready to loose, and rejects whole grid cells whose footprint
+  lies clear of the lane. Measured at 10.6 ms/tick against 10.8 ms/tick before
+  the change, at 7,929 units.
+- Twelve new tests in `tests/tactics.test.ts` covering both, including the two
+  claims most worth pinning: a regiment never masks itself, and the same battery
+  behind the same screen fires from a ridge and holds on the flat.
+
 ## Readability and control
 
 - Fog hides forces, not ground. The veil is a translucent haze rather than an
@@ -646,6 +699,13 @@ all. All four are fixed, and battles now reach a decision.
   identical state checksum, verified over 2,000 ticks.
 - Seven formations with real trade-offs, three stances that govern how far men
   will leave the line, and a counter matrix covering seven troop types.
+- A line of fire: missile regiments trace the lane to their target past the rest
+  of their own army, guns and shot hold rather than fire through it, bows and
+  engines loft over at a cost, and high ground clears the view. Reported to the
+  roster and to the Marshal, since nothing else would show it.
+- A charge that is delivered once, spent by the blow that lands it, re-formed
+  only by breaking off and getting back up to pace — and felt as shock on the
+  formation it hits rather than only as damage.
 - Regiment-level morale with confident/stable/shaken/breaking/routing states.
   Broken regiments refuse orders, stream to the rear, and rally when clear.
 - Three-state fog of war drawn as a translucent veil, contact memory with
@@ -692,6 +752,13 @@ all. All four are fixed, and battles now reach a decision.
   played a full battle at 1x since the retune.
 
 # Next Recommended Task
+
+- Teach the enemy commander to answer the line of fire. It applies to both sides
+  symmetrically and every operation still reaches a decision, but the scripted
+  deployments were written when a missile regiment could shoot from anywhere, so
+  the Ashen bows and battery may now be standing behind their own line in places
+  where a human would not have put them. Worth a pass over the four authored
+  orders of battle with the masked reading in hand.
 
 - Play a full battle at 1x since the contact pass. Envelopment and pinning are
   measured in isolation and the scripted battle-tempo tests still reach a

@@ -77,6 +77,17 @@ The three letters in front of a regiment's name are its troop type, and the
 readout at bottom-left names what that type beats and what beats it. Most fights
 are decided by that matchup and by regiments losing heart, not by arithmetic.
 
+Two things about the fighting are worth knowing before your first battle.
+Missile troops need a lane: guns and handgunners will not fire through your own
+infantry at all, and bows and engines that loft over it hit much less hard, so a
+regiment of bows parked behind the melee is a regiment doing nothing. A ridge
+fixes it — a battery on high ground shoots over its own army — and so does a
+flank. The roster marks a regiment that has lost its lane `MASKED`. And a charge
+is delivered once: horse that has hit a line is in a melee from the next second,
+and only gets its impact back by breaking clean off and coming round again. That
+impact is worth arranging, because what it mostly does is break the formation it
+lands on rather than kill the men in it.
+
 The battlefield opens paused so the first briefing never costs battle time.
 Issue an order, press Space, or choose a speed to begin.
 

@@ -66,6 +66,24 @@ Three things follow from it:
   *out*, and it never returns a man who has actually fallen. The hospital
   carries no weapon, holds no ground, and is the softest target on the field —
   which is what makes a raid into an army's rear worth mounting.
+- **The line of fire.** A missile arm has to be able to *see* what it is
+  shooting at. A shot is traced past whatever other regiments of your own stand
+  in the lane: a gun or a caliver is aimed along its barrel and simply will not
+  fire through your own infantry, while a bow or an engine lofts over and pays
+  for it heavily in accuracy. A regiment never masks itself — its own ranks are
+  drilled to shoot as a body, which the formation profile already prices — so
+  what this costs is always a decision someone made about where two regiments
+  stand. It is the term that makes placing missile troops the whole decision
+  about them, and it gives high ground a second and larger purpose: a battery on
+  a ridge shoots over its own army all day.
+- **The charge.** Horse arriving at speed hits far harder than horse standing
+  in a melee, and it does so exactly once. A squadron that has landed its charge
+  is fighting from the next second onward and recovers its impact only by
+  breaking clean off and getting back up to pace. What a charge mostly does is
+  not kill: it *shakes* the formation it lands on, hardest from behind, and a
+  shaken formation is one that breaks. Pulling horse out, turning it and sending
+  it in again is therefore a real manoeuvre with a real reward, and cavalry
+  parked in a fight is cavalry wasted.
 - **Formations.** Line for frontage, column for crossings, wedge to charge,
   square against cavalry, loose to survive bombardment. Each trades something.
 - **The press.** A regiment fights along its frontage, so men beyond what that
