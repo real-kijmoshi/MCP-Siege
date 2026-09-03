@@ -157,7 +157,6 @@ async function bootstrap(): Promise<void> {
     },
     onNotice: (message) => {
       toast.show(message);
-      battleUx?.showCommand(message);
     },
     onOrderIssued: (message) => {
       beginFromOpening();
