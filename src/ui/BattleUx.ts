@@ -139,7 +139,7 @@ export class BattleUx {
   }
 
   public showCommand(message: string): void {
-    if (this.guideTitle === null || this.guideDetail === null) return;
+    if (this.guide === null || this.guideTitle === null || this.guideDetail === null) return;
     if (this.feedbackTimer !== undefined) window.clearTimeout(this.feedbackTimer);
     if (this.guideBadge !== null) this.guideBadge.textContent = '✓';
     this.guide.dataset.state = 'confirmed';
