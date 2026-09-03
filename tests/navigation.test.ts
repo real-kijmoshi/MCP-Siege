@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TICKS_PER_SECOND } from '../src/game/config/battle';
 import { BATTLE_MAPS } from '../src/game/config/maps';
-import { SCENARIO_IDS } from '../src/game/config/matches';
+import { AUTHORED_SCENARIO_IDS } from '../src/game/config/matches';
 import { SCENARIOS } from '../src/game/config/scenario';
 import { SimulationEngine } from '../src/game/simulation/Engine';
 import { activeGroups } from '../src/game/simulation/GameState';
@@ -19,12 +19,12 @@ import { ZONES, activeZoneIds, isPassable, useBattleMap } from '../src/game/simu
 /** Marches everything the player owns at the far side of the map. */
 function orderGeneralAdvance(engine: SimulationEngine): void {
   const state = engine.getState();
-  const map = BATTLE_MAPS[SCENARIOS[state.scenarioId].mapId];
+  const map = BATTLE_MAPS[state.mapId];
   engine.dispatch('human', {
     type: 'order_groups',
     playerId: 'player',
     groupIds: activeGroups(state, 'player')
-      .filter((group) => group.id !== 'royal_guard')
+      .filter((group) => group.id !== 'kingsguard')
       .map((group) => group.id),
     order: 'attack_zone',
     targetZone: map.enemyHomeZone,
@@ -32,7 +32,7 @@ function orderGeneralAdvance(engine: SimulationEngine): void {
 }
 
 describe('route planning', () => {
-  it.each(SCENARIO_IDS)('connects every pair of zones on %s over open ground', (scenarioId) => {
+  it.each(AUTHORED_SCENARIO_IDS)('connects every pair of zones on %s over open ground', (scenarioId) => {
     useBattleMap(SCENARIOS[scenarioId].mapId);
     const zoneIds = activeZoneIds();
 
@@ -64,7 +64,7 @@ describe('marching', () => {
     // press of friendly regiments walks a column off the line it was routed
     // along, and the line it was given then runs into the bank instead of onto
     // the bridge. It used to stand there for the rest of the battle.
-    const engine = new SimulationEngine({ scenarioId: 'riverwatch', difficultyId: 'captain', seed: 5 });
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 5 });
     const state = engine.getState();
 
     let worstBlockedRun = 0;
@@ -98,7 +98,7 @@ describe('marching', () => {
   });
 
   it('leaves no regiment standing on ground it cannot occupy', () => {
-    const engine = new SimulationEngine({ scenarioId: 'the_long_causeway', difficultyId: 'captain', seed: 3 });
+    const engine = new SimulationEngine({ scenarioId: 'salt_tide', difficultyId: 'captain', seed: 3 });
     const state = engine.getState();
 
     for (let tick = 0; tick < TICKS_PER_SECOND * 240; tick += 1) {
@@ -121,7 +121,7 @@ describe('marching', () => {
     // Unit positions are stored as 32-bit floats. Testing the wider intermediate
     // let a man wedged on the lip of a bridge pass the passability check and
     // then be written a few ten-thousandths the other side of it.
-    const engine = new SimulationEngine({ scenarioId: 'riverwatch', difficultyId: 'captain', seed: 5 });
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 5 });
     const state = engine.getState();
 
     for (let tick = 0; tick < TICKS_PER_SECOND * 240; tick += 1) {

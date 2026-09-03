@@ -19,64 +19,77 @@
     <div class="viewport-warning" role="alert">
       <div><strong>A larger battlefield is required</strong><p>Siege needs a window at least 760 × 480 to draw the field.</p></div>
     </div>
-    <section class="lobby" id="lobby" data-scenario="riverwatch" data-map="river_vale" aria-label="Battle lobby">
-      <header class="lobby-header">
-        <div class="lobby-brand">
-          <span class="crown-mark">♛</span>
-          <div><strong>SIEGE</strong><small>WAR COUNCIL</small></div>
+    <section class="council" id="lobby" data-map="river_vale" aria-label="War Council">
+      <header class="council-header">
+        <div class="council-brand">
+          <span class="crest icon" data-icon="crest"></span>
+          <span class="wordmark icon" data-icon="logo" role="img" aria-label="Siege"></span>
+          <small>WAR COUNCIL</small>
         </div>
-        <p>THE ASHEN WAR <i></i> DAY 41</p>
+        <p class="council-chapter">THE ASHEN WAR <i></i> DAY 41</p>
+        <div class="council-marshal" id="council-marshal" title="WebMCP tool availability">
+          <span class="dot"></span>
+          <small id="council-marshal-label">MARSHAL DETECTING</small>
+        </div>
       </header>
 
-      <main class="campaign-table">
-        <nav class="mission-ledger" aria-label="Choose operation">
-          <h1>Choose operation</h1>
-          <div class="scenario-list" id="lobby-scenarios"></div>
+      <main class="council-table">
+        <nav class="operation-ledger" aria-label="Choose an operation">
+          <h1>CHOOSE AN OPERATION</h1>
+          <div class="operation-list" id="lobby-operations"></div>
+          <p class="ledger-note" id="ledger-note">
+            The last seal is the table itself: a blank battle on any of the four battlefields,
+            yours to fight as it stands and your Marshal's to rewrite through WebMCP.
+          </p>
         </nav>
 
-        <section class="battle-preview">
-          <div class="battlefield-portrait" aria-label="Selected battlefield preview">
-            <div class="map-shade" aria-hidden="true"></div>
-            <div class="map-objective-ring" aria-hidden="true"><span>♚</span></div>
-            <div class="battle-standard crown-standard" aria-hidden="true"><i></i></div>
-            <div class="battle-standard ashen-standard" aria-hidden="true"><i></i></div>
-            <div class="map-host crown-host host-one" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-            <div class="map-host crown-host host-two" aria-hidden="true"><i></i><i></i><i></i></div>
-            <div class="map-host ashen-host host-one" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-            <div class="map-host ashen-host host-two" aria-hidden="true"><i></i><i></i><i></i></div>
-            <div class="march-arrow march-one" aria-hidden="true"></div>
-            <div class="march-arrow march-two" aria-hidden="true"></div>
-            <div class="map-key" aria-hidden="true">
-              <span><i class="key-swatch key-crown"></i>CROWN SPAWN</span>
-              <span><i class="key-swatch key-ashen"></i>ASHEN LINE</span>
-              <span><i class="key-ring"></i>OBJECTIVE</span>
+        <section class="operation-brief" aria-label="Operation briefing">
+          <figure class="field-portrait">
+            <canvas id="lobby-map" aria-label="Battlefield portrait"></canvas>
+            <figcaption>
+              <span class="icon" data-icon="map"></span>
+              <b id="brief-battlefield">RIVER VALE</b>
+              <em id="brief-terrain"></em>
+            </figcaption>
+            <ul class="portrait-key" aria-hidden="true">
+              <li><i class="key-block key-crown"></i>CROWN</li>
+              <li><i class="key-block key-ashen"></i>ASHEN</li>
+              <li><i class="key-block key-king"></i>KINGS</li>
+              <li><i class="key-block key-cross"></i>CROSSING</li>
+            </ul>
+          </figure>
+
+          <div class="brief-body">
+            <p class="brief-eyebrow">
+              <b id="brief-numeral">I</b><span id="brief-location"></span>
+            </p>
+            <h2 id="brief-name">Bridge of Knives</h2>
+            <p class="brief-summary" id="brief-summary"></p>
+            <p class="brief-twist" id="brief-twist"></p>
+
+            <div class="table-ground" id="table-ground" hidden>
+              <p><b>TABLE GROUND</b><em id="table-ground-note"></em></p>
+              <div class="ground-choices" id="table-ground-choices"></div>
             </div>
-            <div class="map-caption" id="briefing-map-caption" aria-hidden="true">RIVER VALE · DAWN</div>
+
+            <ul class="brief-orders" id="brief-orders"></ul>
+            <div class="brief-facts" id="brief-facts"></div>
           </div>
 
-          <div class="battle-order">
-            <div class="order-copy">
-              <h2 id="briefing-name">Riverwatch</h2>
-              <p id="briefing-description"></p>
-              <p class="ground-note" id="briefing-ground"></p>
-              <div class="primary-orders" id="briefing-orders"></div>
-              <div class="battle-facts" id="briefing-facts"></div>
-            </div>
+          <aside class="deploy-column">
+            <h3>ENEMY COMMANDER</h3>
+            <div class="commander-list" id="lobby-difficulties"></div>
+            <p class="commander-note" id="difficulty-description"></p>
 
-            <div class="commit-column">
-              <div class="commander-setting">
-                <div class="difficulty-heading">
-                  <span>Enemy commander</span>
-                  <small>Sets the difficulty</small>
-                </div>
-                <div class="difficulty-list" id="lobby-difficulties"></div>
-                <p class="difficulty-description" id="difficulty-description"></p>
-              </div>
-              <button class="deploy-button" id="lobby-deploy" type="button">
-                <span>DEPLOY ARMY</span><i>→</i>
-              </button>
-            </div>
-          </div>
+            <h3>ORDER OF BATTLE</h3>
+            <dl class="order-of-battle" id="brief-armies"></dl>
+
+            <button class="deploy-seal" id="lobby-deploy" type="button">
+              <span class="icon" data-icon="banner"></span>
+              <b>DEPLOY ARMY</b>
+              <em id="deploy-strength"></em>
+            </button>
+          </aside>
         </section>
       </main>
     </section>

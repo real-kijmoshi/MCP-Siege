@@ -25,10 +25,14 @@ export default defineConfig({
     // though every assertion passes, producing spurious onTaskUpdate errors.
     maxWorkers: 2,
     /*
-     * Several tests march the full 8,000-unit scenario for minutes of game
-     * time, which is seconds of wall clock. The 5s default is not a meaningful
-     * budget for those — the performance test asserts the real one, per tick.
+     * Several tests march a full seven-thousand-man operation for minutes of
+     * game time, which is tens of seconds of wall clock — and several of them
+     * run at once, on shared cores. The 5s default is not a meaningful budget
+     * for those, and neither was 60s once whole battles were being fought to a
+     * decision in the suite. The performance test asserts the real budget, per
+     * tick; this only has to be longer than the slowest honest run.
      */
-    testTimeout: 60_000,
+    testTimeout: 150_000,
   },
 });
+

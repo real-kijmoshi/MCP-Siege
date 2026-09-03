@@ -1,6 +1,5 @@
 import { TICKS_PER_SECOND } from '../config/battle';
 import { DIFFICULTIES, type ScriptedAiOrder } from '../config/matches';
-import { getScenarioDefinition } from '../config/scenario';
 import type { GameCommandPayload, OrderGroupsPayload } from '../commands/types';
 import type { ArmyGroup, ZoneId } from '../types/domain';
 import { raiseAlert } from './Alerts';
@@ -15,11 +14,16 @@ import { ZONES, activeZoneIds, homeZoneOf, zoneAt } from './Zones';
  * as an ordinary command, so the enemy plays by exactly the same rules.
  */
 
-/** The guard is seated with its king on the opening tick and does not leave. */
-function guardOrder(): ScriptedAiOrder {
+/**
+ * The guard is seated with its king on the opening tick and does not leave.
+ *
+ * Which regiment that is comes from the objective rather than a written id, so
+ * an operation designed through the War Council tools seats its own guard.
+ */
+function guardOrder(state: GameState): ScriptedAiOrder {
   return {
     atSeconds: 1,
-    groupId: 'ashen_guard',
+    groupId: state.objective.kings.enemy.guardGroupId,
     order: 'defend_zone',
     targetZone: homeZoneOf('enemy').id,
     formation: 'square',
@@ -30,8 +34,8 @@ function guardOrder(): ScriptedAiOrder {
 function scriptedThisTick(state: GameState): GameCommandPayload[] {
   const commands: GameCommandPayload[] = [];
   const difficulty = DIFFICULTIES[state.difficultyId];
-  const script = getScenarioDefinition(state.scenarioId).aiScript;
-  for (const entry of [guardOrder(), ...script]) {
+  const script = state.scenario.aiScript;
+  for (const entry of [guardOrder(state), ...script]) {
     // Fires on exactly the tick it comes due, so the script never repeats.
     const dueTick = Math.round(entry.atSeconds * difficulty.timelineScale * TICKS_PER_SECOND);
     if (state.currentTick !== dueTick) continue;
@@ -625,3 +629,4 @@ export function enemyAiCommands(state: GameState): GameCommandPayload[] {
     ...reactions(state),
   ];
 }
+

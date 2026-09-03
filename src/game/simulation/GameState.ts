@@ -1,6 +1,7 @@
 import { FOG_COLUMNS, FOG_ROWS } from '../config/battle';
 import type { BattleMapId } from '../config/maps';
 import type { DifficultyId, ScenarioId } from '../config/matches';
+import type { ScenarioDefinition } from '../config/scenario';
 import type {
   ArmyGroup,
   BattleAlert,
@@ -33,6 +34,14 @@ export interface PlayerBattleState {
 export interface GameState {
   gameSeed: number;
   scenarioId: ScenarioId;
+  /**
+   * The whole operation being fought, script included.
+   *
+   * Held here rather than looked up by id because a designed operation has no
+   * entry to look up, and because an engine that owns its own script cannot
+   * read a second engine's — two battles in one page stay independent.
+   */
+  scenario: ScenarioDefinition;
   difficultyId: DifficultyId;
   /** The ground this battle is fought on. Set by `buildScenario` and never changed. */
   mapId: BattleMapId;
@@ -96,14 +105,15 @@ function createPlaceholderKing(ownerId: PlayerId): KingState {
 
 export function createEmptyState(
   seed: number,
-  scenarioId: ScenarioId = 'riverwatch',
+  scenario: ScenarioDefinition,
   difficultyId: DifficultyId = 'captain',
 ): GameState {
   return {
     gameSeed: seed,
-    scenarioId,
+    scenarioId: scenario.id,
+    scenario,
     difficultyId,
-    mapId: 'river_vale',
+    mapId: scenario.mapId,
     random: { value: seed >>> 0 || 1 },
     currentTick: 0,
     commandSequence: 1,
@@ -216,3 +226,4 @@ export function stateChecksum(state: GameState): number {
   mix(state.objective.decidedAtTick);
   return hash >>> 0;
 }
+

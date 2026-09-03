@@ -6,8 +6,8 @@ describe('production command boundaries', () => {
   it('rejects a whole multi-group order atomically when one regiment cannot obey', () => {
     const engine = new SimulationEngine();
     const state = engine.getState();
-    const legion = findGroup(state, 'legion_i')!;
-    const scouts = findGroup(state, 'scouts')!;
+    const legion = findGroup(state, 'vanguard')!;
+    const scouts = findGroup(state, 'outrunners')!;
     scouts.routing = true;
     scouts.morale = 0;
 
@@ -16,7 +16,7 @@ describe('production command boundaries', () => {
     const command = engine.dispatch('human', {
       type: 'order_groups',
       playerId: 'player',
-      groupIds: ['legion_i', 'scouts'],
+      groupIds: ['vanguard', 'outrunners'],
       order: 'move',
       destination: { x: 3000, y: 3600 },
       formation: 'wedge',
@@ -33,7 +33,7 @@ describe('production command boundaries', () => {
 
   it('queues waypoints through a typed command without mutating on dispatch', () => {
     const engine = new SimulationEngine();
-    const group = findGroup(engine.getState(), 'legion_i')!;
+    const group = findGroup(engine.getState(), 'vanguard')!;
 
     engine.dispatch('human', {
       type: 'order_groups',
@@ -65,7 +65,7 @@ describe('production command boundaries', () => {
 
   it('accepts and acknowledges orders while battle time is paused', () => {
     const engine = new SimulationEngine();
-    const group = findGroup(engine.getState(), 'legion_i')!;
+    const group = findGroup(engine.getState(), 'vanguard')!;
     const tick = engine.getState().currentTick;
     const command = engine.dispatch('human', {
       type: 'order_groups',
@@ -85,8 +85,8 @@ describe('production command boundaries', () => {
   });
 
   it('rejects locations from another battlefield without changing the regiment', () => {
-    const engine = new SimulationEngine({ scenarioId: 'riverwatch' });
-    const group = findGroup(engine.getState(), 'legion_i')!;
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives' });
+    const group = findGroup(engine.getState(), 'vanguard')!;
     const command = engine.dispatch('debug', {
       type: 'order_groups',
       playerId: 'player',
@@ -105,8 +105,8 @@ describe('production command boundaries', () => {
 
   it('deploys heterogeneous regiments into distinct semantic slots atomically', () => {
     const engine = new SimulationEngine();
-    const legion = findGroup(engine.getState(), 'legion_i')!;
-    const archers = findGroup(engine.getState(), 'archers_i')!;
+    const legion = findGroup(engine.getState(), 'vanguard')!;
+    const archers = findGroup(engine.getState(), 'longbows')!;
     const command = engine.dispatch('human', {
       type: 'deploy_formation',
       playerId: 'player',
@@ -145,8 +145,8 @@ describe('production command boundaries', () => {
 
   it('rejects a whole custom deployment when one regiment cannot obey', () => {
     const engine = new SimulationEngine();
-    const legion = findGroup(engine.getState(), 'legion_i')!;
-    const scouts = findGroup(engine.getState(), 'scouts')!;
+    const legion = findGroup(engine.getState(), 'vanguard')!;
+    const scouts = findGroup(engine.getState(), 'outrunners')!;
     const originalFormation = legion.formation;
     scouts.routing = true;
     scouts.morale = 0;
@@ -170,7 +170,7 @@ describe('production command boundaries', () => {
   it('detaches one troop category without exposing or losing soldiers', () => {
     const engine = new SimulationEngine();
     const state = engine.getState();
-    const source = findGroup(state, 'reserve_i')!;
+    const source = findGroup(state, 'fenmen')!;
     const originalStrength = source.members.length;
     const originalArchers = source.members.filter(
       (index) => state.units.categoryOf(index) === 'archer',

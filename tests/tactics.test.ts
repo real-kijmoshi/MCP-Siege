@@ -7,7 +7,7 @@ import {
   UNIT_STATS,
   counterMultiplier,
 } from '../src/game/config/battle';
-import { createGroupFromSpec, type GroupSpec } from '../src/game/config/scenario';
+import { SCENARIOS, createGroupFromSpec, type GroupSpec } from '../src/game/config/scenario';
 import { formationRadius, formationSlots } from '../src/game/simulation/Formations';
 import { createEmptyState, findGroup, type GameState } from '../src/game/simulation/GameState';
 import { advanceCombat } from '../src/game/simulation/Combat';
@@ -107,7 +107,7 @@ function duel(
   defender: { category: UnitCategory; count: number; spec?: Partial<GroupSpec> },
   ticks = TICKS_PER_SECOND * 40,
 ): { state: GameState; attackers: number; defenders: number } {
-  const state = createEmptyState(1234);
+  const state = createEmptyState(1234, SCENARIOS.bridge_of_knives);
 
   createGroupFromSpec(state, {
     id: 'attacker',
@@ -147,7 +147,7 @@ function duel(
 
 describe('combat', () => {
   function archerShot(formation: 'line' | 'column'): { damage: number; engagement: number } {
-    const state = createEmptyState(6060);
+    const state = createEmptyState(6060, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'bows',
       name: 'Bows',
@@ -188,7 +188,7 @@ describe('combat', () => {
   });
 
   it('resolves a combat tick simultaneously instead of favouring the first pool slots', () => {
-    const state = createEmptyState(101);
+    const state = createEmptyState(101, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'first',
       name: 'First',
@@ -221,7 +221,7 @@ describe('combat', () => {
   });
 
   it('drops a stale target when its recycled slot now belongs to the same faction', () => {
-    const state = createEmptyState(202);
+    const state = createEmptyState(202, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'pursuer',
       name: 'Pursuer',
@@ -293,7 +293,7 @@ describe('combat', () => {
   });
 
   function cavalryStrike(speed: number, formation: 'line' | 'square', stance: 'aggressive' | 'defensive'): number {
-    const state = createEmptyState(8181);
+    const state = createEmptyState(8181, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'horse',
       name: 'Horse',
@@ -330,7 +330,7 @@ describe('combat', () => {
   });
 
   function pressureYield(stance: 'aggressive' | 'hold_ground'): number {
-    const state = createEmptyState(9191);
+    const state = createEmptyState(9191, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'press',
       name: 'Press',
@@ -371,7 +371,7 @@ describe('combat', () => {
 
 describe('movement physics', () => {
   it('halts a missile-led assault to fire and wheels the formation toward its target', () => {
-    const state = createEmptyState(7070);
+    const state = createEmptyState(7070, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'bows',
       name: 'Bows',
@@ -412,7 +412,7 @@ describe('movement physics', () => {
   });
 
   it('separates overlapping friendly regiments without exposing soldier identities', () => {
-    const state = createEmptyState(2020);
+    const state = createEmptyState(2020, SCENARIOS.bridge_of_knives);
     for (const id of ['first', 'second']) {
       createGroupFromSpec(state, {
         id,
@@ -454,7 +454,7 @@ describe('morale', () => {
   });
 
   it('refuses orders while routing, and accepts them again once rallied', () => {
-    const state = createEmptyState(99);
+    const state = createEmptyState(99, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'broken',
       name: 'Broken',
@@ -521,7 +521,7 @@ function battle(state: GameState, ticks: number): void {
  * in numbers, troop type and stance, so only the geometry differs.
  */
 function assault(kind: 'frontal' | 'ringed'): { survivors: number; encirclement: number } {
-  const state = createEmptyState(4242);
+  const state = createEmptyState(4242, SCENARIOS.bridge_of_knives);
 
   createGroupFromSpec(state, {
     id: 'held',
@@ -596,7 +596,7 @@ describe('envelopment', () => {
 
   it('holds a marching column at a blocking line instead of letting it walk through', () => {
     const march = (withLine: boolean): number => {
-      const state = createEmptyState(77);
+      const state = createEmptyState(77, SCENARIOS.bridge_of_knives);
       createGroupFromSpec(state, {
         id: 'column',
         name: 'Column',
@@ -638,7 +638,7 @@ describe('envelopment', () => {
 
   it('cuts down a formation that has already broken', () => {
     const chase = (broken: boolean): number => {
-      const state = createEmptyState(5150);
+      const state = createEmptyState(5150, SCENARIOS.bridge_of_knives);
 
       createGroupFromSpec(state, {
         id: 'pursuers',
@@ -694,7 +694,7 @@ describe('envelopment', () => {
  */
 describe('the press of men', () => {
   function pack(count: number, formation: 'block' | 'loose'): number {
-    const state = createEmptyState(5150);
+    const state = createEmptyState(5150, SCENARIOS.bridge_of_knives);
     for (let n = 0; n < count; n += 1) {
       createGroupFromSpec(state, {
         id: `packed_${n}`,
@@ -721,7 +721,7 @@ describe('the press of men', () => {
   });
 
   function blowWith(mutate: (group: ArmyGroup) => void): number {
-    const state = createEmptyState(6160);
+    const state = createEmptyState(6160, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'striker',
       name: 'Striker',
@@ -763,7 +763,7 @@ describe('the press of men', () => {
   });
 
   function shotAt(crowding: number): number {
-    const state = createEmptyState(6161);
+    const state = createEmptyState(6161, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'bows',
       name: 'Bows',
@@ -805,7 +805,7 @@ describe('crossings', () => {
    * exactly the ground being tested.
    */
   function blowFromTheCrossing(fromTheBridge: boolean): number {
-    const state = createEmptyState(9192);
+    const state = createEmptyState(9192, SCENARIOS.bridge_of_knives);
     useBattleMap('river_vale');
     const bridgeX = 4000;
     const centre = barrierCenterAt(bridgeX);
@@ -860,7 +860,7 @@ describe('crossings', () => {
 
 describe('exhaustion', () => {
   function endure(engagement: number, marching: boolean, ticks: number): number {
-    const state = createEmptyState(7170);
+    const state = createEmptyState(7170, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'weary',
       name: 'Weary',
@@ -888,7 +888,7 @@ describe('exhaustion', () => {
     expect(marched).toBeLessThan(fought * 0.5);
 
     // The same regiment, left standing out of contact, gets its wind back.
-    const state = createEmptyState(7170);
+    const state = createEmptyState(7170, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'weary',
       name: 'Weary',

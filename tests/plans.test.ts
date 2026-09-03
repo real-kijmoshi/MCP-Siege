@@ -36,31 +36,33 @@ function ironCrossing() {
     name: 'Operation Iron Crossing',
     steps: [
       {
-        groupId: 'legion_i',
+        groupId: 'vanguard',
         action: 'defend_zone',
         targetZone: 'central_field',
         startCondition: { kind: 'immediate' },
         note: 'Hold the centre.',
       },
       {
-        groupId: 'cavalry_i',
+        groupId: 'greyriders',
         action: 'move',
-        targetZone: 'west_forest',
+        // Ground the Grey Riders do not already stand on: an order to march
+        // where a regiment is standing is answered with hold, correctly.
+        targetZone: 'village',
         startCondition: { kind: 'immediate' },
-        note: 'Move through the western forest.',
+        note: 'Move up through the village.',
       },
       {
-        groupId: 'cavalry_i',
+        groupId: 'greyriders',
         action: 'attack_zone',
         targetZone: 'west_crossing',
         startCondition: { kind: 'timer_elapsed', seconds: 20 },
         note: 'Sweep the ford once the centre is committed.',
       },
       {
-        groupId: 'reserve_i',
+        groupId: 'fenmen',
         action: 'support',
-        targetGroupId: 'legion_i',
-        startCondition: { kind: 'morale_below', groupId: 'legion_i', value: 60 },
+        targetGroupId: 'vanguard',
+        startCondition: { kind: 'morale_below', groupId: 'vanguard', value: 60 },
         note: 'Commit the reserve if the centre wavers.',
       },
     ],
@@ -127,7 +129,7 @@ describe('plan mode', () => {
           name: 'Vague Plan',
           steps: [
             {
-              groupId: 'legion_i',
+              groupId: 'vanguard',
               action: 'attack_zone',
               startCondition: { kind: 'immediate' },
               note: 'Attack something.',
@@ -155,7 +157,7 @@ describe('plan mode', () => {
               operation: 'replace_step',
               stepId: secondStepId,
               step: {
-                groupId: 'cavalry_i',
+                groupId: 'greyriders',
                 action: 'move',
                 // The commander asks for the cavalry to swing further west.
                 targetZone: 'west_crossing',
@@ -191,12 +193,12 @@ describe('plan mode', () => {
 
     const state = engine.getState();
     // Two steps were immediate, two were gated.
-    expect(findGroup(state, 'legion_i')?.order.kind).toBe('defend_zone');
-    expect(findGroup(state, 'cavalry_i')?.order.kind).toBe('move');
+    expect(findGroup(state, 'vanguard')?.order.kind).toBe('defend_zone');
+    expect(findGroup(state, 'greyriders')?.order.kind).toBe('move');
     expect(state.conditionals).toHaveLength(2);
 
     // The reserve has not moved: its trigger has not been met.
-    expect(findGroup(state, 'reserve_i')?.order.kind).toBe('idle');
+    expect(findGroup(state, 'fenmen')?.order.kind).toBe('idle');
   });
 
   it('refuses to execute the same plan twice', async () => {
@@ -218,7 +220,7 @@ describe('plan mode', () => {
 
     expect(state.conditionals).toHaveLength(0);
     // Orders already issued still stand.
-    expect(findGroup(state, 'cavalry_i')?.order.kind).toBe('move');
+    expect(findGroup(state, 'greyriders')?.order.kind).toBe('move');
   });
 });
 
@@ -228,13 +230,13 @@ describe('conditional orders', () => {
     unwrap(await call(tools.executePlan({ planId: String(created.planId) })));
 
     const state = engine.getState();
-    const cavalryOrderBefore = findGroup(state, 'cavalry_i')?.order.kind;
+    const cavalryOrderBefore = findGroup(state, 'greyriders')?.order.kind;
     expect(cavalryOrderBefore).toBe('move');
 
     run(TICKS_PER_SECOND * 25);
 
-    expect(findGroup(state, 'cavalry_i')?.order.kind).toBe('attack_zone');
-    expect(findGroup(state, 'cavalry_i')?.order.targetZone).toBe('west_crossing');
+    expect(findGroup(state, 'greyriders')?.order.kind).toBe('attack_zone');
+    expect(findGroup(state, 'greyriders')?.order.targetZone).toBe('west_crossing');
     // The timed conditional is consumed; only the morale one remains.
     expect(state.conditionals).toHaveLength(1);
     expect(state.conditionals[0]?.condition.kind).toBe('morale_below');
@@ -244,9 +246,9 @@ describe('conditional orders', () => {
     unwrap(
       await call(
         tools.setConditionalOrder({
-          groupId: 'legion_ii',
+          groupId: 'ironbacks',
           action: 'retreat',
-          condition: { kind: 'morale_below', groupId: 'legion_ii', value: 25 },
+          condition: { kind: 'morale_below', groupId: 'ironbacks', value: 25 },
           note: 'Pull back before it breaks.',
         }),
       ),
@@ -255,7 +257,7 @@ describe('conditional orders', () => {
     const orders = unwrap(tools.getActiveOrders());
     const conditionals = orders.conditionalOrders as Array<{ trigger: string; groupId: string }>;
     expect(conditionals).toHaveLength(1);
-    expect(conditionals[0]?.groupId).toBe('legion_ii');
+    expect(conditionals[0]?.groupId).toBe('ironbacks');
     expect(conditionals[0]?.trigger).toContain('morale');
   });
 
@@ -263,7 +265,7 @@ describe('conditional orders', () => {
     expectFailure(
       await call(
         tools.setConditionalOrder({
-          groupId: 'legion_ii',
+          groupId: 'ironbacks',
           action: 'retreat',
           condition: { kind: 'immediate' },
           note: 'This should be an order, not a trigger.',
@@ -277,7 +279,7 @@ describe('conditional orders', () => {
     expectFailure(
       await call(
         tools.setConditionalOrder({
-          groupId: 'legion_ii',
+          groupId: 'ironbacks',
           action: 'retreat',
           condition: { kind: 'friendly_zone_lost', zoneId: 'atlantis' },
           note: 'Nope.',
@@ -291,7 +293,7 @@ describe('conditional orders', () => {
     const armed = unwrap(
       await call(
         tools.setConditionalOrder({
-          groupId: 'legion_ii',
+          groupId: 'ironbacks',
           action: 'retreat',
           condition: { kind: 'timer_elapsed', seconds: 600 },
           note: 'Late withdrawal.',
@@ -303,3 +305,4 @@ describe('conditional orders', () => {
     expect(engine.getState().conditionals).toHaveLength(0);
   });
 });
+

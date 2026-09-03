@@ -9,8 +9,11 @@ import {
 } from '../simulation/Zones';
 import { type BattleMapId } from './maps';
 import {
+  AUTHORED_SCENARIO_IDS,
+  type AuthoredScenarioId,
   type ScenarioId,
   type ScriptedAiOrder,
+  type SimulationOptions,
 } from './matches';
 import {
   factionOf,
@@ -24,18 +27,29 @@ import {
 } from '../types/domain';
 
 /**
- * Authored battle scenarios.
+ * The authored operations.
  *
- * A scenario is a map, a deployment on it, and a written enemy script. The two
- * armies are always the same twenty regiments, so `redeploy` restates only what
- * a given operation changes — where a regiment stands, how it is drawn up, and
- * occasionally what it is made of. That keeps every group id stable across
- * every battlefield, which is what lets one WebMCP tool surface and one enemy
- * commander serve all of them.
+ * An operation is a map, a deployment on it, and a written enemy commander. All
+ * four are fought by the same twenty-six regiments under the same ids, because one
+ * stable order of battle is what lets a single WebMCP surface, a single roster
+ * and a single enemy commander serve every battle — and it is what makes a
+ * designed operation (`config/customBattle.ts`) indistinguishable from an
+ * authored one at every layer above this file.
  *
- * Openings are quiet enough to command by hand, and each escalation timeline
- * deliberately overloads a single human a few minutes in — which is the moment
- * the Marshal earns its place.
+ * Each operation exists to pose one problem the others do not:
+ *
+ *   I.   Bridge of Knives — a trap. The centre is bait, and the whole
+ *        operation turns on how long you can bear to leave it there.
+ *   II.  The Ember Gate — two ways through a wall, both of them two-way. The
+ *        gap you are not using is the gap they will use.
+ *   III. The Salt Tide — your sovereign is on the wrong side of the water and
+ *        the tide does not care. Everything is a race.
+ *   IV.  The Open Hand — no feature on the whole field. Two open ends, and two
+ *        bodies of horse already going round them.
+ *
+ * Openings are quiet enough to command by hand, and every timeline deliberately
+ * overloads a single human a few minutes in — which is the moment the Marshal
+ * earns its place.
  */
 
 export interface GroupSpec {
@@ -52,73 +66,87 @@ export interface GroupSpec {
 const FACING_NORTH = -Math.PI / 2;
 const FACING_SOUTH = Math.PI / 2;
 
-export const PLAYER_GROUPS: readonly GroupSpec[] = [
+/* --------------------------------------------------------- orders of battle */
+
+/**
+ * The Crown army.
+ *
+ * Thirteen regiments: the rewritten line and horse retain the gunpowder,
+ * artillery and field-support arms added after this operation branch began.
+ * The Kingsguard carry King Aldric and remain the one regiment that cannot be
+ * spent freely.
+ *
+ * Anchors here are the River Vale deployment. Every other operation restates
+ * what it changes through `redeploy`, so a regiment keeps its id, its name and
+ * its character wherever it is sent.
+ */
+export const CROWN_ARMY: readonly GroupSpec[] = [
   {
-    id: 'legion_i',
-    name: 'Legion I',
+    id: 'vanguard',
+    name: 'Crown Vanguard',
     ownerId: 'player',
-    anchor: { x: 3480, y: 3150 },
+    anchor: { x: 2900, y: 3080 },
     formation: 'line',
     stance: 'defensive',
-    composition: [['infantry', 640], ['heavy_infantry', 260]],
+    composition: [['infantry', 620], ['heavy_infantry', 180]],
   },
   {
-    id: 'legion_ii',
-    name: 'Legion II',
+    id: 'ironbacks',
+    name: 'The Ironbacks',
     ownerId: 'player',
-    anchor: { x: 4520, y: 3180 },
+    anchor: { x: 5100, y: 3020 },
     formation: 'line',
-    stance: 'defensive',
-    composition: [['infantry', 560], ['heavy_infantry', 140]],
+    stance: 'hold_ground',
+    composition: [['heavy_infantry', 380]],
   },
   {
-    id: 'spearwall',
-    name: 'Spearwall',
+    id: 'hedge',
+    name: 'The Hedge',
     ownerId: 'player',
-    anchor: { x: 4000, y: 2930 },
+    anchor: { x: 4000, y: 3220 },
     formation: 'double_line',
     stance: 'hold_ground',
-    composition: [['spearman', 400]],
+    composition: [['spearman', 420]],
   },
   {
-    id: 'archers_i',
-    name: 'Archers I',
+    id: 'longbows',
+    name: 'Longbow Corps',
     ownerId: 'player',
-    anchor: { x: 4000, y: 3560 },
+    anchor: { x: 4000, y: 2960 },
     formation: 'double_line',
     stance: 'defensive',
-    composition: [['archer', 450]],
+    composition: [['archer', 460]],
   },
   {
-    id: 'cavalry_i',
-    name: 'Cavalry I',
+    id: 'greyriders',
+    name: 'Grey Riders',
     ownerId: 'player',
-    anchor: { x: 1950, y: 3320 },
+    anchor: { x: 1500, y: 3400 },
     formation: 'wedge',
     stance: 'aggressive',
-    composition: [['cavalry', 260]],
+    composition: [['cavalry', 280]],
   },
   {
-    id: 'cavalry_ii',
-    name: 'Cavalry II',
+    id: 'lancers',
+    name: 'Vale Lancers',
     ownerId: 'player',
-    anchor: { x: 6480, y: 3320 },
+    anchor: { x: 7150, y: 3150 },
     formation: 'wedge',
     stance: 'aggressive',
-    composition: [['cavalry', 180]],
+    composition: [['cavalry', 200]],
   },
   {
-    id: 'siege_corps',
-    name: 'Siege Corps',
+    id: 'hammers',
+    name: 'Hammer Battery',
     ownerId: 'player',
-    anchor: { x: 4950, y: 3060 },
+    anchor: { x: 4950, y: 3300 },
     formation: 'loose',
     stance: 'hold_ground',
     composition: [['siege', 40]],
   },
   {
     id: 'arquebusiers',
-    name: 'Arquebusiers',
+    name: 'Crown Arquebusiers',
     ownerId: 'player',
     anchor: { x: 4560, y: 3420 },
     formation: 'double_line',
@@ -144,94 +172,101 @@ export const PLAYER_GROUPS: readonly GroupSpec[] = [
     composition: [['surgeon', 70]],
   },
   {
-    id: 'scouts',
-    name: 'Scouts',
+    id: 'outrunners',
+    name: 'Outrunners',
     ownerId: 'player',
-    anchor: { x: 5700, y: 3250 },
+    anchor: { x: 1750, y: 3000 },
     formation: 'loose',
     stance: 'defensive',
-    composition: [['scout', 40]],
+    composition: [['scout', 45]],
   },
   {
-    id: 'reserve_i',
-    name: 'Reserve I',
+    id: 'fenmen',
+    name: 'Fenmen Levy',
     ownerId: 'player',
-    anchor: { x: 4000, y: 4420 },
+    anchor: { x: 4000, y: 4020 },
     formation: 'block',
     stance: 'defensive',
-    composition: [['infantry', 400], ['spearman', 120], ['archer', 80]],
+    composition: [['infantry', 380], ['spearman', 120], ['archer', 80]],
   },
   {
-    id: 'royal_guard',
-    name: 'Royal Guard',
+    id: 'kingsguard',
+    name: 'The Kingsguard',
     ownerId: 'player',
-    anchor: { x: 4000, y: 4620 },
+    anchor: { x: 4000, y: 4520 },
     formation: 'square',
     stance: 'hold_ground',
-    composition: [['heavy_infantry', 260], ['spearman', 120]],
+    composition: [['heavy_infantry', 250], ['spearman', 120]],
   },
 ];
 
-export const ENEMY_GROUPS: readonly GroupSpec[] = [
+/**
+ * The Ashen host.
+ *
+ * Deliberately the Crown army's mirror with a heavier centre and one more
+ * horseman, plus the same later gunpowder and support arms as the current
+ * battlefield simulation.
+ */
+export const ASHEN_ARMY: readonly GroupSpec[] = [
   {
-    id: 'iron_host',
-    name: 'Iron Host',
+    id: 'cinder_host',
+    name: 'The Cinder Host',
     ownerId: 'enemy',
-    anchor: { x: 3780, y: 1660 },
+    anchor: { x: 3820, y: 1760 },
     formation: 'line',
-    stance: 'defensive',
-    composition: [['infantry', 700], ['heavy_infantry', 250]],
+    stance: 'aggressive',
+    composition: [['infantry', 700], ['heavy_infantry', 240]],
   },
   {
-    id: 'ash_legion',
-    name: 'Ash Legion',
+    id: 'blackforge',
+    name: 'Blackforge Foot',
     ownerId: 'enemy',
-    anchor: { x: 4680, y: 1660 },
+    anchor: { x: 4200, y: 1520 },
     formation: 'line',
-    stance: 'defensive',
-    composition: [['infantry', 700]],
+    stance: 'aggressive',
+    composition: [['heavy_infantry', 320]],
   },
   {
-    id: 'northern_spears',
-    name: 'Northern Spears',
+    id: 'thornspears',
+    name: 'Thornspear Wall',
     ownerId: 'enemy',
-    anchor: { x: 4200, y: 1960 },
+    anchor: { x: 4000, y: 1980 },
     formation: 'double_line',
     stance: 'hold_ground',
-    composition: [['spearman', 380]],
+    composition: [['spearman', 400]],
   },
   {
-    id: 'black_arrows',
-    name: 'Black Arrows',
+    id: 'emberbows',
+    name: 'Emberbow Ranks',
     ownerId: 'enemy',
-    anchor: { x: 4200, y: 1230 },
+    anchor: { x: 4000, y: 1250 },
     formation: 'double_line',
     stance: 'defensive',
-    composition: [['archer', 480]],
+    composition: [['archer', 470]],
   },
   {
-    id: 'storm_riders',
-    name: 'Storm Riders',
+    id: 'ash_riders',
+    name: 'Ash Riders',
     ownerId: 'enemy',
-    anchor: { x: 2480, y: 1520 },
+    anchor: { x: 2400, y: 1600 },
     formation: 'wedge',
     stance: 'aggressive',
     composition: [['cavalry', 300]],
   },
   {
-    id: 'night_riders',
-    name: 'Night Riders',
+    id: 'dusk_riders',
+    name: 'Dusk Riders',
     ownerId: 'enemy',
-    anchor: { x: 6350, y: 1780 },
+    anchor: { x: 6300, y: 1700 },
     formation: 'wedge',
     stance: 'aggressive',
     composition: [['cavalry', 220]],
   },
   {
-    id: 'siege_train',
-    name: 'Siege Train',
+    id: 'slagworks',
+    name: 'Slagworks Train',
     ownerId: 'enemy',
-    anchor: { x: 4000, y: 940 },
+    anchor: { x: 4000, y: 980 },
     formation: 'loose',
     stance: 'hold_ground',
     composition: [['siege', 45]],
@@ -264,26 +299,26 @@ export const ENEMY_GROUPS: readonly GroupSpec[] = [
     composition: [['surgeon', 70]],
   },
   {
-    id: 'outriders',
-    name: 'Outriders',
+    id: 'crow_scouts',
+    name: 'Crow Scouts',
     ownerId: 'enemy',
-    anchor: { x: 5400, y: 1620 },
+    anchor: { x: 5400, y: 1600 },
     formation: 'loose',
     stance: 'defensive',
     composition: [['scout', 45]],
   },
   {
-    id: 'ashen_reserve',
-    name: 'Ashen Reserve',
+    id: 'ember_reserve',
+    name: 'Ember Reserve',
     ownerId: 'enemy',
-    anchor: { x: 4000, y: 840 },
+    anchor: { x: 4000, y: 820 },
     formation: 'block',
     stance: 'defensive',
     composition: [['infantry', 380], ['spearman', 120]],
   },
   {
     id: 'ashen_guard',
-    name: 'Ashen Guard',
+    name: 'The Ashen Guard',
     ownerId: 'enemy',
     anchor: { x: 4000, y: 560 },
     formation: 'square',
@@ -306,579 +341,446 @@ export interface KingSpec {
 }
 
 export const KING_SPECS: readonly KingSpec[] = [
-  { ownerId: 'player', name: 'King Aldric', guardGroupId: 'royal_guard' },
+  { ownerId: 'player', name: 'King Aldric', guardGroupId: 'kingsguard' },
   { ownerId: 'enemy', name: 'The Ashen King', guardGroupId: 'ashen_guard' },
 ];
+
+/** Where an operation came from. The War Council labels designed ones plainly. */
+export type ScenarioOrigin = 'authored' | 'designed';
 
 export interface ScenarioDefinition {
   id: ScenarioId;
   /** The ground it is fought on. Deployments are in that map's coordinates. */
   mapId: BattleMapId;
-  eyebrow: string;
+  /** Shown as the seal on the operation card. Two characters at most. */
+  numeral: string;
   name: string;
-  description: string;
+  location: string;
+  /** One paragraph of situation for the briefing. */
+  summary: string;
+  /** One line, carried across the cut onto the battlefield itself. */
+  briefingLine: string;
+  /** The one thing that makes this operation itself and not another. */
+  twist: string;
   objective: string;
   pressure: string;
   duration: string;
   tags: readonly string[];
-  location: string;
-  briefingLine: string;
-  battleOrders: readonly [string, string];
-  battleFacts: readonly [string, string, string];
+  battleOrders: readonly string[];
+  battleFacts: readonly string[];
   playerArmyName: string;
   enemyArmyName: string;
   playerGroups: readonly GroupSpec[];
   enemyGroups: readonly GroupSpec[];
   kingSpecs: readonly KingSpec[];
   aiScript: readonly ScriptedAiOrder[];
+  origin: ScenarioOrigin;
 }
 
 type GroupChanges = Partial<
-  Record<
-    string,
-    Partial<Pick<GroupSpec, 'anchor' | 'formation' | 'stance' | 'composition'>>
-  >
+  Record<string, Partial<Pick<GroupSpec, 'anchor' | 'formation' | 'stance' | 'composition'>>>
 >;
 
+/** Restates only what an operation changes about a regiment. */
 function redeploy(groups: readonly GroupSpec[], changes: GroupChanges): GroupSpec[] {
   return groups.map((group) => ({ ...group, ...changes[group.id] }));
 }
 
-const RIVERWATCH_SCRIPT: readonly ScriptedAiOrder[] = [
-  { atSeconds: 18, groupId: 'iron_host', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
-  { atSeconds: 22, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
-  { atSeconds: 28, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
-  { atSeconds: 34, groupId: 'black_arrows', order: 'move', targetZone: 'central_bridge', formation: 'column' },
-  { atSeconds: 46, groupId: 'black_guns', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 58, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column' },
-  { atSeconds: 78, groupId: 'ashen_surgeons', order: 'move', targetZone: 'enemy_outer_defense', formation: 'loose' },
-  { atSeconds: 85, groupId: 'iron_host', order: 'attack_zone', targetZone: 'central_field', formation: 'line' },
-  { atSeconds: 92, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_field', formation: 'line' },
-  { atSeconds: 100, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'central_field', formation: 'double_line' },
-  { atSeconds: 115, groupId: 'night_riders', order: 'attack_zone', targetZone: 'east_crossing', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 150, groupId: 'night_riders', order: 'attack_zone', targetZone: 'east_field', formation: 'wedge' },
-  { atSeconds: 175, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'west_crossing', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 235, groupId: 'siege_train', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 250, groupId: 'ashen_reserve', order: 'move', targetZone: 'enemy_outer_defense' },
-  { atSeconds: 300, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'central_field', formation: 'wedge' },
-  { atSeconds: 340, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'central_bridge' },
-  { atSeconds: 400, groupId: 'night_riders', order: 'attack_zone', targetZone: 'player_base', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 460, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'player_base', formation: 'column' },
-];
-
-const BRIDGEHEAD_PLAYER = redeploy(PLAYER_GROUPS, {
-  // The shot crosses with the vanguard; the guns and the surgeons do not. A
-  // hospital on the wrong bank means every wounded regiment has to come back
-  // over the bridge the whole operation depends on keeping open.
-  arquebusiers: { anchor: { x: 4350, y: 1950 }, stance: 'aggressive' },
-  culverins: { anchor: { x: 4750, y: 2250 } },
-  field_hospital: { anchor: { x: 4000, y: 3450 } },
-  legion_i: { anchor: { x: 3450, y: 2050 }, stance: 'aggressive' },
-  legion_ii: { anchor: { x: 4650, y: 2080 }, stance: 'aggressive' },
-  spearwall: { anchor: { x: 4020, y: 2280 }, formation: 'line' },
-  archers_i: { anchor: { x: 4050, y: 1810 } },
-  cavalry_i: { anchor: { x: 2100, y: 2250 } },
-  cavalry_ii: { anchor: { x: 6200, y: 2200 } },
-  siege_corps: { anchor: { x: 5100, y: 2020 } },
-  scouts: { anchor: { x: 5850, y: 1900 } },
-  reserve_i: { anchor: { x: 4000, y: 3400 } },
-});
-
-const BRIDGEHEAD_ENEMY = redeploy(ENEMY_GROUPS, {
-  ash_shot: { anchor: { x: 4450, y: 1100 } },
-  black_guns: { anchor: { x: 3800, y: 800 } },
-  ashen_surgeons: { anchor: { x: 4300, y: 620 } },
-  iron_host: { anchor: { x: 3400, y: 1220 }, stance: 'aggressive' },
-  ash_legion: { anchor: { x: 4800, y: 1240 }, stance: 'aggressive' },
-  northern_spears: { anchor: { x: 4100, y: 1480 } },
-  black_arrows: { anchor: { x: 4100, y: 900 } },
-  storm_riders: { anchor: { x: 1900, y: 1450 } },
-  night_riders: { anchor: { x: 6500, y: 1500 } },
-});
-
-const BRIDGEHEAD_SCRIPT: readonly ScriptedAiOrder[] = [
-  { atSeconds: 18, groupId: 'iron_host', order: 'attack_zone', targetZone: 'central_bridge', formation: 'line', stance: 'aggressive' },
-  { atSeconds: 24, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_bridge', formation: 'line', stance: 'aggressive' },
-  { atSeconds: 32, groupId: 'northern_spears', order: 'defend_zone', targetZone: 'enemy_outer_defense', formation: 'double_line' },
-  { atSeconds: 42, groupId: 'black_arrows', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose' },
-  { atSeconds: 52, groupId: 'black_guns', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 58, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'enemy_outer_defense', formation: 'double_line' },
-  { atSeconds: 65, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'west_crossing', formation: 'wedge' },
-  { atSeconds: 72, groupId: 'night_riders', order: 'attack_zone', targetZone: 'east_crossing', formation: 'wedge' },
-  { atSeconds: 115, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'enemy_outer_defense', formation: 'line' },
-  { atSeconds: 150, groupId: 'siege_train', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose' },
-  { atSeconds: 210, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'player_base', formation: 'wedge' },
-  { atSeconds: 260, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'player_base', formation: 'column' },
-];
-
-const LAST_LIGHT_PLAYER = redeploy(PLAYER_GROUPS, {
-  arquebusiers: { anchor: { x: 4550, y: 3950 } },
-  culverins: { anchor: { x: 3500, y: 4350 } },
-  field_hospital: { anchor: { x: 4000, y: 4700 } },
-  legion_i: { anchor: { x: 3050, y: 3850 }, formation: 'double_line' },
-  legion_ii: { anchor: { x: 5000, y: 3850 }, formation: 'double_line' },
-  spearwall: { anchor: { x: 4000, y: 3550 }, formation: 'square' },
-  archers_i: { anchor: { x: 4050, y: 4050 }, formation: 'loose' },
-  cavalry_i: { anchor: { x: 2450, y: 4100 } },
-  cavalry_ii: { anchor: { x: 5650, y: 4100 } },
-  siege_corps: { anchor: { x: 5050, y: 4300 } },
-  scouts: { anchor: { x: 6500, y: 3850 } },
-  reserve_i: { anchor: { x: 3150, y: 4500 }, formation: 'square' },
-});
-
-const LAST_LIGHT_ENEMY = redeploy(ENEMY_GROUPS, {
-  ash_shot: { anchor: { x: 4600, y: 2750 } },
-  black_guns: { anchor: { x: 4500, y: 2300 } },
-  ashen_surgeons: { anchor: { x: 3600, y: 1850 } },
-  iron_host: { anchor: { x: 3450, y: 2850 }, stance: 'aggressive' },
-  ash_legion: { anchor: { x: 4700, y: 2900 }, stance: 'aggressive' },
-  northern_spears: { anchor: { x: 4050, y: 3050 }, stance: 'aggressive' },
-  black_arrows: { anchor: { x: 4050, y: 2550 }, formation: 'loose' },
-  storm_riders: { anchor: { x: 2050, y: 3100 } },
-  night_riders: { anchor: { x: 6100, y: 3100 } },
-  siege_train: { anchor: { x: 5000, y: 2600 } },
-  ashen_reserve: { anchor: { x: 4000, y: 2050 } },
-});
-
-/* ------------------------------------------------ IV. Ashfall Pass: assault */
+/* ------------------------------------------- I. Bridge of Knives: the trap */
 
 /**
- * Cinder Road.
+ * River Vale, from the south bank.
  *
- * The first battle fought somewhere other than the Vale. There is no line to
- * hold here: the spine cannot be crossed, so the whole army has to be fed into
- * two gaps four kilometres apart, and the commander's real decision is which
- * one he means and which one he is only pretending to mean. The siege train is
- * doubled, because the only way to soften a held gap is to shoot into it.
- */
-const CINDER_ROAD_PLAYER = redeploy(PLAYER_GROUPS, {
-  // One arm to each gap. Whichever the commander is only pretending to mean,
-  // he has already committed a battery to it that cannot be recalled in time.
-  arquebusiers: { anchor: { x: 5700, y: 3700 }, stance: 'aggressive' },
-  culverins: { anchor: { x: 2600, y: 4100 } },
-  field_hospital: { anchor: { x: 4000, y: 4400 } },
-  legion_i: { anchor: { x: 2400, y: 3450 }, formation: 'column', stance: 'aggressive' },
-  legion_ii: { anchor: { x: 5750, y: 3550 }, formation: 'column', stance: 'aggressive' },
-  spearwall: { anchor: { x: 2300, y: 3850 }, formation: 'line' },
-  archers_i: { anchor: { x: 2600, y: 3950 }, composition: [['archer', 470]] },
-  cavalry_i: { anchor: { x: 1400, y: 3500 } },
-  cavalry_ii: { anchor: { x: 6400, y: 3700 } },
-  siege_corps: { anchor: { x: 5700, y: 3900 }, composition: [['siege', 48]] },
-  scouts: { anchor: { x: 4000, y: 3400 } },
-  reserve_i: { anchor: { x: 4000, y: 4300 } },
-  // The Crown rides up the Smoke Road with the assault rather than waiting in
-  // camp. Left at the muster he was simply unreachable — the spine protected
-  // him better than his guard did, and the operation stopped being a battle
-  // and became an arithmetic exercise the player could not lose.
-  royal_guard: { anchor: { x: 4000, y: 3950 } },
-});
-
-const CINDER_ROAD_ENEMY = redeploy(ENEMY_GROUPS, {
-  ash_shot: { anchor: { x: 5900, y: 2050 } },
-  black_guns: { anchor: { x: 2400, y: 1600 } },
-  ashen_surgeons: { anchor: { x: 4000, y: 1000 } },
-  iron_host: {
-    anchor: { x: 2400, y: 2050 },
-    formation: 'double_line',
-    stance: 'hold_ground',
-    composition: [['infantry', 700], ['heavy_infantry', 350]],
-  },
-  ash_legion: { anchor: { x: 5750, y: 2150 }, formation: 'double_line', stance: 'hold_ground' },
-  northern_spears: { anchor: { x: 2200, y: 1750 }, composition: [['spearman', 480]] },
-  black_arrows: { anchor: { x: 5900, y: 1900 } },
-  storm_riders: { anchor: { x: 3300, y: 1750 } },
-  night_riders: { anchor: { x: 5000, y: 1600 } },
-  siege_train: { anchor: { x: 4000, y: 1500 } },
-  outriders: { anchor: { x: 4600, y: 2050 } },
-  ashen_reserve: { anchor: { x: 4000, y: 1200 } },
-  ashen_guard: { anchor: { x: 4000, y: 750 } },
-});
-
-/**
- * The Ashen commander does not stand in his own gaps.
+ * The deployment is the operation. A corps of bows stands alone at the central
+ * bridge with a wall of spears behind it and nothing else within half a mile,
+ * which reads to the Ashen commander as a thin centre worth crossing. Both
+ * bodies of foot sit back and wide of it, and both bodies of horse wait in the
+ * woods on either flank.
  *
- * He tried it, and it was a massacre in the player's favour: a formation packed
- * into a defile is attacked from more quarters than it can face, and the
- * envelopment terms turn a held gap into a killing pen for its own garrison. He
- * holds the ground the gap debouches onto instead — the wood above Cinder Gap
- * and the walls of Emberhold above the Gate — so the assault has to come out of
- * the defile in a column and form up under fire.
+ * What the ground then does is the point: a regiment that crosses a bridge
+ * arrives crowded — packed so tightly it cannot swing — and a crowded regiment
+ * that is closed on from two sides is surrounded as well. A commander who
+ * springs this early meets the Cinder Host in the open at full strength. A
+ * commander who waits meets half of it, wedged on a bridgehead, at half value.
+ *
+ * Both armies stand where the base orders of battle place them, so there is no
+ * redeployment here — only the timetable below, which is the Ashen commander
+ * taking the bait exactly as it was left for him.
  */
-const CINDER_ROAD_SCRIPT: readonly ScriptedAiOrder[] = [
-  { atSeconds: 12, groupId: 'iron_host', order: 'defend_zone', targetZone: 'obsidian_wood', formation: 'double_line', stance: 'hold_ground' },
-  { atSeconds: 16, groupId: 'ash_legion', order: 'defend_zone', targetZone: 'emberhold', formation: 'double_line', stance: 'hold_ground' },
-  { atSeconds: 26, groupId: 'black_arrows', order: 'defend_zone', targetZone: 'emberhold', formation: 'loose' },
-  { atSeconds: 34, groupId: 'northern_spears', order: 'defend_zone', targetZone: 'obsidian_wood', formation: 'double_line' },
-  { atSeconds: 40, groupId: 'night_riders', order: 'attack_zone', targetZone: 'slag_flats', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 55, groupId: 'storm_riders', order: 'defend_zone', targetZone: 'obsidian_wood', formation: 'wedge' },
-  { atSeconds: 120, groupId: 'night_riders', order: 'defend_zone', targetZone: 'emberhold', formation: 'wedge' },
-  { atSeconds: 70, groupId: 'black_guns', order: 'attack_zone', targetZone: 'cinder_gap', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 88, groupId: 'ash_shot', order: 'defend_zone', targetZone: 'emberhold', formation: 'double_line', stance: 'hold_ground' },
-  { atSeconds: 100, groupId: 'siege_train', order: 'attack_zone', targetZone: 'ashfall_gate', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 130, groupId: 'ashen_reserve', order: 'move', targetZone: 'upper_terrace' },
-  // Once the assault is committed in the defile, the horse goes into it.
-  { atSeconds: 185, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'cinder_gap', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 215, groupId: 'night_riders', order: 'attack_zone', targetZone: 'ashfall_gate', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 250, groupId: 'outriders', order: 'move', targetZone: 'obsidian_wood', formation: 'loose' },
-  // The gate the player did not choose is a door that opens both ways.
-  { atSeconds: 290, groupId: 'night_riders', order: 'attack_zone', targetZone: 'smoke_road', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 340, groupId: 'iron_host', order: 'attack_zone', targetZone: 'cinder_gap', formation: 'line', stance: 'aggressive' },
-  { atSeconds: 400, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'smoke_road', formation: 'column', stance: 'aggressive' },
-  { atSeconds: 460, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'cinder_gap', formation: 'column' },
+const KNIVES_SCRIPT: readonly ScriptedAiOrder[] = [
+  // The bait is taken: the heavy centre goes straight down the bridge road.
+  { atSeconds: 15, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column', stance: 'aggressive' },
+  { atSeconds: 22, groupId: 'blackforge', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column', stance: 'aggressive' },
+  { atSeconds: 30, groupId: 'thornspears', order: 'move', targetZone: 'central_bridge', formation: 'column' },
+  { atSeconds: 55, groupId: 'emberbows', order: 'move', targetZone: 'enemy_outer_defense', formation: 'loose' },
+  // And unfolds on the near bank, which is where it is worth killing.
+  { atSeconds: 95, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'central_field', formation: 'line' },
+  { atSeconds: 108, groupId: 'blackforge', order: 'attack_zone', targetZone: 'central_field', formation: 'line' },
+  { atSeconds: 122, groupId: 'thornspears', order: 'attack_zone', targetZone: 'central_field', formation: 'double_line' },
+  // The flanks are opened late, so an army that emptied them is punished.
+  { atSeconds: 140, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'east_crossing', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 190, groupId: 'emberbows', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose' },
+  { atSeconds: 205, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'east_field', formation: 'wedge' },
+  { atSeconds: 240, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'west_crossing', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 265, groupId: 'slagworks', order: 'attack_zone', targetZone: 'central_bridge', formation: 'loose', stance: 'hold_ground' },
+  { atSeconds: 300, groupId: 'ember_reserve', order: 'move', targetZone: 'enemy_outer_defense' },
+  { atSeconds: 330, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'village', formation: 'wedge' },
+  { atSeconds: 380, groupId: 'ember_reserve', order: 'attack_zone', targetZone: 'central_bridge', formation: 'line' },
+  // If nothing has decided the field by now, both horse go for the Crown.
+  { atSeconds: 430, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'player_base', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 500, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'player_base', formation: 'column' },
 ];
 
-/* -------------------------------------------- V. Ashfall Pass: the far side */
+/* ---------------------------------------------- II. The Ember Gate: the door */
 
 /**
- * The Ashen Gate.
+ * Ashfall Pass, from below the spine.
  *
- * The gate has already been forced and the Crown itself is standing on the far
- * side of the spine, which means the road home is a single four-hundred-yard
- * gap the enemy only has to reach to close. Everything the player owns is north
- * of the rock except one relief column, and the cavalry is thin because horses
- * were the hardest thing to get through the gate.
- */
-const ASHEN_GATE_PLAYER = redeploy(PLAYER_GROUPS, {
-  arquebusiers: { anchor: { x: 6000, y: 2000 }, stance: 'aggressive' },
-  culverins: { anchor: { x: 5900, y: 2400 } },
-  field_hospital: { anchor: { x: 6350, y: 2300 } },
-  legion_i: { anchor: { x: 5900, y: 2100 }, stance: 'aggressive' },
-  legion_ii: { anchor: { x: 6250, y: 1900 }, stance: 'aggressive' },
-  spearwall: { anchor: { x: 5750, y: 2300 }, formation: 'line' },
-  archers_i: { anchor: { x: 6100, y: 2350 }, formation: 'loose' },
-  cavalry_i: { anchor: { x: 5000, y: 2200 }, composition: [['cavalry', 200]] },
-  cavalry_ii: { anchor: { x: 6800, y: 2200 }, composition: [['cavalry', 140]] },
-  siege_corps: { anchor: { x: 5800, y: 2280 } },
-  scouts: { anchor: { x: 4500, y: 2100 } },
-  reserve_i: { anchor: { x: 5850, y: 2150 }, formation: 'square' },
-  royal_guard: { anchor: { x: 6150, y: 1750 } },
-});
-
-const ASHEN_GATE_ENEMY = redeploy(ENEMY_GROUPS, {
-  ash_shot: { anchor: { x: 4500, y: 1000 } },
-  black_guns: { anchor: { x: 3700, y: 750 } },
-  ashen_surgeons: { anchor: { x: 4400, y: 450 } },
-  iron_host: { anchor: { x: 4000, y: 1250 }, stance: 'aggressive' },
-  ash_legion: { anchor: { x: 4800, y: 1150 }, stance: 'aggressive' },
-  northern_spears: { anchor: { x: 4300, y: 900 }, stance: 'aggressive' },
-  black_arrows: { anchor: { x: 3600, y: 900 }, formation: 'loose' },
-  storm_riders: { anchor: { x: 2600, y: 1500 } },
-  night_riders: { anchor: { x: 5400, y: 1600 } },
-  siege_train: { anchor: { x: 3900, y: 600 } },
-  outriders: { anchor: { x: 3000, y: 1100 } },
-  ashen_reserve: { anchor: { x: 4000, y: 400 } },
-  ashen_guard: { anchor: { x: 4000, y: 750 } },
-});
-
-const ASHEN_GATE_SCRIPT: readonly ScriptedAiOrder[] = [
-  { atSeconds: 10, groupId: 'iron_host', order: 'attack_zone', targetZone: 'emberhold', formation: 'line', stance: 'aggressive' },
-  { atSeconds: 16, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'emberhold', formation: 'line', stance: 'aggressive' },
-  { atSeconds: 25, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'upper_terrace', formation: 'double_line' },
-  { atSeconds: 33, groupId: 'black_arrows', order: 'attack_zone', targetZone: 'upper_terrace', formation: 'loose' },
-  { atSeconds: 48, groupId: 'night_riders', order: 'attack_zone', targetZone: 'ashfall_gate', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 75, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'cinder_gap', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 40, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'emberhold', formation: 'double_line', stance: 'aggressive' },
-  { atSeconds: 96, groupId: 'black_guns', order: 'attack_zone', targetZone: 'upper_terrace', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 115, groupId: 'siege_train', order: 'attack_zone', targetZone: 'emberhold', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 150, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'upper_terrace', formation: 'column' },
-  { atSeconds: 205, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'south_orchard', formation: 'wedge' },
-  { atSeconds: 265, groupId: 'iron_host', order: 'attack_zone', targetZone: 'ashfall_gate', formation: 'column', stance: 'aggressive' },
-];
-
-/* ------------------------------------------------------ VI. Goldmere: open */
-
-/**
- * Goldmere Fields.
+ * Two gaps, four kilometres apart, both held from the high ground above them.
+ * The army is split to face both: the Vanguard, the Hedge and the bows below
+ * Cinder Gap in the west, the Ironbacks and the battery below the Ashfall Gate
+ * in the east. Either can be forced. Neither can be forced cheaply.
  *
- * No river, no pass, no gate. Two armies form up in harvest country and there
- * is nothing on the map that stops either of them going round, which makes this
- * the one battle where the flanks are entirely the commander's problem. Both
- * sides are deliberately cavalry-heavy: the ground rewards the wide ride and
- * punishes a line that lets one develop.
+ * The trick is that a gap is a door, and a door opens both ways. Four minutes
+ * in the Cinder Host comes down through the western gap and makes for the
+ * Crown Camp, and a commander who has fed his whole army north loses his king
+ * to a column he never saw. The Fenmen are placed where a rear guard belongs
+ * for exactly that reason — and taking them forward is a real choice, not a
+ * mistake, because the gate does not break itself.
  */
-const GOLDMERE_PLAYER = redeploy(PLAYER_GROUPS, {
-  // Open country is the one place a battery can see everything it wants to
-  // shoot at, and the one place nothing stops horse getting behind it.
-  arquebusiers: { anchor: { x: 4600, y: 3650 } },
-  culverins: { anchor: { x: 3700, y: 4000 } },
-  field_hospital: { anchor: { x: 4000, y: 4400 } },
-  legion_i: { anchor: { x: 3300, y: 3450 }, composition: [['infantry', 560], ['heavy_infantry', 200]] },
-  legion_ii: { anchor: { x: 4900, y: 3450 } },
-  spearwall: { anchor: { x: 4100, y: 3250 } },
-  archers_i: { anchor: { x: 4100, y: 3800 }, composition: [['archer', 420]] },
-  cavalry_i: { anchor: { x: 1900, y: 3350 }, composition: [['cavalry', 340]] },
-  cavalry_ii: { anchor: { x: 6300, y: 3400 }, composition: [['cavalry', 300]] },
-  siege_corps: { anchor: { x: 4400, y: 3900 }, composition: [['siege', 30]] },
-  scouts: { anchor: { x: 5600, y: 3500 }, composition: [['scout', 55]] },
-  reserve_i: { anchor: { x: 4000, y: 4200 } },
-  royal_guard: { anchor: { x: 4000, y: 4600 } },
+const GATE_PLAYER = redeploy(CROWN_ARMY, {
+  vanguard: { anchor: { x: 2500, y: 3400 }, stance: 'aggressive' },
+  hedge: { anchor: { x: 2650, y: 3660 }, formation: 'line' },
+  longbows: { anchor: { x: 2960, y: 3600 }, formation: 'loose' },
+  ironbacks: { anchor: { x: 5700, y: 3400 }, stance: 'aggressive' },
+  hammers: { anchor: { x: 5760, y: 3760 } },
+  greyriders: { anchor: { x: 1450, y: 3300 } },
+  lancers: { anchor: { x: 6650, y: 3600 } },
+  outrunners: { anchor: { x: 4000, y: 3450 } },
+  fenmen: { anchor: { x: 4000, y: 4050 } },
+  kingsguard: { anchor: { x: 4000, y: 4500 } },
 });
 
-const GOLDMERE_ENEMY = redeploy(ENEMY_GROUPS, {
-  ash_shot: { anchor: { x: 4600, y: 1750 } },
-  black_guns: { anchor: { x: 4000, y: 1300 } },
-  ashen_surgeons: { anchor: { x: 4000, y: 900 } },
-  iron_host: { anchor: { x: 3500, y: 2000 }, composition: [['infantry', 640], ['heavy_infantry', 240]] },
-  ash_legion: { anchor: { x: 5000, y: 1950 }, composition: [['infantry', 680]] },
-  northern_spears: { anchor: { x: 4250, y: 2250 }, composition: [['spearman', 400]] },
-  black_arrows: { anchor: { x: 4300, y: 1500 }, composition: [['archer', 460]] },
-  storm_riders: { anchor: { x: 2200, y: 2050 }, composition: [['cavalry', 360]] },
-  night_riders: { anchor: { x: 6400, y: 1900 }, composition: [['cavalry', 300]] },
-  siege_train: { anchor: { x: 4300, y: 1150 }, composition: [['siege', 30]] },
-  outriders: { anchor: { x: 5400, y: 2350 }, composition: [['scout', 55]] },
-  ashen_reserve: { anchor: { x: 4000, y: 1000 } },
+const GATE_ENEMY = redeploy(ASHEN_ARMY, {
+  thornspears: { anchor: { x: 2350, y: 1880 }, formation: 'double_line', stance: 'hold_ground' },
+  emberbows: { anchor: { x: 2100, y: 1600 }, formation: 'loose' },
+  blackforge: { anchor: { x: 5750, y: 1900 }, stance: 'hold_ground' },
+  slagworks: { anchor: { x: 6150, y: 1700 } },
+  cinder_host: { anchor: { x: 4000, y: 1850 }, stance: 'defensive' },
+  ash_riders: { anchor: { x: 2000, y: 1400 } },
+  dusk_riders: { anchor: { x: 6400, y: 1550 } },
+  crow_scouts: { anchor: { x: 4600, y: 1650 } },
+  ember_reserve: { anchor: { x: 5200, y: 1150 } },
   ashen_guard: { anchor: { x: 4000, y: 700 } },
 });
 
-const GOLDMERE_SCRIPT: readonly ScriptedAiOrder[] = [
-  { atSeconds: 20, groupId: 'iron_host', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'line', stance: 'aggressive' },
-  { atSeconds: 26, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'line', stance: 'aggressive' },
-  { atSeconds: 35, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'double_line' },
-  { atSeconds: 43, groupId: 'black_arrows', order: 'move', targetZone: 'goldmere_town', formation: 'loose' },
-  { atSeconds: 56, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'west_pasture', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 64, groupId: 'night_riders', order: 'attack_zone', targetZone: 'east_pasture', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 112, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'millbrook', formation: 'wedge' },
-  { atSeconds: 128, groupId: 'night_riders', order: 'attack_zone', targetZone: 'hollow_wood', formation: 'wedge' },
-  { atSeconds: 48, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'double_line' },
-  { atSeconds: 140, groupId: 'black_guns', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 168, groupId: 'siege_train', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 195, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'south_downs', formation: 'column' },
-  { atSeconds: 245, groupId: 'iron_host', order: 'attack_zone', targetZone: 'south_downs', formation: 'line' },
-  { atSeconds: 305, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'harvest_camp', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 365, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'harvest_camp', formation: 'column' },
+const GATE_SCRIPT: readonly ScriptedAiOrder[] = [
+  // Both doors are shut and watched before anything else happens.
+  { atSeconds: 10, groupId: 'thornspears', order: 'defend_zone', targetZone: 'cinder_gap', formation: 'double_line', stance: 'hold_ground' },
+  { atSeconds: 14, groupId: 'blackforge', order: 'defend_zone', targetZone: 'ashfall_gate', formation: 'line', stance: 'hold_ground' },
+  { atSeconds: 20, groupId: 'emberbows', order: 'move', targetZone: 'obsidian_wood', formation: 'loose' },
+  { atSeconds: 26, groupId: 'slagworks', order: 'defend_zone', targetZone: 'emberhold', formation: 'loose', stance: 'hold_ground' },
+  { atSeconds: 60, groupId: 'crow_scouts', order: 'scout', targetZone: 'upper_terrace', formation: 'loose' },
+  // The counter-column forms on the terrace, where it can reach either gap.
+  { atSeconds: 120, groupId: 'cinder_host', order: 'move', targetZone: 'upper_terrace', formation: 'line' },
+  { atSeconds: 170, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'cinder_gap', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 210, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'south_orchard', formation: 'wedge', stance: 'aggressive' },
+  // And comes through the western door, southbound, at your camp.
+  { atSeconds: 235, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'cinder_gap', formation: 'column', stance: 'aggressive' },
+  { atSeconds: 285, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'smoke_road', formation: 'line', stance: 'aggressive' },
+  { atSeconds: 300, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'ashfall_gate', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 335, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'slag_flats', formation: 'wedge' },
+  { atSeconds: 365, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'crown_camp', formation: 'column', stance: 'aggressive' },
+  { atSeconds: 390, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'crown_camp', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 430, groupId: 'ember_reserve', order: 'move', targetZone: 'upper_terrace', formation: 'line' },
+  { atSeconds: 500, groupId: 'ember_reserve', order: 'attack_zone', targetZone: 'ashfall_gate', formation: 'line' },
 ];
 
-/* ------------------------------------------- VII. Sunken Causeway: the road */
+/* --------------------------------------------- III. The Salt Tide: the race */
 
 /**
- * The Long Causeway.
+ * The Sunken Coast, with the King already across the water.
  *
- * The channel runs corner to corner, so the two crossings are not a left and a
- * right but a near one and a far one, and a wing committed to the ford is a
- * long march from the wing on the causeway. Nothing else on any map punishes a
- * divided attack this plainly.
+ * A night raid on the Ashen Anchorage went in, went wrong, and left King
+ * Aldric and the Kingsguard on the North Strand with the Ironbacks and nothing
+ * else. The rest of the Crown army is on the near shore, and between the two
+ * halves is a tidal channel with one raised road and one ford on it.
+ *
+ * Every clock in this operation runs the same way. The Ashen host is already
+ * turning on the stranded half; the Thornspears sit on the far end of the
+ * causeway so a relief column has to be paid for; and the Ashen King is at his
+ * anchorage with a guard and very little else, because his host is out hunting
+ * yours. Marching to the rescue is the obvious answer. Riding for his king
+ * while he rides for yours is the other one, and it is not the worse of the two.
  */
-const LONG_CAUSEWAY_PLAYER = redeploy(PLAYER_GROUPS, {
-  arquebusiers: { anchor: { x: 5500, y: 3300 }, stance: 'aggressive' },
-  culverins: { anchor: { x: 3400, y: 4150 } },
-  field_hospital: { anchor: { x: 2900, y: 4400 } },
-  legion_i: { anchor: { x: 3150, y: 3350 }, formation: 'column', stance: 'aggressive' },
-  legion_ii: { anchor: { x: 5600, y: 3050 }, stance: 'aggressive' },
-  spearwall: { anchor: { x: 3300, y: 3700 }, formation: 'line' },
-  archers_i: { anchor: { x: 3350, y: 3900 } },
-  cavalry_i: { anchor: { x: 1800, y: 3600 } },
-  cavalry_ii: { anchor: { x: 6500, y: 3200 } },
-  siege_corps: { anchor: { x: 3450, y: 3950 }, composition: [['siege', 60]] },
-  scouts: { anchor: { x: 4300, y: 3400 } },
-  reserve_i: { anchor: { x: 2900, y: 4200 } },
-  royal_guard: { anchor: { x: 2900, y: 4500 } },
+const TIDE_PLAYER = redeploy(CROWN_ARMY, {
+  kingsguard: { anchor: { x: 2350, y: 1750 }, formation: 'square', stance: 'hold_ground' },
+  ironbacks: { anchor: { x: 2680, y: 1560 }, formation: 'line', stance: 'defensive' },
+  vanguard: { anchor: { x: 3200, y: 3700 }, stance: 'aggressive' },
+  hedge: { anchor: { x: 3080, y: 3960 } },
+  longbows: { anchor: { x: 3420, y: 3900 }, formation: 'loose' },
+  greyriders: { anchor: { x: 2100, y: 4000 } },
+  lancers: { anchor: { x: 5200, y: 3700 } },
+  hammers: { anchor: { x: 3300, y: 4160 } },
+  outrunners: { anchor: { x: 5000, y: 3400 } },
+  fenmen: { anchor: { x: 2900, y: 4400 } },
 });
 
-const LONG_CAUSEWAY_ENEMY = redeploy(ENEMY_GROUPS, {
-  ash_shot: { anchor: { x: 3300, y: 1750 } },
-  black_guns: { anchor: { x: 3800, y: 1400 } },
-  ashen_surgeons: { anchor: { x: 5600, y: 950 } },
-  iron_host: { anchor: { x: 3100, y: 2200 }, formation: 'double_line', stance: 'hold_ground' },
-  ash_legion: { anchor: { x: 6250, y: 1700 }, formation: 'double_line', stance: 'hold_ground' },
-  northern_spears: { anchor: { x: 2700, y: 1900 } },
-  black_arrows: { anchor: { x: 3600, y: 1600 } },
-  storm_riders: { anchor: { x: 1700, y: 1500 } },
-  night_riders: { anchor: { x: 6800, y: 1250 } },
-  siege_train: { anchor: { x: 4300, y: 1600 } },
-  outriders: { anchor: { x: 5000, y: 1750 } },
-  ashen_reserve: { anchor: { x: 5600, y: 1050 } },
-  ashen_guard: { anchor: { x: 5600, y: 800 } },
+const TIDE_ENEMY = redeploy(ASHEN_ARMY, {
+  thornspears: { anchor: { x: 3000, y: 2150 }, formation: 'double_line', stance: 'hold_ground' },
+  blackforge: { anchor: { x: 6300, y: 1600 }, stance: 'hold_ground' },
+  ash_riders: { anchor: { x: 1700, y: 1450 } },
+  cinder_host: { anchor: { x: 4100, y: 1800 }, stance: 'aggressive' },
+  emberbows: { anchor: { x: 4300, y: 1560 }, formation: 'loose' },
+  dusk_riders: { anchor: { x: 6600, y: 1250 } },
+  slagworks: { anchor: { x: 5600, y: 1000 } },
+  crow_scouts: { anchor: { x: 5000, y: 1450 } },
+  ember_reserve: { anchor: { x: 5350, y: 900 } },
+  ashen_guard: { anchor: { x: 5800, y: 700 } },
 });
 
-const LONG_CAUSEWAY_SCRIPT: readonly ScriptedAiOrder[] = [
-  { atSeconds: 15, groupId: 'iron_host', order: 'defend_zone', targetZone: 'long_causeway', formation: 'double_line', stance: 'hold_ground' },
-  { atSeconds: 21, groupId: 'northern_spears', order: 'defend_zone', targetZone: 'long_causeway', formation: 'double_line' },
-  { atSeconds: 29, groupId: 'black_arrows', order: 'defend_zone', targetZone: 'long_causeway', formation: 'loose' },
-  { atSeconds: 42, groupId: 'ash_legion', order: 'defend_zone', targetZone: 'salt_ford', formation: 'double_line', stance: 'hold_ground' },
-  { atSeconds: 72, groupId: 'night_riders', order: 'attack_zone', targetZone: 'salt_ford', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 104, groupId: 'storm_riders', order: 'defend_zone', targetZone: 'north_strand', formation: 'wedge' },
-  { atSeconds: 36, groupId: 'ash_shot', order: 'defend_zone', targetZone: 'long_causeway', formation: 'double_line', stance: 'hold_ground' },
-  { atSeconds: 118, groupId: 'black_guns', order: 'attack_zone', targetZone: 'long_causeway', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 145, groupId: 'siege_train', order: 'attack_zone', targetZone: 'long_causeway', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 180, groupId: 'outriders', order: 'move', targetZone: 'beacon_tower', formation: 'loose' },
-  { atSeconds: 225, groupId: 'ashen_reserve', order: 'move', targetZone: 'beacon_tower' },
-  { atSeconds: 285, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'salt_ford', formation: 'column', stance: 'aggressive' },
-  { atSeconds: 345, groupId: 'night_riders', order: 'attack_zone', targetZone: 'oyster_town', formation: 'wedge', stance: 'aggressive' },
-  { atSeconds: 425, groupId: 'iron_host', order: 'attack_zone', targetZone: 'long_causeway', formation: 'line', stance: 'aggressive' },
+const TIDE_SCRIPT: readonly ScriptedAiOrder[] = [
+  // Both crossings are corked first, so the rescue has to be fought for.
+  { atSeconds: 8, groupId: 'thornspears', order: 'defend_zone', targetZone: 'long_causeway', formation: 'double_line', stance: 'hold_ground' },
+  { atSeconds: 12, groupId: 'blackforge', order: 'defend_zone', targetZone: 'salt_ford', formation: 'line', stance: 'hold_ground' },
+  // Then the hunt for the stranded king begins, horse first.
+  { atSeconds: 20, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'north_strand', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 48, groupId: 'emberbows', order: 'move', targetZone: 'north_strand', formation: 'loose' },
+  { atSeconds: 90, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'north_strand', formation: 'line', stance: 'aggressive' },
+  { atSeconds: 150, groupId: 'dusk_riders', order: 'move', targetZone: 'beacon_tower', formation: 'wedge' },
+  { atSeconds: 205, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'north_strand', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 240, groupId: 'crow_scouts', order: 'scout', targetZone: 'beacon_tower', formation: 'loose' },
+  // The train comes up to shell the one road home.
+  { atSeconds: 265, groupId: 'slagworks', order: 'attack_zone', targetZone: 'long_causeway', formation: 'loose', stance: 'hold_ground' },
+  { atSeconds: 320, groupId: 'ember_reserve', order: 'move', targetZone: 'beacon_tower', formation: 'line' },
+  { atSeconds: 385, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'long_causeway', formation: 'line' },
+  { atSeconds: 440, groupId: 'ember_reserve', order: 'attack_zone', targetZone: 'long_causeway', formation: 'line' },
+  { atSeconds: 500, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'causeway_approach', formation: 'wedge', stance: 'aggressive' },
 ];
 
-const LAST_LIGHT_SCRIPT: readonly ScriptedAiOrder[] = [
-  { atSeconds: 8, groupId: 'iron_host', order: 'attack_zone', targetZone: 'central_field', formation: 'line', stance: 'aggressive' },
-  { atSeconds: 14, groupId: 'ash_legion', order: 'attack_zone', targetZone: 'central_field', formation: 'line', stance: 'aggressive' },
-  { atSeconds: 22, groupId: 'northern_spears', order: 'attack_zone', targetZone: 'central_field', formation: 'double_line' },
-  { atSeconds: 28, groupId: 'black_arrows', order: 'attack_zone', targetZone: 'central_field', formation: 'loose' },
-  { atSeconds: 38, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'village', formation: 'wedge' },
-  { atSeconds: 44, groupId: 'night_riders', order: 'attack_zone', targetZone: 'east_field', formation: 'wedge' },
-  { atSeconds: 34, groupId: 'ash_shot', order: 'attack_zone', targetZone: 'central_field', formation: 'double_line', stance: 'aggressive' },
-  { atSeconds: 62, groupId: 'black_guns', order: 'attack_zone', targetZone: 'central_field', formation: 'loose', stance: 'hold_ground' },
-  { atSeconds: 70, groupId: 'siege_train', order: 'attack_zone', targetZone: 'central_field', formation: 'loose' },
-  { atSeconds: 110, groupId: 'ashen_surgeons', order: 'move', targetZone: 'central_hill', formation: 'loose' },
-  { atSeconds: 95, groupId: 'ashen_reserve', order: 'attack_zone', targetZone: 'central_field', formation: 'column' },
-  { atSeconds: 145, groupId: 'storm_riders', order: 'attack_zone', targetZone: 'player_base', formation: 'wedge' },
-  { atSeconds: 175, groupId: 'iron_host', order: 'attack_zone', targetZone: 'player_base', formation: 'column' },
+/* ---------------------------------------------- IV. The Open Hand: the flanks */
+
+/**
+ * Goldmere, where there is nothing to hold.
+ *
+ * No river, no spine, no channel — harvest country, a town, two woods and two
+ * meres, and not one feature that protects a flank. Both armies form up facing
+ * each other with a mile of stubble between them, and the only cover on the
+ * field is Goldmere Town in the middle of it.
+ *
+ * The Ashen commander opens by sending both bodies of horse wide in the first
+ * half minute, one round each flank, while his foot walks straight at the
+ * town. That is the whole operation: a line with two open ends against two
+ * hands closing behind it. Anchor a flank on the town or on Millbrook, beat
+ * one wing of horse before the other arrives, or refuse a flank outright and
+ * accept being pushed off the ground — but a straight line held to the end is
+ * a line taken from three sides.
+ */
+const OPEN_HAND_PLAYER = redeploy(CROWN_ARMY, {
+  vanguard: { anchor: { x: 4000, y: 3450 }, formation: 'line', stance: 'defensive' },
+  hedge: { anchor: { x: 3550, y: 3600 }, formation: 'double_line', stance: 'hold_ground' },
+  ironbacks: { anchor: { x: 4500, y: 3600 }, formation: 'line', stance: 'hold_ground' },
+  longbows: { anchor: { x: 4050, y: 3820 }, formation: 'loose' },
+  greyriders: { anchor: { x: 2200, y: 3600 } },
+  lancers: { anchor: { x: 6100, y: 3500 } },
+  hammers: { anchor: { x: 4300, y: 4020 } },
+  outrunners: { anchor: { x: 5300, y: 3400 } },
+  fenmen: { anchor: { x: 3300, y: 4150 } },
+  kingsguard: { anchor: { x: 4000, y: 4500 } },
+});
+
+const OPEN_HAND_ENEMY = redeploy(ASHEN_ARMY, {
+  cinder_host: { anchor: { x: 4200, y: 1750 } },
+  blackforge: { anchor: { x: 3800, y: 1500 } },
+  thornspears: { anchor: { x: 4300, y: 2050 } },
+  emberbows: { anchor: { x: 4200, y: 1300 } },
+  ash_riders: { anchor: { x: 2300, y: 1750 } },
+  dusk_riders: { anchor: { x: 6400, y: 1700 } },
+  slagworks: { anchor: { x: 4000, y: 950 } },
+  crow_scouts: { anchor: { x: 5400, y: 1500 } },
+  ember_reserve: { anchor: { x: 3400, y: 900 } },
+  ashen_guard: { anchor: { x: 4000, y: 700 } },
+});
+
+const OPEN_HAND_SCRIPT: readonly ScriptedAiOrder[] = [
+  // Both hands open in the first half minute, before a line can be re-dressed.
+  { atSeconds: 20, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'west_pasture', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 26, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'east_pasture', formation: 'wedge', stance: 'aggressive' },
+  // The foot walks at the only cover on the field.
+  { atSeconds: 45, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'line' },
+  { atSeconds: 58, groupId: 'thornspears', order: 'move', targetZone: 'goldmere_town', formation: 'double_line' },
+  { atSeconds: 92, groupId: 'emberbows', order: 'move', targetZone: 'goldmere_town', formation: 'loose' },
+  // And the hands begin to close.
+  { atSeconds: 112, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'millbrook', formation: 'wedge' },
+  { atSeconds: 124, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'hollow_wood', formation: 'wedge' },
+  { atSeconds: 152, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'south_downs', formation: 'line', stance: 'aggressive' },
+  { atSeconds: 168, groupId: 'blackforge', order: 'attack_zone', targetZone: 'south_downs', formation: 'line', stance: 'aggressive' },
+  { atSeconds: 212, groupId: 'thornspears', order: 'attack_zone', targetZone: 'south_downs', formation: 'double_line' },
+  { atSeconds: 244, groupId: 'slagworks', order: 'attack_zone', targetZone: 'goldmere_town', formation: 'loose', stance: 'hold_ground' },
+  { atSeconds: 284, groupId: 'ash_riders', order: 'attack_zone', targetZone: 'harvest_camp', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 304, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'harvest_camp', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 362, groupId: 'ember_reserve', order: 'move', targetZone: 'goldmere_town', formation: 'line' },
+  { atSeconds: 424, groupId: 'ember_reserve', order: 'attack_zone', targetZone: 'south_downs', formation: 'line' },
+  { atSeconds: 486, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'harvest_camp', formation: 'column', stance: 'aggressive' },
 ];
 
-export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
-  riverwatch: {
-    id: 'riverwatch',
+/* ------------------------------------------------------------------ registry */
+
+export const SCENARIOS: Record<AuthoredScenarioId, ScenarioDefinition> = {
+  bridge_of_knives: {
+    id: 'bridge_of_knives',
     mapId: 'river_vale',
-    eyebrow: 'I · THE RIVER LINE',
-    name: 'Riverwatch',
-    description: 'Hold three crossings as the Ashen Host unfolds a measured, many-front assault.',
-    objective: 'Break the northern line, then take the Ashen King.',
+    numeral: 'I',
+    name: 'Bridge of Knives',
+    location: 'The Vale Water',
+    summary:
+      'Your centre is four hundred bows and a wall of spears, and it is meant to look weaker ' +
+      'than that. The Cinder Host will cross the middle bridge to break it. Everything else ' +
+      'you own is standing off the road, out of sight, waiting to be let loose on a column ' +
+      'that is still wedged on a bridgehead.',
+    briefingLine: 'Let them cross. Then close both wings and kill them against their own river.',
+    twist: 'The bait is real. Springing the trap early is how you lose it.',
+    objective: 'Break the Ashen centre on the near bank, then take the Ashen King.',
     pressure: 'Rising',
-    duration: '6–15 min',
-    tags: ['Balanced', 'Three fronts', 'Classic'],
-    location: 'Three Crossings',
-    briefingLine: 'Hold the three crossings before the Ashen Host envelops the valley.',
-    battleOrders: ['Break the northern line', 'Take the Ashen King'],
-    battleFacts: ['~4,400 enemy', '3 crossings', '6–15 min'],
+    duration: '7–15 min',
+    tags: ['Ambush', 'Patience', 'Three crossings'],
+    battleOrders: [
+      'Hold the bridge screen — do not reinforce it early',
+      'Close both wings once the crossing is packed',
+      'Take the Ashen King',
+    ],
+    battleFacts: ['~3,600 Ashen', '3 crossings', 'Trap sprung at your word'],
     playerArmyName: 'Crownlands',
     enemyArmyName: 'Ashen Host',
-    playerGroups: PLAYER_GROUPS,
-    enemyGroups: ENEMY_GROUPS,
+    playerGroups: CROWN_ARMY,
+    enemyGroups: ASHEN_ARMY,
     kingSpecs: KING_SPECS,
-    aiScript: RIVERWATCH_SCRIPT,
+    aiScript: KNIVES_SCRIPT,
+    origin: 'authored',
   },
-  broken_bridgehead: {
-    id: 'broken_bridgehead',
-    mapId: 'river_vale',
-    eyebrow: 'II · ACROSS THE WATER',
-    name: 'Broken Bridgehead',
-    description: 'Your vanguard begins north of the river, exposed and already within striking distance.',
-    objective: 'Hold the bridgehead or withdraw in order before the counterattack cuts it off.',
-    pressure: 'Immediate',
-    duration: '5–12 min',
-    tags: ['Offensive', 'Exposed line', 'Fast'],
-    location: 'Northern Bank',
-    briefingLine: 'Hold the northern foothold before the counterattack cuts your road home.',
-    battleOrders: ['Hold the bridgehead', 'Keep the central span open'],
-    battleFacts: ['~4,400 enemy', '1 retreat route', '5–12 min'],
-    playerArmyName: 'Crown Vanguard',
-    enemyArmyName: 'Ashen Host',
-    playerGroups: BRIDGEHEAD_PLAYER,
-    enemyGroups: BRIDGEHEAD_ENEMY,
-    kingSpecs: KING_SPECS,
-    aiScript: BRIDGEHEAD_SCRIPT,
-  },
-  last_light: {
-    id: 'last_light',
-    mapId: 'river_vale',
-    eyebrow: 'III · THE FINAL MILE',
-    name: 'Last Light',
-    description: 'The crossings are lost. Reform around the Crown while the enemy closes from three sides.',
-    objective: 'Keep King Aldric free, blunt the assault, and create a road north.',
-    pressure: 'Severe',
-    duration: '5–10 min',
-    tags: ['Defensive', 'Close quarters', 'Hard start'],
-    location: 'Crown Encampment',
-    briefingLine: 'The crossings are lost. Keep the Ashen Host from reaching King Aldric.',
-    battleOrders: ['Hold the Crown encampment', 'Break the Ashen pursuit'],
-    battleFacts: ['~4,400 enemy', 'King exposed', '5–10 min'],
-    playerArmyName: 'Crown Remnant',
-    enemyArmyName: 'Ashen Pursuit',
-    playerGroups: LAST_LIGHT_PLAYER,
-    enemyGroups: LAST_LIGHT_ENEMY,
-    kingSpecs: KING_SPECS,
-    aiScript: LAST_LIGHT_SCRIPT,
-  },
-  cinder_road: {
-    id: 'cinder_road',
+  ember_gate: {
+    id: 'ember_gate',
     mapId: 'ashfall_pass',
-    eyebrow: 'IV · THE BURNING ROAD',
-    name: 'Cinder Road',
-    description:
-      'A dead volcanic spine, broken open in two places, and an army that has to go through one of them.',
-    objective: 'Force a gap, take the terrace above it, and reach the Ash Citadel.',
+    numeral: 'II',
+    name: 'The Ember Gate',
+    location: 'Ashfall Pass',
+    summary:
+      'The spine cannot be crossed. Cinder Gap in the west is narrow and held by spears with ' +
+      'bows above them; the Ashfall Gate in the east is wider, held by heavy foot, and covered ' +
+      'by a siege train in Emberhold. Force one. The other one stays open behind you, and the ' +
+      'Ashen commander knows it.',
+    briefingLine: 'Force a gap. Remember that the one you leave is a road to your own camp.',
+    twist: 'Four minutes in, their centre comes south through the gap you did not use.',
+    objective: 'Force a gap, hold your camp behind you, and reach the Ash Citadel.',
     pressure: 'Deliberate',
     duration: '8–16 min',
-    tags: ['Assault', 'Two gaps', 'Siege'],
-    location: 'Ashfall Pass',
-    briefingLine: 'The spine cannot be crossed. Force Cinder Gap or the Ashfall Gate.',
-    battleOrders: ['Force one of the two gaps', 'Take the Ashen King'],
-    battleFacts: ['~4,600 enemy', '2 gaps, held', '8–16 min'],
+    tags: ['Assault', 'Two gaps', 'Rear guard'],
+    battleOrders: [
+      'Force Cinder Gap or the Ashfall Gate',
+      'Keep something alive between their column and King Aldric',
+      'Take the Ash Citadel',
+    ],
+    battleFacts: ['~3,700 Ashen', '2 gaps, both two-way', 'Siege above the gate'],
     playerArmyName: 'Crown Vanguard',
     enemyArmyName: 'Ashen Wardens',
-    playerGroups: CINDER_ROAD_PLAYER,
-    enemyGroups: CINDER_ROAD_ENEMY,
+    playerGroups: GATE_PLAYER,
+    enemyGroups: GATE_ENEMY,
     kingSpecs: KING_SPECS,
-    aiScript: CINDER_ROAD_SCRIPT,
+    aiScript: GATE_SCRIPT,
+    origin: 'authored',
   },
-  ashen_gate: {
-    id: 'ashen_gate',
-    mapId: 'ashfall_pass',
-    eyebrow: 'V · THE FAR SIDE',
-    name: 'The Ashen Gate',
-    description:
-      'Your army is through the gate and above the spine. The one road home is four hundred yards wide.',
-    objective: 'Hold Emberhold and keep the Ashfall Gate open behind you.',
-    pressure: 'Immediate',
-    duration: '6–12 min',
-    tags: ['Exposed', 'One road home', 'Hard start'],
-    location: 'Emberhold',
-    briefingLine: 'You are across the spine. Keep the gate behind you open.',
-    battleOrders: ['Hold Emberhold', 'Keep the Ashfall Gate open'],
-    battleFacts: ['~4,400 enemy', '1 road home', '6–12 min'],
-    playerArmyName: 'Crown Vanguard',
-    enemyArmyName: 'Ashen Host',
-    playerGroups: ASHEN_GATE_PLAYER,
-    enemyGroups: ASHEN_GATE_ENEMY,
-    kingSpecs: KING_SPECS,
-    aiScript: ASHEN_GATE_SCRIPT,
-  },
-  goldmere_fields: {
-    id: 'goldmere_fields',
-    mapId: 'goldmere',
-    eyebrow: 'VI · THE OPEN FIELD',
-    name: 'Goldmere Fields',
-    description:
-      'Harvest country with nothing in it. No river, no pass, and both flanks open the whole way round.',
-    objective: 'Beat the Ashen host in the open and ride down its king.',
-    pressure: 'Building',
-    duration: '7–14 min',
-    tags: ['Open ground', 'Cavalry', 'Manoeuvre'],
-    location: 'Goldmere',
-    briefingLine: 'Open country. Nothing here protects a flank but the men on it.',
-    battleOrders: ['Hold Goldmere Town', 'Turn a flank and take their king'],
-    battleFacts: ['~4,400 enemy', '660 enemy horse', '7–14 min'],
-    playerArmyName: 'Crownlands',
-    enemyArmyName: 'Ashen Host',
-    playerGroups: GOLDMERE_PLAYER,
-    enemyGroups: GOLDMERE_ENEMY,
-    kingSpecs: KING_SPECS,
-    aiScript: GOLDMERE_SCRIPT,
-  },
-  the_long_causeway: {
-    id: 'the_long_causeway',
+  salt_tide: {
+    id: 'salt_tide',
     mapId: 'sunken_causeway',
-    eyebrow: 'VII · THE DROWNED COAST',
-    name: 'The Long Causeway',
-    description:
-      'A tidal channel cut corner to corner. One raised road, one ford, and an hour of marching between them.',
-    objective: 'Cross the channel and take the Ashen Anchorage.',
-    pressure: 'Grinding',
-    duration: '9–18 min',
-    tags: ['Crossing', 'Split fronts', 'Siege'],
+    numeral: 'III',
+    name: 'The Salt Tide',
     location: 'The Sunken Coast',
-    briefingLine: 'One causeway, one ford, and a long march between them. Choose.',
-    battleOrders: ['Take the Long Causeway or the Salt Ford', 'Take the Ashen King'],
-    battleFacts: ['~4,400 enemy', '2 crossings, far apart', '9–18 min'],
+    summary:
+      'The raid failed. King Aldric stands on the North Strand with the Kingsguard and the ' +
+      'Ironbacks, on the wrong side of a tidal channel, and the Ashen host is already turning ' +
+      'towards him. Your army is on the near shore. Between them: one raised causeway, one ' +
+      'ford, and an hour of marching between the two.',
+    briefingLine: 'Your king is across the water and they know it. Both sides are racing now.',
+    twist: 'Their host is out hunting your king — which is what leaves theirs thinly guarded.',
+    objective: 'Get King Aldric home, or take the Ashen King before they take yours.',
+    pressure: 'Immediate',
+    duration: '6–14 min',
+    tags: ['Rescue', 'Race', 'Split army'],
+    battleOrders: [
+      'Break the cork on the Long Causeway',
+      'Keep the Kingsguard alive and moving',
+      'Or ride for the Anchorage and end it first',
+    ],
+    battleFacts: ['~3,700 Ashen', 'King cut off', '2 crossings, far apart'],
     playerArmyName: 'Crown Landing',
     enemyArmyName: 'Ashen Coastguard',
-    playerGroups: LONG_CAUSEWAY_PLAYER,
-    enemyGroups: LONG_CAUSEWAY_ENEMY,
+    playerGroups: TIDE_PLAYER,
+    enemyGroups: TIDE_ENEMY,
     kingSpecs: KING_SPECS,
-    aiScript: LONG_CAUSEWAY_SCRIPT,
+    aiScript: TIDE_SCRIPT,
+    origin: 'authored',
+  },
+  open_hand: {
+    id: 'open_hand',
+    mapId: 'goldmere',
+    numeral: 'IV',
+    name: 'The Open Hand',
+    location: 'Goldmere',
+    summary:
+      'Harvest country, and nothing in it. No river, no pass, no channel — one town in the ' +
+      'middle of a mile of stubble, two woods, two meres, and not one feature that will hold a ' +
+      'flank for you. Both hosts are drawn up facing each other, and theirs is the heavier in ' +
+      'horse.',
+    briefingLine: 'Open ground. Nothing here protects a flank but the men standing on it.',
+    twist: 'Both their horse wings go wide in the first half minute, one round each end of you.',
+    objective: 'Beat the Ashen host in the open and ride down its king.',
+    pressure: 'Building',
+    duration: '7–15 min',
+    tags: ['Open ground', 'Cavalry', 'Both flanks'],
+    battleOrders: [
+      'Anchor a flank on Goldmere Town or Millbrook',
+      'Beat one wing of horse before the other closes',
+      'Ride down the Ashen King in the open',
+    ],
+    battleFacts: ['~3,600 Ashen', '520 Ashen horse', 'No ground holds a flank'],
+    playerArmyName: 'Crownlands',
+    enemyArmyName: 'Ashen Host',
+    playerGroups: OPEN_HAND_PLAYER,
+    enemyGroups: OPEN_HAND_ENEMY,
+    kingSpecs: KING_SPECS,
+    aiScript: OPEN_HAND_SCRIPT,
+    origin: 'authored',
   },
 };
 
-export function getScenarioDefinition(id: ScenarioId): ScenarioDefinition {
+/** The authored operations, in the order the War Council lists them. */
+export const AUTHORED_SCENARIOS: readonly ScenarioDefinition[] = AUTHORED_SCENARIO_IDS.map(
+  (id) => SCENARIOS[id],
+);
+
+export function isAuthoredScenarioId(value: string): value is AuthoredScenarioId {
+  return (AUTHORED_SCENARIO_IDS as readonly string[]).includes(value);
+}
+
+export function getScenarioDefinition(id: AuthoredScenarioId): ScenarioDefinition {
   return SCENARIOS[id];
+}
+
+/**
+ * The operation a set of simulation options asks for.
+ *
+ * A designed operation carries itself; an authored one is named. Asking for
+ * `custom` without supplying the operation is an authoring error rather than a
+ * silent fallback, because a battle nobody wrote is not a battle worth fighting.
+ */
+export function resolveScenario(
+  options: Pick<SimulationOptions, 'scenarioId' | 'scenario'>,
+): ScenarioDefinition {
+  if (options.scenario !== undefined) return options.scenario;
+  if (isAuthoredScenarioId(options.scenarioId)) return SCENARIOS[options.scenarioId];
+  throw new Error(
+    'A designed operation must be supplied in full; nothing is registered under "custom".',
+  );
 }
 
 /* -------------------------------------------------------------- construction */
@@ -1003,8 +905,14 @@ export function createGroupFromSpec(state: GameState, spec: GroupSpec): ArmyGrou
   return group;
 }
 
-export function buildScenario(state: GameState, scenarioId: ScenarioId = 'riverwatch'): void {
-  const scenario = getScenarioDefinition(scenarioId);
+/**
+ * Raises both armies of an operation onto the map it is fought on.
+ *
+ * Takes the operation itself rather than its id, because a designed operation
+ * has no id to look up — and because an engine that is handed its whole script
+ * cannot read another engine's.
+ */
+export function buildScenario(state: GameState, scenario: ScenarioDefinition): void {
   // The map is chosen here and never again: every anchor below, and every
   // geographic answer for the rest of the battle, is read against it.
   state.mapId = scenario.mapId;
