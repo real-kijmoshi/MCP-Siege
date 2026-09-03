@@ -155,6 +155,10 @@ async function bootstrap(): Promise<void> {
       const current = steps.indexOf(speed);
       setSpeed(steps[Math.max(0, Math.min(steps.length - 1, current + delta))] ?? 1);
     },
+    onNotice: (message) => {
+      toast.show(message);
+      battleUx?.showCommand(message);
+    },
     onOrderIssued: (message) => {
       beginFromOpening();
       toast.show(message);
