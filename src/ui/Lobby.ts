@@ -33,8 +33,25 @@ export function showLobby(): Promise<MatchSelection> {
   const mapCaption = requireElement<HTMLElement>('briefing-map-caption');
   const deploy = requireElement<HTMLButtonElement>('lobby-deploy');
 
-  let scenarioId: ScenarioId = 'riverwatch';
-  let difficultyId: DifficultyId = 'captain';
+  const savedScenario = window.localStorage.getItem('siege:last-scenario');
+  const savedDifficulty = window.localStorage.getItem('siege:last-difficulty');
+  let scenarioId: ScenarioId =
+    SCENARIO_IDS.find((id) => id === savedScenario) ?? 'riverwatch';
+  let difficultyId: DifficultyId =
+    DIFFICULTY_IDS.find((id) => id === savedDifficulty) ?? 'captain';
+
+  const rememberSelection = (): void => {
+    window.localStorage.setItem('siege:last-scenario', scenarioId);
+    window.localStorage.setItem('siege:last-difficulty', difficultyId);
+  };
+
+  const updateDeployLabel = (): void => {
+    const label = deploy.querySelector('span');
+    if (label !== null) {
+      label.textContent = `DEPLOY · ${SCENARIOS[scenarioId].name.toUpperCase()}`;
+    }
+    deploy.title = `${SCENARIOS[scenarioId].name} against ${DIFFICULTIES[difficultyId].name} (${DIFFICULTIES[difficultyId].tier})`;
+  };
 
   const updateScenarioSelection = (): void => {
     for (const other of scenarioList.querySelectorAll<HTMLButtonElement>('.mission-entry')) {
@@ -76,10 +93,12 @@ export function showLobby(): Promise<MatchSelection> {
     );
     root.dataset.scenario = scenarioId;
     root.dataset.map = scenario.mapId;
+    updateDeployLabel();
   };
 
   const renderDifficulty = (): void => {
     difficultyDescription.textContent = DIFFICULTIES[difficultyId].description;
+    updateDeployLabel();
   };
 
   for (const id of SCENARIO_IDS) {
@@ -95,6 +114,7 @@ export function showLobby(): Promise<MatchSelection> {
       '<i class="mission-seal" aria-hidden="true">♜</i>';
     button.addEventListener('click', () => {
       scenarioId = id;
+      rememberSelection();
       updateScenarioSelection();
       renderBriefing();
     });
@@ -114,11 +134,13 @@ export function showLobby(): Promise<MatchSelection> {
     const title = document.createElement('strong');
     title.textContent = difficulty.name;
     const tier = document.createElement('small');
-    tier.textContent = difficulty.tier;
+    tier.textContent = id === 'captain' ? `${difficulty.tier} · Recommended` : difficulty.tier;
+    if (id === 'captain') button.dataset.recommended = 'true';
     button.append(title, tier);
     button.setAttribute('aria-label', `${difficulty.name} — ${difficulty.tier}`);
     button.addEventListener('click', () => {
       difficultyId = id;
+      rememberSelection();
       updateDifficultySelection();
       renderDifficulty();
     });
@@ -127,6 +149,23 @@ export function showLobby(): Promise<MatchSelection> {
     difficultyList.append(button);
   }
 
+  const bindArrowNavigation = (container: HTMLElement): void => {
+    container.addEventListener('keydown', (event) => {
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      const buttons = [...container.querySelectorAll<HTMLButtonElement>('button')];
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      if (index < 0 || buttons.length === 0) return;
+      const backwards = event.key === 'ArrowUp' || event.key === 'ArrowLeft';
+      const next = buttons[(index + (backwards ? -1 : 1) + buttons.length) % buttons.length];
+      if (next === undefined) return;
+      event.preventDefault();
+      next.focus();
+      next.click();
+    });
+  };
+
+  bindArrowNavigation(scenarioList);
+  bindArrowNavigation(difficultyList);
   renderBriefing();
   renderDifficulty();
 
