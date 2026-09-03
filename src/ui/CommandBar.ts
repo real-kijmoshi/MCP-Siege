@@ -69,6 +69,7 @@ export class CommandBar {
   private readonly matchup = document.getElementById('selection-matchup');
   private readonly menu = document.getElementById('formation-menu');
   private readonly stanceMenu = document.getElementById('stance-menu');
+  private readonly commandRoot = document.getElementById('commands');
   private readonly buttons = new Map<string, HTMLButtonElement>();
 
   public constructor(
@@ -292,6 +293,11 @@ export class CommandBar {
   public update(): void {
     const groupIds = this.selected();
     const state = this.engine.getState();
+    if (this.commandRoot !== null) this.commandRoot.dataset.selectionCount = String(groupIds.length);
+    if (this.readout !== null) {
+      this.readout.dataset.state =
+        groupIds.length === 0 ? 'empty' : groupIds.length === 1 ? 'single' : 'multiple';
+    }
 
     for (const [command, button] of this.buttons) {
       if (command === 'merge') button.disabled = groupIds.length < 2;
@@ -331,7 +337,7 @@ export class CommandBar {
 
       label.textContent = `${zone.name.toUpperCase()} · ${terrain.toUpperCase()} · ${group.formation
         .toUpperCase()
-        .replace('_', ' ')}`;
+        .replace('_', ' ')} · ${group.stance.toUpperCase().replace('_', ' ')}`;
 
       // The one place the counter matrix is spelled out in words. Without it a
       // player can lose a cavalry wing to a spear wall and never learn why.
@@ -341,7 +347,7 @@ export class CommandBar {
     } else {
       label.textContent = `${groups.length} GROUPS SELECTED`;
       detail.textContent = `${men.toLocaleString()} men under orders`;
-      this.setMatchup('');
+      this.setMatchup('Right-click a destination to move together · Shift queues another waypoint · F centres the camera');
     }
   }
 
