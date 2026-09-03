@@ -2031,3 +2031,582 @@ canvas:focus-visible,
   }
 }
 
+
+
+/* ===================================================== seamless UX pass */
+
+/* The state of battle time should never depend on spotting one selected icon. */
+.battle-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 116px;
+  padding: 5px 9px;
+  border: 1px solid var(--wood-light);
+  background: rgba(20, 16, 10, 0.84);
+  box-shadow: inset 0 0 0 1px rgba(240, 205, 118, 0.06);
+}
+
+.battle-state > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.battle-state b {
+  color: var(--parchment);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.battle-state small {
+  color: var(--ink-faint);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.battle-state-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border: 1px solid #5f2c24;
+  background: #c14c3d;
+  box-shadow: 0 0 0 2px rgba(193, 76, 61, 0.12);
+}
+
+.battle-state[data-state='running'] .battle-state-dot {
+  border-color: #47653e;
+  background: #7aae68;
+  box-shadow: 0 0 0 2px rgba(122, 174, 104, 0.12);
+  animation: battle-live 1.8s steps(2, end) infinite;
+}
+
+@keyframes battle-live {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.top-action {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--wood-light);
+  background: var(--stone-dark);
+  color: var(--parchment);
+  cursor: pointer;
+  font: inherit;
+}
+
+.top-action b {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid var(--gold-dark);
+  color: var(--gold);
+  font-size: 12px;
+}
+
+.top-action span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.top-action:hover,
+.top-action[aria-expanded='true'] {
+  border-color: var(--gold-dark);
+  background: var(--stone);
+}
+
+/* Search and triage keep the roster useful once the army becomes large. */
+.army-tools {
+  display: grid;
+  gap: 6px;
+  padding: 7px 7px 8px;
+  border-bottom: 1px solid var(--wood-dark);
+  background: rgba(12, 10, 7, 0.38);
+}
+
+.army-search {
+  position: relative;
+  display: block;
+}
+
+.army-search input {
+  width: 100%;
+  height: 28px;
+  padding: 0 27px 0 9px;
+  border: 1px solid var(--wood-light);
+  outline: none;
+  background: rgba(7, 7, 5, 0.72);
+  color: var(--parchment);
+  font: 700 9px/1 var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.army-search input::placeholder {
+  color: var(--ink-faint);
+}
+
+.army-search input:focus {
+  border-color: var(--gold-dark);
+  box-shadow: 0 0 0 2px rgba(196, 157, 73, 0.12);
+}
+
+.army-search button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.army-search button:hover {
+  color: var(--parchment);
+}
+
+.army-filters {
+  display: grid;
+  grid-template-columns: 0.65fr 1.35fr;
+  gap: 4px;
+}
+
+.army-filters button {
+  min-width: 0;
+  height: 24px;
+  border: 1px solid var(--wood-dark);
+  background: var(--stone-dark);
+  color: var(--ink-faint);
+  cursor: pointer;
+  font: 700 8px/1 var(--mono);
+  letter-spacing: 0.07em;
+}
+
+.army-filters button:hover {
+  color: var(--parchment);
+}
+
+.army-filters button.active {
+  border-color: var(--gold-dark);
+  background: #2b2417;
+  color: var(--gold);
+}
+
+.army-filters button span {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  margin-right: 3px;
+  place-items: center;
+  background: rgba(184, 69, 47, 0.2);
+  color: #e98b70;
+}
+
+.army-empty {
+  display: grid;
+  min-height: 140px;
+  place-content: center;
+  gap: 6px;
+  padding: 20px;
+  text-align: center;
+}
+
+.army-empty b {
+  color: var(--parchment);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.army-empty span {
+  max-width: 180px;
+  color: var(--ink-faint);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+/* A compact toolbar puts discoverable equivalents beside hidden shortcuts. */
+.battle-toolbar {
+  position: absolute;
+  z-index: 12;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  gap: 5px;
+  pointer-events: auto;
+}
+
+.toolbar-group {
+  display: flex;
+  padding: 3px;
+  border: 1px solid rgba(82, 62, 35, 0.95);
+  background: rgba(13, 11, 8, 0.9);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.toolbar-group button {
+  min-width: 28px;
+  height: 27px;
+  padding: 0 7px;
+  border: 0;
+  border-right: 1px solid rgba(82, 62, 35, 0.62);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font: 700 8px/1 var(--mono);
+  letter-spacing: 0.06em;
+}
+
+.toolbar-group button:last-child {
+  border-right: 0;
+}
+
+.toolbar-group button:hover {
+  background: rgba(196, 157, 73, 0.12);
+  color: var(--parchment);
+}
+
+.toolbar-group button:active {
+  transform: translateY(1px);
+}
+
+body[data-selection-count='0'] #view-focus-selection,
+body[data-selection-count='0'] #selection-clear {
+  opacity: 0.38;
+  pointer-events: none;
+}
+
+/* The guide always describes the next action, instead of dumping every control. */
+.interaction-guide {
+  position: absolute;
+  z-index: 13;
+  left: 50%;
+  bottom: 14px;
+  display: grid;
+  width: min(520px, calc(100% - 28px));
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 9px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(111, 84, 43, 0.95);
+  background: linear-gradient(180deg, rgba(31, 25, 15, 0.95), rgba(14, 12, 8, 0.95));
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.guide-badge {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid var(--gold-dark);
+  background: rgba(196, 157, 73, 0.08);
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.guide-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guide-copy strong {
+  overflow: hidden;
+  color: var(--parchment);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.guide-copy small {
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interaction-guide > kbd {
+  border: 1px solid var(--wood-light);
+  padding: 3px 6px;
+  color: var(--ink-faint);
+  font: 700 9px/1 var(--mono);
+}
+
+.interaction-guide[data-state='confirmed'] {
+  border-color: rgba(86, 130, 75, 0.95);
+}
+
+.interaction-guide[data-state='confirmed'] .guide-badge {
+  border-color: #5f8954;
+  color: #9bd28a;
+}
+
+.interaction-guide.is-paused::after {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  padding: 3px 8px;
+  transform: translateX(-50%);
+  border: 1px solid #6d392c;
+  background: #2c1612;
+  color: #ee9a7d;
+  content: 'BATTLE PAUSED';
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+/* A proper modal keeps the field manual readable and keyboard-safe. */
+.help-overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 5, 4, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+.help-overlay[hidden] {
+  display: none;
+}
+
+.help-card {
+  width: min(780px, 100%);
+  max-height: min(720px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid var(--gold-dark);
+  outline: none;
+  background:
+    linear-gradient(rgba(34, 27, 17, 0.97), rgba(14, 12, 8, 0.99)),
+    var(--stone-dark);
+  box-shadow: 0 16px 60px rgba(0, 0, 0, 0.58), inset 0 0 0 3px #171109;
+}
+
+.help-card > header,
+.help-card > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--wood-light);
+}
+
+.help-card > header small {
+  color: var(--gold);
+  font-size: 8px;
+  letter-spacing: 0.22em;
+}
+
+.help-card h2 {
+  margin: 4px 0 0;
+  color: var(--parchment);
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+
+.help-card > header button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid var(--wood-light);
+  background: var(--stone-dark);
+  color: var(--parchment);
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin: 0 20px;
+  border: 1px solid var(--wood-light);
+  background: var(--wood-light);
+}
+
+.help-grid article {
+  position: relative;
+  min-height: 150px;
+  padding: 20px;
+  background: rgba(13, 11, 8, 0.95);
+}
+
+.help-number {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--gold-dark);
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.help-grid h3 {
+  margin: 14px 0 7px;
+  color: var(--parchment);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.help-grid p {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.help-card kbd {
+  display: inline-block;
+  padding: 3px 5px;
+  border: 1px solid var(--wood-light);
+  border-bottom-width: 2px;
+  background: #17130d;
+  color: var(--parchment);
+  font: 700 9px/1 var(--mono);
+  white-space: nowrap;
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  margin: 18px 20px 2px;
+  border: 1px solid var(--wood-dark);
+  background: var(--wood-dark);
+}
+
+.shortcut-grid span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 9px;
+  background: rgba(19, 16, 11, 0.98);
+}
+
+.shortcut-grid b {
+  color: var(--ink-faint);
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.help-card > footer {
+  margin-top: 16px;
+  border-top: 1px solid var(--wood-light);
+  border-bottom: 0;
+  color: var(--ink-faint);
+  font-size: 9px;
+}
+
+.help-card > footer button {
+  padding: 9px 14px;
+  border: 1px solid var(--gold-dark);
+  background: #2d2617;
+  color: var(--gold);
+  cursor: pointer;
+  font: 800 9px/1 var(--mono);
+  letter-spacing: 0.09em;
+}
+
+:where(button, input, canvas, [tabindex]):focus-visible {
+  outline: 2px solid #e9bd59;
+  outline-offset: 2px;
+}
+
+/* Protect the command layer on shorter laptops and narrower desktop windows. */
+@media (max-width: 1260px) {
+  .battle-state {
+    min-width: 0;
+  }
+
+  .battle-state small,
+  .top-action span {
+    display: none;
+  }
+
+  .top-action {
+    width: 34px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .selection-tools {
+    display: none;
+  }
+}
+
+@media (max-width: 1040px) {
+  .interaction-guide {
+    bottom: 8px;
+    width: calc(100% - 16px);
+  }
+
+  .guide-copy small {
+    font-size: 8px;
+  }
+
+  .battle-toolbar {
+    max-width: calc(100% - 20px);
+    overflow-x: auto;
+  }
+
+  .help-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .help-grid article {
+    min-height: 0;
+  }
+
+  .shortcut-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-height: 700px) {
+  .interaction-guide {
+    padding-block: 6px;
+  }
+
+  .help-card > header,
+  .help-card > footer {
+    padding-block: 12px;
+  }
+
+  .help-grid article {
+    min-height: 118px;
+    padding: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .battle-state-dot,
+  .interaction-guide,
+  .help-overlay,
+  .help-card {
+    animation: none !important;
+    transition: none !important;
+  }
+}
