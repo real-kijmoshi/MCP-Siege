@@ -396,7 +396,18 @@ export class Input {
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const target = event.target;
-    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+    // Focused controls own their keystrokes. Without this, pressing Space on a
+    // toolbar button also toggles battle time and letter keys can pan the map
+    // while someone is searching the roster.
+    if (
+      document.body.classList.contains('modal-open') ||
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.closest('button, a, [role="dialog"]') !== null)
+    ) {
+      return;
+    }
 
     this.pressedKeys.add(event.key.toLowerCase());
 
@@ -443,21 +454,17 @@ export class Input {
         this.focusSelection();
         break;
       case 'escape':
-        this.renderer.selection.clear();
-        this.callbacks.onSelectionChange();
+        this.clearSelection();
         break;
       case 'z':
-        this.zoomAtCentre(1 / ZOOM_STEP);
+        this.zoomOut();
         break;
       case 'x':
-        this.zoomAtCentre(ZOOM_STEP);
+        this.zoomIn();
         break;
-      case 'h': {
-        // Home on the thing the whole battle is about.
-        const king = this.state.objective.kings.player.position;
-        this.renderer.camera.centerOn(king.x, king.y);
+      case 'h':
+        this.focusKing();
         break;
-      }
       case '+':
       case '=':
         this.callbacks.onSpeedChange(1);
@@ -473,7 +480,7 @@ export class Input {
   };
 
   /** Every regiment still standing. The fastest way to move a whole army. */
-  private selectAll(): void {
+  public selectAll(): void {
     this.renderer.selection.clear();
     for (const group of activeGroups(this.state, 'player')) this.renderer.selection.add(group.id);
     this.callbacks.onSelectionChange();
@@ -501,6 +508,25 @@ export class Input {
   private zoomAtCentre(factor: number): void {
     const camera = this.renderer.camera;
     camera.zoomAt(camera.viewportWidth / 2, camera.viewportHeight / 2, factor);
+  }
+
+  public zoomIn(): void {
+    this.zoomAtCentre(ZOOM_STEP);
+  }
+
+  public zoomOut(): void {
+    this.zoomAtCentre(1 / ZOOM_STEP);
+  }
+
+  public clearSelection(): void {
+    if (this.renderer.selection.size === 0) return;
+    this.renderer.selection.clear();
+    this.callbacks.onSelectionChange();
+  }
+
+  public focusKing(): void {
+    const king = this.state.objective.kings.player.position;
+    this.renderer.camera.centerOn(king.x, king.y);
   }
 
   /** Centres on a named regiment. Used by the roster and the alert feed. */
