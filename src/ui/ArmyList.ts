@@ -16,16 +16,46 @@ export class ArmyList {
   private readonly body = document.getElementById('army-list-body');
   private readonly count = document.getElementById('army-list-count');
   private signature = '';
+  private filter: 'all' | 'attention' = 'all';
+  private query = '';
 
   public constructor(
     private readonly onSelect: (groupId: string, additive: boolean) => void,
     private readonly onFocus: (groupId: string) => void = () => {},
-  ) {}
+  ) {
+    const search = document.getElementById('army-search');
+    if (search instanceof HTMLInputElement) {
+      search.addEventListener('input', () => {
+        this.query = search.value.trim().toLocaleLowerCase();
+        this.signature = '';
+      });
+    }
+
+    document.getElementById('army-search-clear')?.addEventListener('click', () => {
+      if (!(search instanceof HTMLInputElement)) return;
+      search.value = '';
+      this.query = '';
+      this.signature = '';
+      search.focus();
+    });
+
+    for (const button of document.querySelectorAll<HTMLButtonElement>('[data-army-filter]')) {
+      button.addEventListener('click', () => {
+        this.filter = button.dataset.armyFilter === 'attention' ? 'attention' : 'all';
+        for (const other of document.querySelectorAll<HTMLButtonElement>('[data-army-filter]')) {
+          const selected = other === button;
+          other.classList.toggle('active', selected);
+          other.setAttribute('aria-pressed', String(selected));
+        }
+        this.signature = '';
+      });
+    }
+  }
 
   public render(armies: readonly ArmySummary[], selection: ReadonlySet<string>): void {
     if (this.body === null) return;
 
-    const signature = armies
+    const signature = `${this.filter}:${this.query}|` + armies
       .map(
         (army) =>
           `${army.id}:${army.strength}:${army.activity}:${Math.round(army.morale / 3)}:${
@@ -44,7 +74,9 @@ export class ArmyList {
       document.activeElement instanceof HTMLElement
         ? document.activeElement.closest<HTMLButtonElement>('.army-row')?.dataset.groupId
         : undefined;
-    this.body.replaceChildren(...armies.map((army) => this.row(army, selection.has(army.id))));
+    const visible = armies.filter((army) => this.isVisible(army));
+    const rows = visible.map((army) => this.row(army, selection.has(army.id)));
+    this.body.replaceChildren(...(rows.length > 0 ? rows : [this.emptyState()]));
     if (focusedGroupId !== undefined) {
       for (const row of this.body.querySelectorAll<HTMLButtonElement>('.army-row')) {
         if (row.dataset.groupId === focusedGroupId) row.focus({ preventScroll: true });
@@ -55,9 +87,38 @@ export class ArmyList {
     // the roster is not something the commander has to count.
     if (this.count !== null) {
       const men = armies.reduce((total, army) => total + army.strength, 0);
-      this.count.textContent = `${armies.length} · ${men.toLocaleString()}`;
-      this.count.title = `${armies.length} regiments, ${men.toLocaleString()} men`;
+      this.count.textContent =
+        visible.length === armies.length
+          ? `${armies.length} · ${men.toLocaleString()}`
+          : `${visible.length}/${armies.length} · ${men.toLocaleString()}`;
+      this.count.title = `${visible.length} shown of ${armies.length} regiments, ${men.toLocaleString()} men total`;
     }
+  }
+
+  private isVisible(army: ArmySummary): boolean {
+    const matchesQuery =
+      this.query.length === 0 ||
+      army.name.toLocaleLowerCase().includes(this.query) ||
+      army.zoneName.toLocaleLowerCase().includes(this.query) ||
+      UNIT_STATS[army.primaryRole].label.toLocaleLowerCase().includes(this.query) ||
+      CATEGORY_TOKEN[army.primaryRole].toLocaleLowerCase().includes(this.query);
+    if (!matchesQuery) return false;
+    if (this.filter === 'all') return true;
+    return (
+      army.engaged ||
+      army.surrounded ||
+      army.pinned ||
+      army.crowded ||
+      army.spent ||
+      army.moraleState === 'routing'
+    );
+  }
+
+  private emptyState(): HTMLElement {
+    const empty = document.createElement('div');
+    empty.className = 'army-empty';
+    empty.innerHTML = '<b>No regiments match</b><span>Clear the search or show all groups.</span>';
+    return empty;
   }
 
   private row(army: ArmySummary, selected: boolean): HTMLButtonElement {
