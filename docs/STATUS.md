@@ -7,17 +7,52 @@ for each battlefield — and an external Marshal can now design an operation of
 its own, on ground of its own choosing, and fight it. No simulation rule
 changed: combat, morale, fog, the objective and the command queue are untouched.
 
-# Pixel-Art Unit Shading Pass
+# Pixel-Art Soldiers
 
-Detailed-zoom soldiers were flat single-colour blocks — a square, circle,
-triangle or diamond per category, all one shade. `UnitLayer` now adds a
-contact shadow at the feet and a metal glint at the crown of every detailed
-unit, drawn from the same shadow and stone-light inks the terrain and keeps
-already use. Both accents are batched across every category and faction in
-one pass each, so the change costs exactly two more `fill()` calls for the
-whole battlefield regardless of how many troop types are on the field — the
-existing per-category body fills, and the low-LOD block and blob paths, are
-unchanged. No simulation, command, query or WebMCP behaviour is touched.
+Every man on the battlefield was a flat single-colour block — a square, circle,
+triangle or diamond by category, one shade each. He is now a drawn figure: dark
+legs with the ground showing between them, a tunic in his regiment's colour, a
+face, a helmet, and whatever he actually carries. No simulation, command, query
+or WebMCP behaviour changed; this is `UnitLayer` and `pixelart.ts` only.
+
+- **Ten figures, authored not generated.** `FIGURES` in `pixelart.ts` holds a
+  drawing per troop type on a small grid whose origin is between the man's
+  feet: swordsmen with shield and blade, a spear hedge whose shafts stand three
+  times a man's height, great-helmed heavies, archers whose bows are three
+  cells of a curve, arquebusiers with a levelled barrel, hooded scouts,
+  surgeons with a linen cross and no weapon, lancers on horses drawn barrel
+  first, trebuchets with the arm thrown up, and cannon on their carriages.
+- **Five inks, none of them new.** A soldier is cut from the palette the ground
+  already uses: the canopy's shadow, the palisade's timber, the keep's dressed
+  stone, sand for skin and linen, and the regiment's own colour for cloth. The
+  steel is the mid grey rather than the light one, because in the light grey a
+  battery of guns read as white bars laid on the grass.
+- **Drawn one ink at a time, not one man at a time.** Every shadow on the field
+  goes down in a single fill, then every shaft, then each regiment's cloth in
+  its own colour, then all the skin and all the steel. That is four fills plus
+  one per regiment colour however many kinds of troops are present — and it is
+  also the right order to draw a man in, so a lance sits behind its rider and a
+  helmet over his face.
+- **A man faces where he is going.** Figures mirror on the sign of the
+  soldier's own velocity, and fall back to his regiment's facing when he is
+  standing, so a line holding ground faces its enemy instead of all facing east
+  out of the drawing.
+- **Four rungs of detail, one set of drawings.** Cells are flagged as
+  silhouette-carrying and packed first, so command zoom draws a prefix of the
+  same art rather than a second set of drawings that could drift from it:
+  whole figures close to, silhouettes at command zoom, blocks below that, and
+  regiment blobs at strategic zoom. Scatter hashed from each soldier's index
+  keeps eight hundred identical men from reading as wallpaper, and uses the art
+  hash rather than the simulation stream, which no drawing may touch.
+- **Measured.** Timing `render` directly on a full battle of ~7,900 men, a
+  frame drawing two thousand whole figures costs 3.2 ms against the 1.5 ms the
+  flat blocks cost, inside a 16.7 ms frame; at command zoom the silhouette pass
+  measures the same 2.0 ms the blocks did. Past 2,500 figures on screen the
+  layer falls back to silhouettes, which is a guard against a pile-up larger
+  than anything measured rather than a limit ordinary play reaches.
+- **Driven in a browser.** All ten troop types, an enemy army in contact and
+  every level-of-detail rung were checked on the running game with no console
+  errors.
 
 # The War Council
 
