@@ -1,4 +1,4 @@
-import { buildScenario } from '../config/scenario';
+import { buildScenario, resolveScenario } from '../config/scenario';
 import {
   resolveSimulationOptions,
   type SimulationOptions,
@@ -67,8 +67,10 @@ export class SimulationEngine {
 
   public constructor(options?: number | Partial<SimulationOptions>) {
     const resolved = resolveSimulationOptions(options);
-    this.state = createEmptyState(resolved.seed, resolved.scenarioId, resolved.difficultyId);
-    buildScenario(this.state, resolved.scenarioId);
+    // An operation is resolved once, here, and then belongs to this engine.
+    const scenario = resolveScenario(resolved);
+    this.state = createEmptyState(resolved.seed, scenario, resolved.difficultyId);
+    buildScenario(this.state, scenario);
     seedInitialVisibility(this.state);
     seedZoneControl(this.state);
     resetAlertTracking(this.state);
@@ -239,3 +241,4 @@ export class SimulationEngine {
     }
   }
 }
+

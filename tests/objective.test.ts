@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OBJECTIVE, TICKS_PER_SECOND } from '../src/game/config/battle';
-import { createGroupFromSpec, type GroupSpec } from '../src/game/config/scenario';
+import { SCENARIOS, createGroupFromSpec, type GroupSpec } from '../src/game/config/scenario';
 import { GameQueries } from '../src/game/queries/GameQueries';
 import { evaluateCondition } from '../src/game/simulation/Conditions';
 import { SimulationEngine } from '../src/game/simulation/Engine';
@@ -48,7 +48,7 @@ function spec(
  * the capture bar is the contest itself.
  */
 function siegeState(guardSize: number, raiderSize: number): GameState {
-  const state = createEmptyState(11);
+  const state = createEmptyState(11, SCENARIOS.bridge_of_knives);
   const kingAt = { x: 4000, y: 700 };
 
   if (guardSize > 0) {
@@ -221,13 +221,13 @@ describe('the objective in the scenario', () => {
     engine.dispatch('human', {
       type: 'order_groups',
       playerId: 'player',
-      groupIds: ['royal_guard'],
+      groupIds: ['kingsguard'],
       order: 'move',
       targetZone: 'village',
     });
     run(engine, TICKS_PER_SECOND * 25);
 
-    const guard = findGroup(state, 'royal_guard');
+    const guard = findGroup(state, 'kingsguard');
     const king = state.objective.kings.player;
     expect(king.position).toEqual({ x: guard?.anchor.x, y: guard?.anchor.y });
     expect(Math.hypot(king.position.x - before.x, king.position.y - before.y)).toBeGreaterThan(200);
@@ -243,8 +243,8 @@ describe('the objective in the scenario', () => {
     expect(report.enemyKing.note).toContain('Never sighted');
     expect(report.result).toEqual({
       elapsedSeconds: 0,
-      initialUnits: 4306,
-      survivingUnits: 4306,
+      initialUnits: 3931,
+      survivingUnits: 3931,
       losses: 0,
       survivingRegiments: 13,
     });
@@ -278,7 +278,7 @@ describe('the objective in the scenario', () => {
     const command = engine.dispatch('webmcp', {
       type: 'order_groups',
       playerId: 'player',
-      groupIds: ['legion_i'],
+      groupIds: ['vanguard'],
       order: 'attack_zone',
       targetZone: 'central_bridge',
     });
@@ -289,8 +289,8 @@ describe('the objective in the scenario', () => {
     expect(result?.ok === false && result.code).toBe('BATTLE_OVER');
 
     // And the battle really has stopped: nothing manoeuvres afterwards.
-    const before = findGroup(engine.getState(), 'iron_host')?.anchor.y ?? 0;
+    const before = findGroup(engine.getState(), 'cinder_host')?.anchor.y ?? 0;
     run(engine, TICKS_PER_SECOND * 5);
-    expect(findGroup(engine.getState(), 'iron_host')?.anchor.y).toBe(before);
+    expect(findGroup(engine.getState(), 'cinder_host')?.anchor.y).toBe(before);
   });
 });

@@ -55,7 +55,7 @@ function rush(seed: number): Result {
     const state = engine.getState();
     if (state.currentTick % (TICKS_PER_SECOND * 30) === 0) {
       const groupIds = activeGroups(state, 'player')
-        .filter((group) => group.id !== 'royal_guard' && !group.routing)
+        .filter((group) => group.id !== 'kingsguard' && !group.routing)
         .map((group) => group.id);
       if (groupIds.length > 0) {
         engine.dispatch('human', {
@@ -93,13 +93,13 @@ function defence(seed: number): Result {
     });
   };
 
-  hold(['legion_i'], 'central_field', 'line', 'hold_ground');
-  hold(['spearwall'], 'central_field', 'double_line', 'hold_ground');
-  hold(['legion_ii'], 'central_field', 'line', 'defensive');
-  hold(['archers_i'], 'central_hill', 'loose', 'defensive');
-  hold(['siege_corps'], 'central_hill', undefined, 'defensive');
-  hold(['reserve_i'], 'player_base', 'block', 'hold_ground');
-  hold(['cavalry_i', 'cavalry_ii'], 'player_base', 'wedge', 'defensive');
+  hold(['vanguard'], 'central_field', 'line', 'hold_ground');
+  hold(['hedge'], 'central_field', 'double_line', 'hold_ground');
+  hold(['ironbacks'], 'central_field', 'line', 'defensive');
+  hold(['longbows'], 'central_hill', 'loose', 'defensive');
+  hold(['hammers'], 'central_hill', undefined, 'defensive');
+  hold(['fenmen'], 'player_base', 'block', 'hold_ground');
+  hold(['greyriders', 'lancers'], 'player_base', 'wedge', 'defensive');
 
   let answering = false;
   for (let tick = 0; tick < LIMIT; tick += 1) {
@@ -108,7 +108,7 @@ function defence(seed: number): Result {
       const beset = state.objective.kings.player.attackers > 0;
       if (beset && !answering) {
         answering = true;
-        hold(['cavalry_i', 'cavalry_ii'], 'player_base', 'wedge', 'aggressive');
+        hold(['greyriders', 'lancers'], 'player_base', 'wedge', 'aggressive');
       } else if (!beset) {
         answering = false;
       }
@@ -127,3 +127,4 @@ describe('balance', () => {
     }
   }, 600_000);
 });
+

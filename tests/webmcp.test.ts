@@ -74,9 +74,9 @@ describe('reads', () => {
     expect(data.playerUnits).toBeGreaterThan(3000);
     expect(data.fronts).toBeTruthy();
     expect(data.operation).toEqual({
-      id: 'riverwatch',
-      name: 'Riverwatch',
-      briefing: 'Break the northern line, then take the Ashen King.',
+      id: 'bridge_of_knives',
+      name: 'Bridge of Knives',
+      briefing: 'Break the Ashen centre on the near bank, then take the Ashen King.',
       difficulty: 'Captain',
     });
     expect(data.attention).toEqual(expect.arrayContaining([expect.stringContaining('No enemy')]));
@@ -88,18 +88,18 @@ describe('reads', () => {
   it('lists armies with the ids that commands accept', () => {
     const data = unwrap(tools.getArmies());
     const armies = data.armies as Array<{ id: string; name: string }>;
-    expect(armies.map((army) => army.id)).toContain('legion_i');
+    expect(armies.map((army) => army.id)).toContain('vanguard');
     expect(armies.every((army) => army.name.length > 0)).toBe(true);
   });
 
   it('rejects unknown parameters on a strict schema', () => {
-    const error = expectFailure(tools.getArmyDetails({ groupId: 'legion_i', extra: 1 }));
+    const error = expectFailure(tools.getArmyDetails({ groupId: 'vanguard', extra: 1 }));
     expect(error.code).toBe('INVALID_INPUT');
     expect(error.message).toContain('extra');
   });
 
   it('refuses to describe a group that is not yours', () => {
-    expectFailure(tools.getArmyDetails({ groupId: 'iron_host' }), 'GROUP_NOT_FOUND');
+    expectFailure(tools.getArmyDetails({ groupId: 'cinder_host' }), 'GROUP_NOT_FOUND');
   });
 });
 
@@ -130,9 +130,9 @@ describe('fog of war', () => {
     const error = expectFailure(
       await call(
         tools.orderGroup({
-          groupIds: ['legion_i'],
+          groupIds: ['vanguard'],
           order: 'attack_group',
-          targetGroupId: 'siege_train',
+          targetGroupId: 'slagworks',
         }),
       ),
     );
@@ -144,27 +144,27 @@ describe('commands', () => {
   it('moves a group through the same queue the player uses', async () => {
     const data = unwrap(
       await call(
-        tools.orderGroup({ groupIds: ['cavalry_i'], order: 'move', targetZone: 'west_crossing' }),
+        tools.orderGroup({ groupIds: ['greyriders'], order: 'move', targetZone: 'west_crossing' }),
       ),
     );
     expect(data.ok).toBe(true);
 
-    const group = activeGroups(engine.getState(), 'player').find((g) => g.id === 'cavalry_i');
+    const group = activeGroups(engine.getState(), 'player').find((g) => g.id === 'greyriders');
     expect(group?.order.kind).toBe('move');
     expect(group?.path.length).toBeGreaterThan(0);
   });
 
   it('queues named-zone waypoints instead of replacing the current march', async () => {
     await call(
-      tools.orderGroup({ groupIds: ['cavalry_i'], order: 'move', targetZone: 'west_crossing' }),
+      tools.orderGroup({ groupIds: ['greyriders'], order: 'move', targetZone: 'west_crossing' }),
     );
-    const group = activeGroups(engine.getState(), 'player').find((entry) => entry.id === 'cavalry_i')!;
+    const group = activeGroups(engine.getState(), 'player').find((entry) => entry.id === 'greyriders')!;
     const before = group.path.length;
 
     unwrap(
       await call(
         tools.orderGroup({
-          groupIds: ['cavalry_i'],
+          groupIds: ['greyriders'],
           order: 'move',
           targetZone: 'east_crossing',
           append: true,
@@ -183,14 +183,14 @@ describe('commands', () => {
           targetZone: 'central_field',
           assignments: [
             {
-              groupId: 'legion_i',
+              groupId: 'vanguard',
               slot: 'front_center',
               order: 'attack_zone',
               formation: 'double_line',
               stance: 'aggressive',
             },
             {
-              groupId: 'archers_i',
+              groupId: 'longbows',
               slot: 'rear_center',
               order: 'defend_zone',
               formation: 'line',
@@ -200,10 +200,10 @@ describe('commands', () => {
         }),
       ),
     );
-    expect(data.groupIds).toEqual(['legion_i', 'archers_i']);
+    expect(data.groupIds).toEqual(['vanguard', 'longbows']);
 
-    const legion = activeGroups(engine.getState(), 'player').find((group) => group.id === 'legion_i')!;
-    const archers = activeGroups(engine.getState(), 'player').find((group) => group.id === 'archers_i')!;
+    const legion = activeGroups(engine.getState(), 'player').find((group) => group.id === 'vanguard')!;
+    const archers = activeGroups(engine.getState(), 'player').find((group) => group.id === 'longbows')!;
     expect(legion.formation).toBe('double_line');
     expect(archers.stance).toBe('hold_ground');
     expect(legion.order.destination).not.toEqual(archers.order.destination);
@@ -211,7 +211,7 @@ describe('commands', () => {
 
   it('rejects an incomplete order before it reaches the command queue', async () => {
     expectFailure(
-      await tools.orderGroup({ groupIds: ['legion_i'], order: 'move' }),
+      await tools.orderGroup({ groupIds: ['vanguard'], order: 'move' }),
       'INVALID_INPUT',
     );
     expect(engine.pendingCommandCount).toBe(0);
@@ -220,7 +220,7 @@ describe('commands', () => {
   it('defaults simple plan steps to immediate execution with a readable note', async () => {
     const started = tools.createPlan({
       name: 'Open the centre',
-      steps: [{ groupId: 'legion_i', action: 'move', targetZone: 'central_bridge' }],
+      steps: [{ groupId: 'vanguard', action: 'move', targetZone: 'central_bridge' }],
     });
     const data = unwrap(await call(started));
     expect(data.planId).toBeTruthy();
@@ -233,20 +233,20 @@ describe('commands', () => {
 
   it('rejects an unknown zone name', async () => {
     expectFailure(
-      await call(tools.orderGroup({ groupIds: ['legion_i'], order: 'move', targetZone: 'moon' })),
+      await call(tools.orderGroup({ groupIds: ['vanguard'], order: 'move', targetZone: 'moon' })),
       'INVALID_INPUT',
     );
   });
 
   it('splits a group while preserving its mix of troops', async () => {
-    const before = activeGroups(engine.getState(), 'player').find((g) => g.id === 'reserve_i');
+    const before = activeGroups(engine.getState(), 'player').find((g) => g.id === 'fenmen');
     const beforeStrength = before?.members.length ?? 0;
 
     const data = unwrap(
       await call(
         tools.reorganizeArmies({
           operation: 'split',
-          groupId: 'reserve_i',
+          groupId: 'fenmen',
           percent: 40,
           name: 'Reserve East',
         }),
@@ -255,7 +255,7 @@ describe('commands', () => {
 
     const state = engine.getState();
     const detachment = activeGroups(state, 'player').find((g) => g.id === data.newGroupId);
-    const source = activeGroups(state, 'player').find((g) => g.id === 'reserve_i');
+    const source = activeGroups(state, 'player').find((g) => g.id === 'fenmen');
 
     expect(detachment).toBeDefined();
     expect(source).toBeDefined();
@@ -271,13 +271,13 @@ describe('commands', () => {
 
   it('detaches a troop category into a new regiment without soldier ids', async () => {
     const state = engine.getState();
-    const source = activeGroups(state, 'player').find((group) => group.id === 'reserve_i')!;
+    const source = activeGroups(state, 'player').find((group) => group.id === 'fenmen')!;
     const before = source.members.length;
     const data = unwrap(
       await call(
         tools.reorganizeArmies({
           operation: 'detach',
-          groupId: 'reserve_i',
+          groupId: 'fenmen',
           category: 'archer',
           percent: 100,
           name: 'Reserve Archers',
@@ -294,7 +294,7 @@ describe('commands', () => {
 
   it('refuses to command the enemy', async () => {
     expectFailure(
-      await call(tools.orderGroup({ groupIds: ['iron_host'], order: 'hold' })),
+      await call(tools.orderGroup({ groupIds: ['cinder_host'], order: 'hold' })),
       'GROUP_NOT_FOUND',
     );
   });

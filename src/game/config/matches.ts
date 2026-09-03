@@ -1,15 +1,27 @@
 import type { Formation, OrderKind, Stance, ZoneId } from '../types/domain';
+import type { ScenarioDefinition } from './scenario';
 
-export const SCENARIO_IDS = [
-  'riverwatch',
-  'broken_bridgehead',
-  'last_light',
-  'cinder_road',
-  'ashen_gate',
-  'goldmere_fields',
-  'the_long_causeway',
+/**
+ * The authored operations.
+ *
+ * One for each battlefield, and each one a different problem: a trap that has to
+ * be sprung at the right moment, an assault through one of two gaps with the
+ * other one open behind you, a sovereign stranded on the wrong side of a tidal
+ * channel, and a field with no feature on it at all, where both flanks are the
+ * commander's own to hold. A fifth kind of battle exists — the one laid on the
+ * War Council table, which a Marshal may rewrite through WebMCP — and that one
+ * is `custom`.
+ */
+export const AUTHORED_SCENARIO_IDS = [
+  'bridge_of_knives',
+  'ember_gate',
+  'salt_tide',
+  'open_hand',
 ] as const;
-export type ScenarioId = (typeof SCENARIO_IDS)[number];
+export type AuthoredScenarioId = (typeof AUTHORED_SCENARIO_IDS)[number];
+
+/** An operation is either one of the authored three, or a designed one. */
+export type ScenarioId = AuthoredScenarioId | 'custom';
 
 export const DIFFICULTY_IDS = ['levy', 'captain', 'warlord'] as const;
 export type DifficultyId = (typeof DIFFICULTY_IDS)[number];
@@ -171,11 +183,20 @@ export interface SimulationOptions {
   seed: number;
   scenarioId: ScenarioId;
   difficultyId: DifficultyId;
+  /**
+   * The operation to fight, in full.
+   *
+   * Authored operations are looked up from `scenarioId`; a designed one has no
+   * entry to look up, so it is carried here. Either way the engine copies it
+   * into its own state, which is what keeps two battles in one process — one
+   * authored, one designed by a Marshal — from reading each other's script.
+   */
+  scenario?: ScenarioDefinition;
 }
 
 export const DEFAULT_SIMULATION_OPTIONS: SimulationOptions = {
   seed: 20_260_829,
-  scenarioId: 'riverwatch',
+  scenarioId: 'bridge_of_knives',
   difficultyId: 'captain',
 };
 
@@ -185,3 +206,4 @@ export function resolveSimulationOptions(
   if (typeof options === 'number') return { ...DEFAULT_SIMULATION_OPTIONS, seed: options };
   return { ...DEFAULT_SIMULATION_OPTIONS, ...options };
 }
+

@@ -78,7 +78,7 @@ describe('artillery', () => {
     // The whole distinction between a gun and a siege engine. A piece that has
     // moved this tick has its wait reset, so a battery walked forward with the
     // advance shoots at nothing for the entire march.
-    const engine = new SimulationEngine({ scenarioId: 'riverwatch', difficultyId: 'captain', seed: 4 });
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 4 });
     const state = engine.getState();
     const deploy = UNIT_STATS.cannon.deployTicks;
     expect(deploy).toBeGreaterThan(0);
@@ -109,13 +109,13 @@ describe('artillery', () => {
   it('fires once it has been given ground to stand on', () => {
     // A gun only ever reaches the full reload by actually loosing a shot, so a
     // wait longer than the unlimbering time is proof the battery is in action.
-    const engine = new SimulationEngine({ scenarioId: 'riverwatch', difficultyId: 'captain', seed: 4 });
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 4 });
     const state = engine.getState();
 
     engine.dispatch('human', {
       type: 'order_groups',
       playerId: 'player',
-      groupIds: ['legion_i', 'legion_ii', 'spearwall'],
+      groupIds: ['vanguard', 'ironbacks', 'hedge'],
       order: 'attack_zone',
       targetZone: 'central_bridge',
     });
@@ -137,7 +137,7 @@ describe('artillery', () => {
   });
 
   it('tells the commander his guns are still on their teams', () => {
-    const engine = new SimulationEngine({ scenarioId: 'riverwatch', difficultyId: 'captain', seed: 4 });
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 4 });
     const queries = new GameQueries(() => engine.getState());
 
     const before = queries.getArmies('player').find((army) => army.id === 'culverins');
@@ -157,7 +157,7 @@ describe('artillery', () => {
 
     // Nothing without guns in it is ever reported as limbered, however far it
     // is marching.
-    const legion = queries.getArmies('player').find((army) => army.id === 'legion_i');
+    const legion = queries.getArmies('player').find((army) => army.id === 'vanguard');
     expect(legion?.limbered).toBe(false);
   });
 });
@@ -194,9 +194,9 @@ function convalesce(hospitalX: number, hospitalY: number): {
   morale: number;
   succour: number;
 } {
-  const engine = new SimulationEngine({ scenarioId: 'riverwatch', difficultyId: 'captain', seed: 7 });
+  const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 7 });
   const state = engine.getState();
-  const reserve = findGroup(state, 'reserve_i');
+  const reserve = findGroup(state, 'fenmen');
   const hospital = findGroup(state, 'field_hospital');
   if (reserve === undefined || hospital === undefined) throw new Error('missing regiment');
 
@@ -235,9 +235,9 @@ describe('the field hospital', () => {
   it('does nothing whatever for men who are still fighting', () => {
     // Care has to be something a commander buys by pulling a regiment out. If
     // it also arrived by leaving one in, holding ground would simply be free.
-    const engine = new SimulationEngine({ scenarioId: 'riverwatch', difficultyId: 'captain', seed: 7 });
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 7 });
     const state = engine.getState();
-    const reserve = findGroup(state, 'reserve_i');
+    const reserve = findGroup(state, 'fenmen');
     const hospital = findGroup(state, 'field_hospital');
     if (reserve === undefined || hospital === undefined) throw new Error('missing regiment');
 
@@ -254,10 +254,10 @@ describe('the field hospital', () => {
   });
 
   it('reports care on the roster the commander actually reads', () => {
-    const engine = new SimulationEngine({ scenarioId: 'riverwatch', difficultyId: 'captain', seed: 7 });
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 7 });
     const queries = new GameQueries(() => engine.getState());
     const state = engine.getState();
-    const reserve = findGroup(state, 'reserve_i');
+    const reserve = findGroup(state, 'fenmen');
     const hospital = findGroup(state, 'field_hospital');
     if (reserve === undefined || hospital === undefined) throw new Error('missing regiment');
 
@@ -265,7 +265,7 @@ describe('the field hospital', () => {
     station(state, hospital, 2100, 4600);
     engine.step();
 
-    const row = queries.getArmies('player').find((army) => army.id === 'reserve_i');
+    const row = queries.getArmies('player').find((army) => army.id === 'fenmen');
     expect(row?.tended).toBe(true);
   });
 
@@ -274,10 +274,10 @@ describe('the field hospital', () => {
     // ever acquires a target or pins anybody by standing there.
     expect(UNIT_STATS.surgeon.attack).toBe(0);
 
-    const engine = new SimulationEngine({ scenarioId: 'riverwatch', difficultyId: 'captain', seed: 7 });
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 7 });
     const state = engine.getState();
     const hospital = findGroup(state, 'field_hospital');
-    const ironHost = findGroup(state, 'iron_host');
+    const ironHost = findGroup(state, 'cinder_host');
     if (hospital === undefined || ironHost === undefined) throw new Error('missing regiment');
 
     // Stood directly in front of an enemy regiment, which would be suicide and

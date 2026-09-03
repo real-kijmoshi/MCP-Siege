@@ -2,11 +2,11 @@ import { describe, it } from 'vitest';
 import { TICKS_PER_SECOND } from '../src/game/config/battle';
 import { BATTLE_MAPS } from '../src/game/config/maps';
 import { SCENARIOS } from '../src/game/config/scenario';
-import { SCENARIO_IDS } from '../src/game/config/matches';
+import { AUTHORED_SCENARIO_IDS } from '../src/game/config/matches';
 import { SimulationEngine } from '../src/game/simulation/Engine';
 
 describe('probe', () => {
-  for (const scenarioId of SCENARIO_IDS) {
+  for (const scenarioId of AUTHORED_SCENARIO_IDS) {
     it(`${scenarioId}`, () => {
       const scenario = SCENARIOS[scenarioId];
       const map = BATTLE_MAPS[scenario.mapId];
@@ -20,7 +20,7 @@ describe('probe', () => {
           engine.dispatch('human', {
             type: 'order_groups',
             playerId: 'player',
-            groupIds: ['legion_i', 'legion_ii', 'spearwall', 'archers_i'],
+            groupIds: ['vanguard', 'ironbacks', 'hedge', 'longbows'],
             order: 'attack_zone',
             targetZone: crossing,
           });
@@ -29,7 +29,7 @@ describe('probe', () => {
           engine.dispatch('human', {
             type: 'order_groups',
             playerId: 'player',
-            groupIds: ['legion_i', 'legion_ii', 'spearwall', 'reserve_i', 'cavalry_i', 'cavalry_ii'],
+            groupIds: ['vanguard', 'ironbacks', 'hedge', 'fenmen', 'greyriders', 'lancers'],
             order: 'attack_zone',
             targetZone: map.enemyHomeZone,
           });
@@ -51,3 +51,4 @@ describe('probe', () => {
     });
   }
 });
+

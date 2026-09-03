@@ -4,13 +4,15 @@ A browser strategy game about commanding **more army than one person can drive b
 hand**, built so that an external AI agent can fight alongside you through
 [WebMCP](https://github.com/webmachinelearning/webmcp).
 
-Roughly 8,700 soldiers in twenty-six regiments fight over a river crossing, a
-volcanic pass, an open harvest plain or a tidal causeway, and each side has a
+Roughly 8,000 soldiers in twenty-six regiments fight over a river crossing, a
+volcanic pass, a tidal causeway or an open harvest plain, and each side has a
 king to lose. You are the Commander. An agent in a WebMCP-capable browser —
 ChatGPT's in-app browser, or Chrome with the WebMCP flag — is your **Marshal**.
 It reads the same fog-limited intelligence you do, drafts operations you can see
 drawn over the battlefield before anything moves, and issues orders through
-exactly the same command queue your mouse does.
+exactly the same command queue your mouse does. Before the battle it can do one
+more thing: **design a battle of its own** on any of the four battlefields, put
+it on the War Council table, and either hand it to you or deploy it itself.
 
 There is no chat panel in this page. The agent lives in the browser; the page
 provides the world.
@@ -24,8 +26,8 @@ npm run dev      # http://localhost:5173
 
 ```bash
 npm run typecheck   # strict TypeScript
-npm run test        # 139 deterministic tests, no browser needed
-npm run build       # static bundle, ~62 kB gzipped
+npm run test        # 196 deterministic tests, no browser needed
+npm run build       # static bundle, ~87 kB gzipped
 ```
 
 Deploys as a static site. `vercel.json` and `public/_headers` carry the two
@@ -164,34 +166,76 @@ where he stands.
 
 ## Operations and difficulty
 
-The War Council lobby offers seven authored starts across four hand-built
-8,000 × 5,000 battlefields. Each map is shaped around one dividing feature and
-the few places it can be passed:
+The War Council — the home screen — offers four authored operations, one for each
+hand-built 8,000 × 5,000 battlefield, plus the designed operation on the table.
+Each map is shaped around one dividing feature and the few places it can be
+passed, and the portrait on the council screen is drawn from the map data
+itself, so a battle designed thirty seconds ago gets a real portrait too.
 
-**River Vale** — a slow river with three crossings.
+**I. Bridge of Knives** — River Vale, a slow river with three crossings. Your
+centre is bait. Let the Cinder Host cross, let the bridgehead crowd, then close
+both wings on it. Springing it early is how you lose it.
 
-- **Riverwatch** — hold the southern bank through a measured three-front assault.
-- **Broken Bridgehead** — command an exposed vanguard already north of the river.
-- **Last Light** — reform around King Aldric after the crossings have been lost.
+**II. The Ember Gate** — Ashfall Pass, a dead volcanic spine broken open in two
+places. Force one gap knowing the other is a road to your own camp — which is
+the road their centre takes, four minutes in.
 
-**Ashfall Pass** — a dead volcanic spine, broken open in two places.
+**III. The Salt Tide** — the Sunken Coast, a tidal channel crossed in exactly two
+places an hour apart. Your king is stranded on the far shore with one regiment.
+Fight him home, or ride for their king while their host is busy hunting yours.
 
-- **Cinder Road** — force one of two gaps four kilometres apart.
-- **The Ashen Gate** — hold the far side with one road home behind you.
+**IV. The Open Hand** — Goldmere, harvest country with no feature on it at all.
+Both their horse wings go wide in the first half minute, one round each end of
+your line. Nothing here holds a flank but the men standing on it.
 
-**Goldmere** — open harvest country with nothing dividing it at all.
-
-- **Goldmere Fields** — a cavalry-heavy battle where both flanks are your problem.
-
-**Sunken Causeway** — a tidal channel cut corner to corner.
-
-- **The Long Causeway** — one raised road, one ford, and a long march between them.
+**The table** — a blank battle on whichever battlefield you pick, generated from
+that map's own ground: yours to fight as it stands, and your Marshal's to
+rewrite through WebMCP.
 
 Levy, Captain, and Warlord change enemy commitment timing, reaction cadence,
 threat radius, and royal relief behavior. They do not change fog-of-war rules or
 give the enemy a privileged command path. The selected operation and commander
 are included in `get_battle_overview`, so a WebMCP Marshal receives the same
 briefing as the human player.
+
+## Letting the Marshal design the battle
+
+While the War Council is up — and only then — the page publishes a second, small
+tool set:
+
+| Tool | What it does |
+|---|---|
+| `list_operations` | Every operation, its ground, its order of battle, and the trick it turns on |
+| `describe_battlefield` | One map's named zones, terrain, crossings, roads and musters |
+| `design_operation` | Write a battle: a map, two armies on named ground, and the enemy's timetable |
+| `review_operation` | Read the designed operation back in full |
+| `select_operation` | Put an operation in front of the commander without deploying — and, for the table, choose its battlefield |
+| `launch_operation` | Deploy, and hand over to the battlefield tools |
+
+A design is data, not code. Regiments are placed by **zone name**, never by
+coordinate; strength is bounded; each side must name the regiment its king rides
+with; and the enemy's timetable may only order regiments that design actually
+raises. Anything else comes back as a refusal with the reason and a suggestion.
+The council closes the moment an army marches, and every tool above then answers
+`BATTLE_BEGUN`.
+
+```js
+await design_operation({
+  name: 'The Narrow Ford',
+  mapId: 'river_vale',
+  playerRegiments: [
+    { id: 'south_foot', name: 'South Foot', zone: 'central_field',
+      formation: 'line', troops: [{ category: 'infantry', count: 700 }] },
+    /* … */
+    { id: 'south_crown', name: 'South Crown', zone: 'player_base', carriesKing: true,
+      formation: 'square', troops: [{ category: 'heavy_infantry', count: 240 }] },
+  ],
+  enemyRegiments: [/* … one of them carriesKing … */],
+  enemyPlan: [
+    { atSeconds: 60, groupId: 'north_foot', order: 'attack_zone', targetZone: 'central_bridge' },
+  ],
+});
+```
 
 ## How it fits together
 

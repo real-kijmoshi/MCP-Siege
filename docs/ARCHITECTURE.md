@@ -75,12 +75,42 @@ with one fill per batch — fourteen fills for eight thousand men. Level of deta
 switches from glyphs to blocks to per-regiment density blobs as the camera pulls
 back, which is what keeps a huge battle readable.
 
+## Operations
+
+An operation is a map, two deployments on it, both kings' guards and a written
+enemy timetable — one `ScenarioDefinition`. Three are authored; a fourth is
+designed at the War Council, either by a human deploying the default draft or by
+an agent writing its own through `design_operation`.
+
+The engine takes the whole definition rather than an id and copies it into its
+own `GameState`, so nothing looks a battle up in a shared table mid-tick and two
+engines in one page — one authored, one designed — cannot read each other's
+script. `config/customBattle.ts` is the only thing that turns a submitted design
+into a definition, and it validates every field before anything is raised.
+
 ## WebMCP
 
 The adapter owns schemas, runtime validation, registration and result shaping.
 Reads call `GameQueries`. Writes dispatch ordinary commands and await the result
 the fixed-step simulation produces; they cannot mutate state or advance the
 clock. The page has no Marshal interface of its own.
+
+Two surfaces exist, never simultaneously. The **War Council** surface is
+published while the home screen is up and unregistered through its own
+`AbortSignal` the moment an army deploys; it reads map data and writes only the
+operation on the table. The **battlefield** surface replaces it and is the one
+described above. Every War Council tool answers `BATTLE_BEGUN` after the
+handover, so an agent can never be holding a design tool over a battle already
+in progress.
+
+## The War Council screen
+
+`ui/Lobby.ts` owns the home screen and the small port the council tools act
+through — it is the only place both a human click and a tool call decide the
+same thing. `ui/LobbyMap.ts` draws the battlefield portrait from map data and
+the operation's deployment onto a fixed 320 × 200 buffer that CSS scales without
+smoothing, so every operation — including one designed a moment ago — gets a
+true portrait rather than a stock image.
 
 ## Enemy AI
 
@@ -99,3 +129,4 @@ and is bound by its own fog.
   `simulation/Zones.ts` and re-established from `GameState.mapId` before every
   tick, every dispatch and every query. Nothing else may write it.
 - Reinforcements are a manpower counter and timed waves, not an economy.
+

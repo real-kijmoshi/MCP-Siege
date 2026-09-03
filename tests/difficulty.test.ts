@@ -29,9 +29,9 @@ function deployDefensively(engine: SimulationEngine): void {
       targetZone,
     });
   };
-  hold(['legion_i', 'legion_ii', 'spearwall'], 'central_field');
-  hold(['archers_i', 'siege_corps'], 'central_hill');
-  hold(['reserve_i', 'cavalry_i', 'cavalry_ii'], 'player_base');
+  hold(['vanguard', 'ironbacks', 'hedge'], 'central_field');
+  hold(['longbows', 'hammers'], 'central_hill');
+  hold(['fenmen', 'greyriders', 'lancers'], 'player_base');
 }
 
 interface Observed {
@@ -49,7 +49,7 @@ interface Observed {
   relievedWorn: boolean;
 }
 
-function observe(difficultyId: DifficultyId, seed: number, seconds = 420): Observed {
+async function observe(difficultyId: DifficultyId, seed: number, seconds = 420): Promise<Observed> {
   const engine = new SimulationEngine({ seed, difficultyId });
   const state = engine.getState();
   const together = new Map<string, number>();
@@ -59,6 +59,11 @@ function observe(difficultyId: DifficultyId, seed: number, seconds = 420): Obser
   deployDefensively(engine);
 
   for (let tick = 0; tick < TICKS_PER_SECOND * seconds; tick += 1) {
+    // Long deterministic battles must occasionally release the worker event
+    // loop, otherwise Vitest can mistake healthy CPU work for a dead worker.
+    if (tick > 0 && tick % 2_000 === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
     engine.step();
 
     together.clear();
@@ -102,11 +107,13 @@ describe('the three commanders', () => {
     expect(captain.declineRatio).toBeLessThan(warlord.declineRatio);
   });
 
-  it('sends a levy in one regiment at a time and a warlord in a body', () => {
+  it('sends a levy in one regiment at a time and a warlord in a body', async () => {
     // The levy answers whatever is nearest each of his regiments, which is how
     // an assault used to walk into a massed defence and die in detail. The
     // warlord picks a point first and puts several regiments on it together.
-    expect(observe('warlord', 22).massedOrders).toBeGreaterThan(observe('levy', 22).massedOrders);
+    const warlord = await observe('warlord', 22);
+    const levy = await observe('levy', 22);
+    expect(warlord.massedOrders).toBeGreaterThan(levy.massedOrders);
   }, 600_000);
 
   it('stops calling regiments back once the final push is on', () => {
@@ -126,7 +133,7 @@ describe('the three commanders', () => {
 
     for (let tick = 0; tick < dueTick; tick += 1) engine.step();
 
-    const group = findGroup(state, 'iron_host');
+    const group = findGroup(state, 'cinder_host');
     if (group === undefined) throw new Error('missing regiment');
 
     // Worn past the warlord threshold, out on the western flank where nothing
@@ -146,7 +153,7 @@ describe('the three commanders', () => {
     engine.dispatch('enemy_ai', {
       type: 'order_groups',
       playerId: 'enemy',
-      groupIds: ['iron_host'],
+      groupIds: ['cinder_host'],
       order: 'attack_zone',
       targetZone: 'player_base',
     });
@@ -163,9 +170,9 @@ describe('the three commanders', () => {
     }
   }, 600_000);
 
-  it('relieves a worn regiment only above the easiest commander', () => {
+  it('relieves a worn regiment only above the easiest commander', async () => {
     expect(DIFFICULTIES.levy.withdrawSpentBelow).toBe(0);
-    expect(observe('levy', 22).relievedWorn).toBe(false);
-    expect(observe('warlord', 22).relievedWorn).toBe(true);
+    expect((await observe('levy', 22)).relievedWorn).toBe(false);
+    expect((await observe('warlord', 22)).relievedWorn).toBe(true);
   }, 600_000);
 });

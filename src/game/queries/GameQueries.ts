@@ -9,7 +9,6 @@ import {
   UNIT_STATS,
 } from '../config/battle';
 import { DIFFICULTIES } from '../config/matches';
-import { SCENARIOS } from '../config/scenario';
 import { describeCondition } from '../simulation/Conditions';
 import { activeGroups, findGroup, type GameState } from '../simulation/GameState';
 import { ZONES, activeZones, useBattleMap, zoneAt } from '../simulation/Zones';
@@ -769,8 +768,8 @@ export class GameQueries {
       nextActions,
       operation: {
         id: state.scenarioId,
-        name: SCENARIOS[state.scenarioId].name,
-        briefing: SCENARIOS[state.scenarioId].objective,
+        name: state.scenario.name,
+        briefing: state.scenario.objective,
         difficulty: DIFFICULTIES[state.difficultyId].name,
       },
     };
@@ -860,3 +859,4 @@ export class GameQueries {
     return this.state().players[opponentOf(playerId)].name;
   }
 }
+

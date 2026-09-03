@@ -3,7 +3,6 @@ import '../styles/lobby.css';
 
 import { MAP_HEIGHT, MAP_WIDTH, TICKS_PER_SECOND } from '../game/config/battle';
 import { DIFFICULTIES } from '../game/config/matches';
-import { SCENARIOS } from '../game/config/scenario';
 import { GameQueries } from '../game/queries/GameQueries';
 import { SimulationEngine } from '../game/simulation/Engine';
 import { activeGroups } from '../game/simulation/GameState';
@@ -20,7 +19,7 @@ import { CommandBar } from '../ui/CommandBar';
 import { FirstOrders } from '../ui/FirstOrders';
 import { ObjectiveBanner } from '../ui/ObjectiveBanner';
 import { TopBar } from '../ui/TopBar';
-import { showLobby } from '../ui/Lobby';
+import { showWarCouncil } from '../ui/Lobby';
 import { mountIcons } from '../ui/icons';
 import {
   getWebMcpCapabilityMessage,
@@ -78,12 +77,17 @@ function frameBattlefield(renderer: Renderer): void {
 }
 
 async function bootstrap(): Promise<void> {
-  const selection = await showLobby();
-  const engine = new SimulationEngine(selection);
+  const selection = await showWarCouncil();
+  // The operation is handed to the engine whole, authored or designed alike.
+  const engine = new SimulationEngine({
+    scenarioId: selection.scenario.id,
+    difficultyId: selection.difficultyId,
+    scenario: selection.scenario,
+  });
   const matchLabel = document.getElementById('match-label');
   if (matchLabel !== null) {
     matchLabel.textContent =
-      `${SCENARIOS[selection.scenarioId].name} · ${DIFFICULTIES[selection.difficultyId].name}`;
+      `${selection.scenario.name} · ${DIFFICULTIES[selection.difficultyId].name}`;
   }
   const queries = new GameQueries(() => engine.getState());
 
@@ -99,7 +103,6 @@ async function bootstrap(): Promise<void> {
   mountIcons();
   const objectiveBanner = new ObjectiveBanner();
   const fieldJournal = new FieldJournal();
-
   // Give a first-time commander time to read the field. The opening assault is
   // only seconds away on Captain, so starting the clock under the briefing
   // punished the player for reading the instructions we put in front of them.
@@ -123,7 +126,7 @@ async function bootstrap(): Promise<void> {
   };
   topBar = new TopBar(setSpeed);
   topBar.syncSpeed(0);
-  firstOrders = new FirstOrders(selection.scenarioId, beginFromOpening);
+  firstOrders = new FirstOrders(selection.scenario, beginFromOpening);
 
   const armyList = new ArmyList(
     (groupId, additive) => {

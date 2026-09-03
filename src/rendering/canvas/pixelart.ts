@@ -588,6 +588,72 @@ export const ICON_TERRAIN: Sprite = {
   ],
 };
 
+/* ------------------------------------------------------------------- brand */
+
+/**
+ * The wordmark.
+ *
+ * Hand-set on a five-by-seven grid and outlined in the same shadow ink the
+ * terrain uses, so the title of the game is drawn out of the game's own
+ * material rather than set in a typeface the battlefield has never seen. It is
+ * the one sprite in the file authored at more than icon size, and it is the
+ * only place the interface says the game's name.
+ */
+export const LOGO_SIEGE: Sprite = {
+  rows: [
+    '.##############################',
+    '##ooo##ooooo#ooooo##ooo##ooooo#',
+    '#oo##o###o###oo####oo##o#oo####',
+    '#oo####.#o#.#oo####oo####oo###.',
+    '##ooo##.#o#.#oooo##oo#oo#oooo#.',
+    '####oo#.#o#.#oo####oo##o#oo###.',
+    '#o##oo###o###oo####oo##o#oo####',
+    '##ooo##ooooo#ooooo##ooo##ooooo#',
+    '.##############################',
+  ],
+};
+
+/**
+ * The Crown crest: a three-pointed crown over a shield.
+ *
+ * It stands where a favicon, a header mark or a seal is needed. Gold for the
+ * crown because gold is the sovereign's colour everywhere else in the game,
+ * and crimson for the field because the Crown's own heraldry has to be
+ * distinguishable from the blue its soldiers are drawn in.
+ */
+export const ICON_CREST: Sprite = {
+  rows: [
+    '.y...y...y.',
+    '.yy.yyy.yy.',
+    '.yyyyyyyyy.',
+    '.yoyoyoyoy.',
+    '.yyyyyyyyy.',
+    'ooooooooooo',
+    'oRRRRoRRRRo',
+    'oRRRRoRRRRo',
+    'oRoooooooRo',
+    '.oRRRoRRRo.',
+    '.oRRRoRRRo.',
+    '..oRRoRRo..',
+    '...oRoRo...',
+    '....ooo....',
+  ],
+};
+
+/** A folded map. Marks the battlefield portrait and anything about ground. */
+export const ICON_MAP: Sprite = {
+  rows: [
+    'PPPPPPPP',
+    'PllLlLlP',
+    'PlGGlLlP',
+    'PlGlliiP',
+    'PllliilP',
+    'PlNllllP',
+    'PlllNllP',
+    'PPPPPPPP',
+  ],
+};
+
 /** Every glyph the interface can ask for, by name. */
 export const UI_SPRITES: Record<string, Sprite> = {
   attack: ICON_ATTACK,
@@ -606,5 +672,9 @@ export const UI_SPRITES: Record<string, Sprite> = {
   morale: ICON_MORALE,
   banner: ICON_BANNER,
   terrain: ICON_TERRAIN,
+  crest: ICON_CREST,
+  logo: LOGO_SIEGE,
+  map: ICON_MAP,
   ...ROLE_SPRITES,
 };
+

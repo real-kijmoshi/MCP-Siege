@@ -8,7 +8,8 @@ import {
   type BattleMapId,
 } from '../src/game/config/maps';
 import { SCENARIOS } from '../src/game/config/scenario';
-import { SCENARIO_IDS } from '../src/game/config/matches';
+import { createSkirmishOperation } from '../src/game/config/customBattle';
+import { AUTHORED_SCENARIO_IDS } from '../src/game/config/matches';
 import { computePath } from '../src/game/simulation/Navigation';
 import { SimulationEngine } from '../src/game/simulation/Engine';
 import {
@@ -166,7 +167,7 @@ describe('battle maps', () => {
 });
 
 describe('scenario deployments', () => {
-  for (const scenarioId of SCENARIO_IDS) {
+  for (const scenarioId of AUTHORED_SCENARIO_IDS) {
     const scenario = SCENARIOS[scenarioId];
 
     it(`${scenarioId} deploys both armies on its own map`, () => {
@@ -216,10 +217,15 @@ describe('scenario deployments', () => {
     });
   }
 
-  it('covers every authored map with at least one operation', () => {
-    const used = new Set<BattleMapId>(SCENARIO_IDS.map((id) => SCENARIOS[id].mapId));
+  it('gives every battlefield an authored operation, and a table besides', () => {
+    // A battlefield nothing is fought on may as well not exist, however sound
+    // its geometry — and the table has to be layable on all of them, since its
+    // ground is the commander's to choose.
+    const authored = new Set<BattleMapId>(AUTHORED_SCENARIO_IDS.map((id) => SCENARIOS[id].mapId));
     for (const mapId of BATTLE_MAP_IDS) {
-      expect(used.has(mapId), `no operation is fought on ${mapId}`).toBe(true);
+      expect(authored.has(mapId), `no operation is fought on ${mapId}`).toBe(true);
+      expect(createSkirmishOperation(mapId).mapId).toBe(mapId);
     }
   });
 });
+

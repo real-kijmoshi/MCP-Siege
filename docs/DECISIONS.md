@@ -106,3 +106,64 @@ queued command is failed with `BATTLE_OVER`. The alternative — letting the
 battle grind on behind a victory banner — makes the result a UI claim rather
 than a fact about the state, and leaves the projections describing a battle that
 is supposedly finished.
+
+## ADR-013: One operation per battlefield, each with a different problem
+
+Seven authored operations became four. The seven differed mostly in where the
+same core regiments started, and four of them asked the commander the same
+question — cross a line held against you — with the furniture moved.
+
+The four that replaced them are chosen so that no two are answered the same way:
+a trap that punishes the commander who springs it early, an assault through a
+door that opens both ways, a rescue that is also a race to the enemy's own
+sovereign, and an open field where both flanks are the commander's own to hold.
+An operation that could not name a problem the other three do not pose was cut
+rather than kept.
+
+One per battlefield is the rule that sets the number. A map with no operation on
+it is content nobody sees; a second operation on a map that has one has to earn
+its place against the first, and none of the cut four could.
+
+The orders of battle are shared across all three deliberately. One stable roster
+is what lets a single tool surface, a single roster panel and a single enemy
+commander serve every operation, and it means a Marshal that has learned one
+battle knows the pieces of the next.
+
+## ADR-014: The operation is carried in state, not looked up by id
+
+`GameState` holds the whole `ScenarioDefinition` the engine is fighting rather
+than an id that other code resolves against a table.
+
+This began as a requirement of designed operations — there is no table entry to
+look up for a battle written thirty seconds ago — but it is the better design
+regardless. A module-level registry consulted mid-tick is shared mutable state
+by another name: two engines in one page, one authored and one designed, would
+read each other's script. Carrying the definition also let the enemy commander
+seat its royal guard from the objective rather than from a written group id,
+which is what allows a design to name its own regiments.
+
+## ADR-015: A second tool surface, live only before the battle
+
+The War Council publishes its own six tools while the home screen is up and
+unregisters them, through the `AbortSignal` they were registered with, the
+moment an army deploys. They are not folded into the battlefield surface.
+
+Two surfaces rather than one falls out of what each is for. Before the battle
+there is no simulation to protect, nothing hidden by fog, and the useful verbs
+are *read every battlefield* and *write an operation*. After it there is exactly
+one authoritative state, everything is fog-limited, and the useful verbs are
+orders. A single surface would have to answer "no battle yet" or "too late" on
+half its tools at any moment; two surfaces answer that once, at the boundary,
+with `BATTLE_BEGUN`.
+
+A designed operation is data, never code: named ground, bounded strengths, a
+king on each side, ids unique across the whole battle, and a timetable drawn
+from a closed order vocabulary. It is validated in one place,
+`config/customBattle.ts`, and becomes an ordinary operation the instant it
+exists — fought by the same engine, reported by the same tools, and labelled as
+designed wherever it is shown.
+
+The blank battle on the table is generated from the chosen map rather than
+written for one, which is what makes the ground a choice rather than a fixture.
+It also means the designed path is exercised by an ordinary human deployment on
+any of the four battlefields, not only by a tool call.

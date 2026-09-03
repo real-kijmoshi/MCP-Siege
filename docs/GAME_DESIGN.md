@@ -105,13 +105,17 @@ Three things follow from it:
 
 ## Intentionally limited scope
 
-Seven authored operations across four authored battlefields, three deterministic
-enemy command presets, one battle at a time. Maps and scenarios are *written*,
-never generated: each one is hand-placed ground with a hand-written enemy script,
-and the four maps all share one size, one fog grid and one camera. Non-goals:
-multiplayer, accounts, persistence, campaigns, base building, technology trees,
-heroes, diplomacy, procedural maps, mobile controls, per-soldier animation, and
-any embedded LLM infrastructure.
+Four authored operations, one for each authored battlefield, plus the designed
+operation on the War Council table — whose ground is the commander's to choose.
+Three deterministic enemy command presets, one battle at a time. Maps are *written*, never generated: each one is
+hand-placed ground with hand-placed roads, and the four share one size, one fog
+grid and one camera. The authored operations are hand-written too — a
+deployment and a timetable each. The one thing that is not hand-written is the
+operation an external Marshal designs for itself, and even that is assembled
+from the same named ground by the same builder, then validated before anything
+is raised on it. Non-goals: multiplayer, accounts, persistence, campaigns, base
+building, technology trees, heroes, diplomacy, procedural maps, mobile controls,
+per-soldier animation, and any embedded LLM infrastructure.
 
 Ten troop types, fixed at authoring time. The arms exist to make the counter
 matrix worth reading, and each one earns its place by being the answer to
@@ -125,43 +129,63 @@ Reinforcements are a manpower counter and timed waves — enough to give the top
 bar something true to show and to supply the "reinforcements arrive" beat. They
 are not an economy and should not become one.
 
-## The scenario arcs
+## The four operations
 
-**Riverwatch** is the original measured escalation. The opening is quiet, then
-the centre storms the bridge, cavalry sweeps both crossings, the siege train
-comes into range, and the reserve follows.
+Four, not seven — one for each battlefield. Each exists to pose a problem the
+other three do not, and an operation that only changed where the regiments
+started was cut rather than kept.
 
-**Broken Bridgehead** begins with the Crown vanguard already north of the river.
-The enemy counterattacks quickly, forcing a choice between reinforcing the
-foothold and withdrawing across a route that must remain open.
+**I. Bridge of Knives** (River Vale) is a trap, and the deployment is the whole
+operation. The centre is a corps of bows and a wall of spears standing alone at
+the middle bridge, which reads to the Ashen commander as the thin place worth
+crossing. Both bodies of foot are back and wide of it; both bodies of horse wait
+in the woods on the flanks. A regiment that crosses a bridge arrives crowded —
+too packed to swing — and a crowded regiment closed on from two sides is
+surrounded as well, so the crowding and encirclement rules are what actually
+decide this battle. Spring it early and you meet the Cinder Host in the open at
+full strength; wait, and you meet half of it wedged on a bridgehead at half
+value. It is the only operation in the game where the correct opening move is to
+do nothing at all.
 
-**Last Light** begins after the crossings have been lost. The army is compressed
-around King Aldric and must absorb a close three-front assault before it can
-create a road north.
+**II. The Ember Gate** (Ashfall Pass) is a door, and a door opens both ways.
+Two gaps four kilometres apart, both held from the high ground above them, and
+an army split to face both: bows and spears below Cinder Gap, the Ironbacks and
+the battery below the Ashfall Gate. Force either. Four minutes in, the Cinder
+Host comes *south* through the western gap and makes for the Crown Camp, so a
+commander who has fed everything forward loses his king to a column he never
+watched for. Leaving the Fenmen at home is a real decision with a real cost,
+because the gate does not break itself.
 
-**Cinder Road** is the first operation fought off the Vale. Ashfall Pass is a
-dead volcanic spine with two gaps four kilometres apart, and the defenders in
-one are too far from the other to be recalled to it. The commander's real
-decision is which gap he means and which one he is only pretending to mean.
+**III. The Salt Tide** (Sunken Causeway) is a race. A night raid on the Ashen
+Anchorage left King Aldric and the Kingsguard on the North Strand with the
+Ironbacks and nothing else, on the far side of a tidal channel that is crossed
+in exactly two places, an hour of marching apart. Every clock runs the same way:
+the Ashen host is already turning on the stranded half, and their spears are
+corked on the far end of the causeway so a relief column has to be paid for.
+Marching to the rescue is the obvious answer. Riding for *their* king while his
+host is out hunting yours is the other one, and it is not the worse of the two.
 
-**The Ashen Gate** is the same ground from the far side: the army is already
-through and above the spine, with the Crown itself standing on the wrong side of
-a four-hundred-yard gap the enemy only has to reach to close.
+**IV. The Open Hand** (Goldmere) is a field with nothing on it. No river, no
+spine, no channel — harvest country, one town, two woods, two meres, and not a
+single feature that will hold a flank for you. In the first half minute both
+Ashen horse wings go wide, one round each end of your line, while their foot
+walks at the town. It is the operation where the envelopment rules *are* the
+battle: anchor a flank on the town or on Millbrook, beat one wing before the
+other arrives, or refuse a flank and give ground on purpose — but a straight
+line held to the end is a line taken from three sides.
 
-**Goldmere Fields** removes the terrain argument entirely. Two armies form up in
-open harvest country with nothing between them, both sides deliberately
-cavalry-heavy. It is the operation where the envelopment rules are the whole
-battle, because nothing on the map protects a flank but the men standing on it.
+**The table** is the fifth seal on the War Council screen: a blank battle whose
+ground the commander picks, which an external Marshal can rewrite through
+WebMCP and a human can fight as it stands. It is *generated from the chosen
+map* — two matched armies of seven regiments drawn up on whatever that
+battlefield actually offers — so choosing River Vale, Ashfall Pass, Goldmere or
+the Sunken Coast lays a fresh skirmish on it. It is not meant to be a good
+battle; it is meant to be an honest blank one.
 
-**The Long Causeway** cuts a tidal channel corner to corner, so its two
-crossings are not a left and a right but a near one and a far one. A wing
-committed to the ford is a long march from the wing on the causeway, and nothing
-else on any map punishes a divided attack this plainly.
-
-Every arc ends the same way. Once the scripted escalation is spent the enemy
-commander stops trading blows along the line and drives everything he has left
-at the player's sovereign, so a battle closes on a crisis rather than trailing
-off into a stalemate neither side can break.
+Every operation ends the same way. Once the scripted escalation is spent the
+enemy commander stops trading blows along the line and drives everything he has
+left at the player's sovereign, so a battle closes on a crisis rather than
+trailing off into a stalemate neither side can break.
 
 The commander also declines to be farmed. He will not march a regiment into
 several times its own numbers standing on the objective — he halts it on the
@@ -177,3 +201,28 @@ enemy commits, how often it reacts to visible contacts, how far it coordinates,
 how broadly it recalls relief for its king, how quickly it notices an army that
 has committed itself, and how soon it makes that final drive. Difficulty never
 grants hidden information or bypasses the command queue.
+
+## Operations a Marshal writes
+
+The War Council screen publishes its own small tool surface, live only while the
+home screen is up. It exists because the most interesting thing an agent can do
+with a battle game is not play one: it is design one, hand it to a human, and
+watch it be fought.
+
+A designed operation is data, never code — a battlefield, two orders of battle
+placed on *named ground*, one regiment per side carrying its sovereign, and a
+timetable for the enemy commander drawn from the same order vocabulary the
+scripted operations use. Choosing only the ground is a smaller version of the
+same act: `select_operation` with a `mapId` lays the generated blank battle on
+that battlefield, which a Marshal can then read and improve on. It is validated before it exists: bounded strength, no
+king-less side, no regiment on ground that is not on the chosen map, no
+commander ordering a regiment nobody raised. Once built it is an ordinary
+operation in every respect, fought by the same engine and reported by the same
+tools, and it is drawn on the War Council table so a human can read it before
+deploying it.
+
+The designed operation is *labelled* as designed everywhere it appears. It is a
+battle the game will honestly fight; it is not one the game claims to have
+authored.
+
+

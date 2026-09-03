@@ -1,5 +1,4 @@
-import { SCENARIOS } from '../game/config/scenario';
-import type { ScenarioId } from '../game/config/matches';
+import type { ScenarioDefinition } from '../game/config/scenario';
 
 /**
  * The opening brief, on the battlefield itself.
@@ -16,11 +15,11 @@ export class FirstOrders {
   private readonly element = document.getElementById('first-orders');
   private dismissed = false;
 
-  public constructor(scenarioId: ScenarioId, onBegin: () => void) {
-    const scenario = SCENARIOS[scenarioId];
-
+  public constructor(scenario: ScenarioDefinition, onBegin: () => void) {
     const title = document.getElementById('first-orders-title');
-    if (title !== null) title.textContent = scenario.battleOrders[0];
+    // Battle orders are authored non-empty, but a designed operation is not
+    // authored: fall back to the objective rather than an empty card.
+    if (title !== null) title.textContent = scenario.battleOrders[0] ?? scenario.objective;
 
     const body = document.getElementById('first-orders-body');
     if (body !== null) body.textContent = scenario.briefingLine;
