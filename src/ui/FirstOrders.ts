@@ -25,9 +25,11 @@ export class FirstOrders {
     const body = document.getElementById('first-orders-body');
     if (body !== null) body.textContent = scenario.briefingLine;
 
+    // Closing the briefing is not consent to start the clock. The dedicated
+    // Begin button starts play; dismiss simply reveals the field while paused.
     document
       .getElementById('first-orders-dismiss')
-      ?.addEventListener('click', onBegin);
+      ?.addEventListener('click', () => this.dismiss());
     document
       .getElementById('first-orders-begin')
       ?.addEventListener('click', onBegin);
