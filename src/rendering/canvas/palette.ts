@@ -25,6 +25,8 @@ export const PALETTE = {
   forestCanopy: '#2f4d27',
   hill: '#6d6140',
   hillContour: '#8d7d51',
+  /** Close to `hill`, for the same reason `grassAlt` is close to `grass`. */
+  hillAlt: '#635840',
   river: '#27506e',
   riverEdge: '#4682a4',
   crossing: '#7b5a34',
@@ -60,6 +62,37 @@ export const PALETTE = {
   smoke: '#6a6e66',
   /** Foam and shallow water highlight. */
   foam: '#8fc6d8',
+
+  /* --------------------------------------------------- ground detailing */
+  /**
+   * Moss, pebbles and scree. These never form a shape of their own; they are
+   * scattered a pixel or two at a time over grass and rock so that a field
+   * reads as ground that has been rained on rather than as a flat fill. `moss`
+   * is only the fallback: a map that tints its ground grows its own.
+   */
+  moss: '#42603a',
+  pebble: '#6d6a5e',
+  scree: '#8b887c',
+  /** Birch bark. Pale, but never the white that reads as litter on a map. */
+  birchBark: '#8d8f80',
+  /**
+   * The crest that catches the light in shoaling water. The water tones
+   * themselves are derived per map from its own river colour, so that an ash
+   * country river is not shaded in the blues of a farmland one.
+   */
+  shallowLight: '#63a2b8',
+  /** Roofing. Thatch is straw over rafters; tile is fired clay laid in courses. */
+  thatch: '#9b8250',
+  thatchDark: '#6c5934',
+  roofTileDark: '#5d342a',
+  /** Kitchen gardens and the beaten cobble of a market square. */
+  garden: '#59692f',
+  gardenDark: '#3f4c21',
+  cobble: '#877f6f',
+  cobbleDark: '#665f52',
+  /** Camp canvas. The one pale colour on a battlefield of green and brown. */
+  tentCloth: '#c4b89c',
+  tentClothDark: '#948a72',
 
   /* ------------------------------------------------------------ overlays */
   zoneLabel: 'rgba(233, 227, 199, 0.72)',

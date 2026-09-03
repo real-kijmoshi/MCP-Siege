@@ -58,6 +58,17 @@ export const INK: Record<string, string> = {
   I: PALETTE.riverEdge,
   a: PALETTE.foam,
   m: PALETTE.smoke,
+  /* Detailing inks. Thatch, tile shade, cobble, garden row, camp canvas. */
+  t: PALETTE.thatch,
+  T: PALETTE.thatchDark,
+  d: PALETTE.roofTileDark,
+  c: PALETTE.cobble,
+  x: PALETTE.cobbleDark,
+  p: PALETTE.garden,
+  u: PALETTE.tentCloth,
+  U: PALETTE.tentClothDark,
+  h: PALETTE.scree,
+  J: PALETTE.birchBark,
   /* Interface inks. Used by the roster and command glyphs, never by the map. */
   A: PALETTE.selection,
   B: PALETTE.selectionDark,
@@ -290,6 +301,177 @@ export const WAYPOST: Sprite = {
 /** Broken rock along an impassable spine. */
 export const CRAG: Sprite = {
   rows: ['..SS...', '.SsssS.', 'Sssksss', 'ssksskk', '#kk##k#'],
+};
+
+/* --------------------------------------------------- woodland detailing */
+
+/** A birch, for pale trunks among the dark conifers. */
+export const TREE_BIRCH: Sprite = {
+  rows: [
+    '..GGG..',
+    '.GGgGG.',
+    'GGGGGGG',
+    '.GgGGG.',
+    '..GGG..',
+    '...J...',
+    '...w...',
+    '...J...',
+    '..###..',
+  ],
+};
+
+/** New growth along a felled edge. */
+export const TREE_SAPLING: Sprite = {
+  rows: ['..G..', '.GGG.', '.GgG.', '..W..', '..#..'],
+};
+
+/** What the woodcutters left behind. Marks a logging path as worked ground. */
+export const STUMP: Sprite = {
+  rows: ['.....', '.WVW.', 'WVVVW', '.www.', '.###.'],
+};
+
+/** Cut timber stacked to season at the head of a logging path. */
+export const LOG_PILE: Sprite = {
+  rows: ['.VWVWVWV.', 'WVWVWVWVW', '.wwwwwww.', '.##...##.'],
+};
+
+/** A deer, deep in a wood where nothing has marched yet. */
+export const DEER: Sprite = {
+  rows: ['.....w.w', '......NN', '.NNNNNN.', 'NNNNNNN.', '.n.n.n..', '.n.n.n..'],
+};
+
+/** Two birds over the canopy. Anchored at their centre, since they fly. */
+export const BIRDS: Sprite = {
+  rows: ['#.#..', '.#...', '.....', '..#.#', '...#.'],
+  anchorX: 2,
+  anchorY: 2,
+};
+
+/* ------------------------------------------------------- ridge detailing */
+
+/** A stretch of ancient wall, half swallowed by the rock it was cut from. */
+export const RUIN_WALL: Sprite = {
+  rows: ['.S...S..', '.Sk..Sk.', '.SsksSs.', 'SSsksSsk', 'Ssskssss', '#kk##kk#'],
+};
+
+/** A standing arch. The only thing left of whatever held this ridge before. */
+export const RUIN_ARCH: Sprite = {
+  rows: ['..SSSS..', '.Sk..kS.', '.S....S.', '.S#..#S.', '.S#..#S.', '.k#..#k.', '.#....#.'],
+};
+
+/* ----------------------------------------------------- village detailing */
+
+/** A thatched cottage. Straw over rafters, and the commonest roof there is. */
+export const COTTAGE_THATCH: Sprite = {
+  rows: [
+    '...ttt...',
+    '..tTttt..',
+    '.tttTttt.',
+    'ttTtttTtt',
+    '#WWWWWWW#',
+    '.WeWWWeW.',
+    '.WWWeWWW.',
+    '.##ee##..',
+  ],
+};
+
+/** A tiled cottage, laid in courses. The house of somebody who could pay. */
+export const COTTAGE_TILE: Sprite = {
+  rows: [
+    '...rrr...',
+    '..rdrdr..',
+    '.rrdrdrr.',
+    'rdrdrdrdr',
+    '#WWWWWWW#',
+    '.WeWWWeW.',
+    '.WWWeWWW.',
+    '.##ee##..',
+  ],
+};
+
+/** A byre or a woodshed. Fills the gaps between houses. */
+export const SHED: Sprite = {
+  rows: ['.ttttt.', 'ttttttt', '#WWWWW#', '.WeeeW.', '.##.##.'],
+};
+
+/** A kitchen garden: fenced, and planted in rows. */
+export const GARDEN_PLOT: Sprite = {
+  rows: ['wwwwwww', 'wpEpEpw', 'wEpEpEw', 'wpEpEpw', '#######'],
+};
+
+/** A market stall under an awning. Only ever on the square. */
+export const MARKET_STALL: Sprite = {
+  rows: ['.RRRRR.', 'RRRRRRR', 'W.....W', 'W.WWW.W', 'W.WWW.W', '#.....#'],
+};
+
+/** The village well, at the middle of the square. */
+export const WELL: Sprite = {
+  rows: ['..W.W..', '..WWW..', '..W.W..', '.sssss.', '.skkks.', '.sssss.', '.#####.'],
+};
+
+/* -------------------------------------------------------- camp and works */
+
+/** A soldier's ridge tent, with a pennant. */
+export const TENT: Sprite = {
+  rows: ['...o...', '...u...', '..uUu..', '.uuUuu.', '.uUuUu.', 'uuuU#uu', '#######'],
+};
+
+/** The command pavilion: bigger, striped, and flying its own colour. */
+export const TENT_BIG: Sprite = {
+  rows: [
+    '....o....',
+    '....u....',
+    '...uRu...',
+    '..uuRuu..',
+    '.uuRuRuu.',
+    'uuRuuuRuu',
+    'uuuu#uuuu',
+    '#########',
+  ],
+};
+
+/** Laid logs in a stone ring. The flame over it is drawn on the tick clock. */
+export const CAMPFIRE: Sprite = {
+  rows: ['..w.w..', '.wWWWw.', 'ksssssk', '.#####.'],
+};
+
+/** A run of sharpened logs with a walkway behind. */
+export const PALISADE: Sprite = {
+  rows: ['.V.V.V.V.', 'VWVWVWVWV', 'WWWWWWWWW', 'WwWwWwWwW', 'WWWWWWWWW', '#########'],
+};
+
+/** Crossed stakes: the cheap field work that stops a horse. */
+export const STAKES: Sprite = {
+  rows: ['V.....V..', '.W...W...', '..WWW....', '.W...W...', 'W.....W..', '##.##.##.'],
+};
+
+/** An onager on its carriage, arm cocked. */
+export const SIEGE_ENGINE: Sprite = {
+  rows: [
+    '......V..',
+    '.....V...',
+    '....V....',
+    'W..VV....',
+    'WWWWWWWW.',
+    'W.WWWW.W.',
+    'kk.WW.kk.',
+    'kk....kk.',
+    '##....##.',
+  ],
+};
+
+/** A belfry, planked and roofed, waiting for a wall to be pushed against. */
+export const SIEGE_TOWER: Sprite = {
+  rows: ['.wwwww.', '.WVVVW.', '.W###W.', '.WVVVW.', '.W###W.', '.WVVVW.', '.WWWWW.', '.k...k.', '.#####.'],
+};
+
+/** The baggage: a covered cart, and what it carries. */
+export const SUPPLY_CART: Sprite = {
+  rows: ['..WWWWW..', '.WVVVVVW.', 'WWWWWWWWW', '.k.....k.', '.k.....k.', '.#.....#.'],
+};
+
+export const BARRELS: Sprite = {
+  rows: ['.W.W.', 'WVWVW', 'WVWVW', '.W.W.', '.###.'],
 };
 
 /* ---------------------------------------------------------------- unit roles */
