@@ -437,7 +437,7 @@ export const MORALE_THRESHOLDS = {
   confident: 80,
   stable: 55,
   shaken: 35,
-  breaking: 15,
+  breaking: 10,
 } as const;
 
 export const MORALE = {
@@ -1003,7 +1003,7 @@ export const OBJECTIVE = {
    * before annihilation, and attrition has to be able to decide a field or
    * every casualty on it is meaningless.
    */
-  collapsePercent: 34,
+  collapsePercent: 10,
   /** No side may collapse before this, so the opening cannot decide anything. */
   graceSeconds: 60,
 } as const;

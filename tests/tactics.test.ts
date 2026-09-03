@@ -376,6 +376,61 @@ describe('combat', () => {
     expect(pressureYield('aggressive', 5)).toBe(0);
     expect(pressureYield('aggressive', 10)).toBeGreaterThan(0);
   });
+
+  it('never walks an ordered assault backwards out of the fight it was sent into', () => {
+    // The press is a contest, not a mutual recoil. When only the shove a
+    // formation received was booked and never the one it delivered, two lines
+    // in melee each gave ground to the other: the assaulting regiment was
+    // driven back past the line it started on, the gap reopened, and contact
+    // broke off entirely. Ordered forward against an equal enemy it must take
+    // ground, or at worst grind — never reverse.
+    const state = createEmptyState(4242, SCENARIOS.bridge_of_knives);
+    createGroupFromSpec(state, {
+      id: 'assault',
+      name: 'Assault',
+      ownerId: 'player',
+      anchor: { x: 4000, y: 3100 },
+      formation: 'line',
+      stance: 'defensive',
+      composition: [['infantry', 120]],
+    });
+    createGroupFromSpec(state, {
+      id: 'wall',
+      name: 'Wall',
+      ownerId: 'enemy',
+      anchor: { x: 4000, y: 3000 },
+      formation: 'line',
+      stance: 'defensive',
+      composition: [['infantry', 120]],
+    });
+    const assault = findGroup(state, 'assault')!;
+    const wall = findGroup(state, 'wall')!;
+    assault.order = {
+      kind: 'attack_zone',
+      targetZone: 'central_bridge',
+      destination: { x: 4000, y: 2900 },
+      issuedAtTick: 0,
+    };
+    assault.path = [{ x: 4000, y: 2900 }];
+    wall.order = { kind: 'hold', issuedAtTick: 0 };
+
+    const start = assault.anchor.y;
+    let backslide = 0;
+    let contactTicks = 0;
+    for (let tick = 0; tick < TICKS_PER_SECOND * 20; tick += 1) {
+      state.currentTick = tick;
+      advanceCombat(state);
+      advanceMovement(state);
+      backslide = Math.max(backslide, assault.anchor.y - start);
+      if (assault.engagement > 0.2) contactTicks += 1;
+    }
+
+    // The assault is ordered south, so any positive drift is ground lost.
+    expect(backslide).toBeLessThan(1);
+    expect(start - assault.anchor.y).toBeGreaterThan(100);
+    // And it stayed in the fight rather than being pushed out of reach of it.
+    expect(contactTicks).toBeGreaterThan(TICKS_PER_SECOND * 10);
+  });
 });
 
 describe('movement physics', () => {

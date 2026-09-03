@@ -1134,3 +1134,23 @@ decision into no decision at all.
 
 - Prevented a handful of melee survivors from physically pushing back an intact regiment. Small contacts still fight and pin the files they reach, while group displacement now begins only when more than 5% of the defending formation is in contact and reaches full effect at 12%.
 - Added a regression proving five cavalry cannot move a fresh hundred-man line while a meaningful ten-man press still can.
+
+# 2026-09-03 — The press is a contest, not a mutual recoil
+
+- Fixed regiments backing out of every fight they were ordered into. `Combat`
+  booked only the shove a group *received* and never the one it *delivered*, so
+  both sides of a melee were pushed away from each other: the fight physically
+  drove itself apart, the gap reopened, and an assaulting regiment — throttled
+  to a fraction of its march while pinned — was walked off the ground it had
+  just taken and could not recover it. A group ordered to attack an equal line
+  measurably ended up *behind* its own start line while contact decayed to zero.
+- Each melee contact is now recorded from both ends and displacement resolves on
+  the net. Even weight locks the two lines together and they grind; the heavier
+  or faster press carries the contact in its direction, so the winner takes
+  ground and the loser gives it. Broken men neither lean nor are leaned on, so a
+  pursuit is still carried by movement rather than by the press.
+- The participation gate deliberately still reads only the men leaning on a
+  formation, not the ones it is leaning on, so a token contact neither shoves a
+  regiment backwards nor hands it a free stride forward.
+- Added a regression: a regiment ordered forward against an equal enemy must
+  take ground or grind, never reverse, and must stay in contact while it does.

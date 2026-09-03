@@ -47,6 +47,14 @@ let contactCounts = new Int32Array(64);
 let arcCounts = new Int32Array(64 * CONTACT.arcCount);
 let pressureX = new Float32Array(64);
 let pressureY = new Float32Array(64);
+/**
+ * The shove a group delivers, as opposed to the one it takes.
+ *
+ * Recorded separately because the press is a contest and has to be resolved as
+ * one: a group's own drive is what cancels the drive coming the other way.
+ */
+let driveX = new Float32Array(64);
+let driveY = new Float32Array(64);
 /** Melee bodies contributing pressure against each group this tick. */
 let pressureCounts = new Int32Array(64);
 /** Friendly neighbours counted this tick, and how many men were asked. */
@@ -69,6 +77,8 @@ function ensureContactBuffers(groupCount: number): void {
     arcCounts.fill(0, 0, groupCount * CONTACT.arcCount);
     pressureX.fill(0, 0, groupCount);
     pressureY.fill(0, 0, groupCount);
+    driveX.fill(0, 0, groupCount);
+    driveY.fill(0, 0, groupCount);
     pressureCounts.fill(0, 0, groupCount);
     crowdSum.fill(0, 0, groupCount);
     crowdSamples.fill(0, 0, groupCount);
@@ -83,6 +93,8 @@ function ensureContactBuffers(groupCount: number): void {
   arcCounts = new Int32Array(capacity * CONTACT.arcCount);
   pressureX = new Float32Array(capacity);
   pressureY = new Float32Array(capacity);
+  driveX = new Float32Array(capacity);
+  driveY = new Float32Array(capacity);
   pressureCounts = new Int32Array(capacity);
   crowdSum = new Int32Array(capacity);
   crowdSamples = new Int32Array(capacity);
@@ -550,7 +562,14 @@ export function advanceCombat(state: GameState): void {
       arcCounts[bucket] = (arcCounts[bucket] ?? 0) + 1;
     }
 
-    if (defenderSlot >= 0 && isMelee) {
+    // The shove, recorded from both ends. A man leaning on the enemy in front
+    // of him drives that enemy back and drives his own formation forward by
+    // the same amount, and both halves have to be booked or the press stops
+    // being a contest: with only the receiving end counted, two lines in melee
+    // each gave ground to the other and the fight physically pushed itself
+    // apart, so an ordered assault was walked off the ground it had just
+    // taken. Men who have already broken are not leaned on and do not lean.
+    if (defenderSlot >= 0 && isMelee && defenderGroup?.routing !== true) {
       const distance = Math.hypot(dx, dy);
       if (distance > 0.001) {
         const speedShare = Math.min(
@@ -562,9 +581,15 @@ export function advanceCombat(state: GameState): void {
           stats.mass *
           (0.3 + speedShare * 0.9) *
           (isInBarrier(x, y) ? CONTACT.crossingPressure : 1);
-        pressureX[defenderSlot] = (pressureX[defenderSlot] ?? 0) + (dx / distance) * momentum;
-        pressureY[defenderSlot] = (pressureY[defenderSlot] ?? 0) + (dy / distance) * momentum;
+        const pushX = (dx / distance) * momentum;
+        const pushY = (dy / distance) * momentum;
+        pressureX[defenderSlot] = (pressureX[defenderSlot] ?? 0) + pushX;
+        pressureY[defenderSlot] = (pressureY[defenderSlot] ?? 0) + pushY;
         pressureCounts[defenderSlot] = (pressureCounts[defenderSlot] ?? 0) + 1;
+        if (attackerSlot >= 0) {
+          driveX[attackerSlot] = (driveX[attackerSlot] ?? 0) + pushX;
+          driveY[attackerSlot] = (driveY[attackerSlot] ?? 0) + pushY;
+        }
       }
     }
 
@@ -636,20 +661,36 @@ export function advanceCombat(state: GameState): void {
   compactGroups(state);
 }
 
-/** A stronger press physically yields ground instead of two lines ghosting together. */
+/**
+ * The press. A stronger shove takes ground; an even one locks the two lines
+ * together instead of letting them ghost through each other.
+ *
+ * What moves the formation is the *net* of the shove it takes and the shove it
+ * gives, so two regiments leaning on each other with equal weight stay where
+ * they are and grind. Booking only the receiving half made the press mutually
+ * repulsive: every melee drove both sides backwards out of contact, the gap
+ * reopened, and a regiment under orders to attack was walked off the ground it
+ * had just taken — the fight pushed itself apart rather than being decided.
+ */
 function applyCombatPressure(state: GameState): void {
   for (let slot = 0; slot < state.groups.length; slot += 1) {
     const group = state.groups[slot];
     if (group === undefined || group.members.length === 0 || group.routing) continue;
-    const x = pressureX[slot] ?? 0;
-    const y = pressureY[slot] ?? 0;
+    // Received and delivered are both measured pointing away from the man
+    // doing the shoving, so the two simply sum: whichever side leans harder
+    // carries the whole contact in its direction, and the loser gives ground.
+    const x = (pressureX[slot] ?? 0) + (driveX[slot] ?? 0);
+    const y = (pressureY[slot] ?? 0) + (driveY[slot] ?? 0);
     const magnitude = Math.hypot(x, y);
     if (magnitude < 0.001) continue;
 
     // A few men can fight, kill and pin the files immediately in front of
     // them, but they cannot bodily drive an intact regiment across the map.
-    // Require a meaningful share of the defending formation to be under
-    // pressure, then ramp smoothly to full effect as another rank joins in.
+    // The gate reads the men leaning on this formation and not the ones it is
+    // leaning on, so a regiment that has met a token contact still does not
+    // lurch off its march: five survivors neither shove a fresh six hundred
+    // backwards nor give them a free stride forward. Above the gate it ramps
+    // smoothly to full effect as another rank joins in.
     const contactShare = (pressureCounts[slot] ?? 0) / Math.max(1, group.members.length);
     if (contactShare <= CONTACT.minimumPressureShare) continue;
     const participation = Math.min(
