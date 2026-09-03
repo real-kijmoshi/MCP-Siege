@@ -810,3 +810,32 @@
   .deploy-button { padding-top: 8px; padding-bottom: 7px; }
   .deploy-button span { font-size: 12px; }
 }
+
+
+/* Remembered setup and recommended difficulty affordances. */
+.difficulty-option[data-recommended='true'] small {
+  color: var(--gold);
+}
+
+.difficulty-option[data-recommended='true']:not(.selected)::after {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 5px;
+  height: 5px;
+  background: var(--gold-dark);
+  content: '';
+}
+
+.deploy-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-entry:focus-visible,
+.difficulty-option:focus-visible,
+.deploy-button:focus-visible {
+  outline: 2px solid #e9bd59;
+  outline-offset: 2px;
+}
