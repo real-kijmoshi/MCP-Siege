@@ -37,6 +37,7 @@ export class BattleUx {
 
     this.helpButton?.addEventListener('click', () => this.openHelp());
     document.getElementById('help-close')?.addEventListener('click', () => this.closeHelp());
+    document.getElementById('help-done')?.addEventListener('click', () => this.closeHelp());
     this.help?.addEventListener('click', (event) => {
       if (event.target === this.help) this.closeHelp();
     });
