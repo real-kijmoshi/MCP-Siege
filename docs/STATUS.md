@@ -1,5 +1,61 @@
 # Current Milestone
 
+## Sound-system rebuild
+
+Battle audio is now mixed through separate interface and combat buses into a
+compressed master output. Procedural noise is allocated once and reused,
+combat voices are independently rate-limited, and mute changes ramp cleanly.
+The audio context follows page lifecycle without participating in simulation
+state. The control persists its preference and exposes its current action to
+assistive technology. Visible-combat filtering remains at the same fog-of-war
+boundary as battlefield effects.
+
+## Authority, emergency retreat, and recovery
+
+Regiments now remain under orders through morale collapse and retreat
+involuntarily only below ten percent of their original strength. Enemy
+commanders likewise no longer rotate merely worn formations out of the line;
+their emergency relief threshold is ten percent. Command authority is expressed
+through morale: confident troops respect their stance's pursuit leash exactly,
+while shaken troops increasingly chase a visibly depleted enemy on instinct.
+Field-hospital healing now has diminishing returns as a soldier approaches full
+health, so a battered formation cannot be restored to pristine condition at the
+same constant rate.
+
+An aggressive melee attack now also keeps a regiment's anchor pressing through
+contact while morale provides enough command authority. Rear ranks follow the assault
+instead of dressing backward around an anchor left behind while only a handful
+of front-rank soldiers fight; a shaken regiment can still be pinned and pushed
+back normally.
+
+## Battlefield clarity pass
+
+The command screen now reserves persistent map labels for crossings; other
+place names appear when inspected. Friendly regiment plates show the regiment
+name by default and add strength only for the selected group, while morale bars
+remain visible only for selected or engaged troops. The field journal no longer
+duplicates the objective strip, and its secondary prose is visually collapsed.
+At the opening command zoom, regiments are now drawn as clean formation
+footprints instead of hundreds of tiny soldier blocks; zooming in still reveals
+the individual ranks.
+The default battlefield now uses the tactical pixel style: the authored
+low-resolution terrain bake still shapes rivers, banks, roads, bridges, woods
+and hills, but it omits decorative props, buildings, ground speckle and animated
+scenery. It therefore shares the units' pixel language without returning to the
+full renderer's visual density. The art-rich version remains available through
+the `DetailedTerrainLayer` full style. Tactical water is a solid deep channel
+with two restrained bank tones rather than blue noise, and grass, hills and
+roads likewise omit checker patches, scree scatter and cart-rut decoration.
+Locations now carry only a handful of large pixel landmarks: four trees for a
+wood, three buildings and a well for a village, a tower and two crags for a
+hill, and three tents for a camp. Rivers carry evenly spaced short current marks
+instead of randomized surface noise.
+Village ground now has three lanes, a small cobbled centre and three garden
+plots. Rivers have a continuous darker central channel, and tactical bridges
+are narrower, use calmer plank spacing and sit on stone abutments at both banks.
+These are presentation-only changes: commands, queries, simulation state and
+the objective rules are unchanged.
+
 The War Council, the operations and the Marshal's own battle. The home screen
 has been redrawn as part of the game rather than a screen in front of it, the
 seven authored scenarios have been replaced by four written from scratch — one
@@ -1068,3 +1124,13 @@ decision into no decision at all.
   thirty minutes: he holds his line, the enemy bleeds down to about half, and
   nothing closes it out. That is a defensible reading of "you are a spectator if
   you spectate", but it is worth a deliberate decision rather than a default.
+# 2026-09-03 — Calmer battle opening
+
+- Reduced the side-rail footprint so the battlefield has more room.
+- Hid the inactive command deck until a regiment is selected.
+- Removed the duplicate command instruction from the opening orders and suppressed the contextual guide while that briefing is visible.
+
+# 2026-09-03 — Physical pressure respects numerical weight
+
+- Prevented a handful of melee survivors from physically pushing back an intact regiment. Small contacts still fight and pin the files they reach, while group displacement now begins only when more than 5% of the defending formation is in contact and reaches full effect at 12%.
+- Added a regression proving five cavalry cannot move a fresh hundred-man line while a meaningful ten-man press still can.

@@ -63,11 +63,6 @@ export class FieldJournal {
       single ?? '',
       details === undefined ? '' : `${details.strength}:${Math.round(details.morale / 2)}:${details.activity}:${details.zone}:${Math.round(details.fatigue / 5)}:${details.formation}:${details.stance}`,
       view.hoveredZone ?? '',
-      view.objective.yourKing.status,
-      view.objective.yourKing.capturePercent,
-      view.objective.enemyKing.capturePercent,
-      view.objective.enemyKing.lastSeenZone ?? '',
-      view.objective.enemyKing.visibleNow ? 1 : 0,
     ].join('|');
     if (signature === this.signature) return;
     this.signature = signature;
@@ -75,7 +70,6 @@ export class FieldJournal {
     this.root.innerHTML = [
       this.regimentSection(details, selected.length),
       this.groundSection(view.hoveredZone, details),
-      this.objectiveSection(view.objective),
     ].join('');
   }
 
@@ -166,33 +160,6 @@ export class FieldJournal {
     return section('terrain', 'GROUND', body);
   }
 
-  /* ------------------------------------------------------------ objective */
-
-  private objectiveSection(report: ObjectiveReport): string {
-    const own = report.yourKing;
-    const foe = report.enemyKing;
-
-    const body = `
-      <p class="journal-goal">${escape(report.goal)}</p>
-      <div class="king-row" data-status="${own.status}">
-        <span class="icon">${iconMarkup('crown')}</span>
-        <span class="king-body">
-          <b>${escape(own.name)}</b>
-          <small>${own.status === 'safe'
-            ? `Safe in ${escape(own.zoneName)} · guard ${own.guardStrength}`
-            : `${own.capturePercent}% taken · ${own.attackers} against ${own.defenders}`}</small>
-        </span>
-      </div>
-      <div class="king-row" data-status="${foe.lastSeenZone === undefined ? 'unseen' : foe.capturePercent > 0 ? 'threatened' : 'safe'}">
-        <span class="icon">${iconMarkup('crown')}</span>
-        <span class="king-body">
-          <b>${escape(foe.name)}</b>
-          <small>${escape(foe.note)}</small>
-        </span>
-      </div>`;
-
-    return section('banner', 'THE OATH', body);
-  }
 }
 
 /* ------------------------------------------------------------------ markup */

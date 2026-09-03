@@ -492,6 +492,20 @@ export const MORALE = {
    * the formation it belonged to.
    */
   bloodiedFloor: 35,
+  /** A broken regiment only flees once fewer than one man in ten remains. */
+  emergencyRetreatStrength: 0.1,
+} as const;
+
+/** How strongly shaken troops overrun their ordered pursuit leash. */
+export const COMMAND_AUTHORITY = {
+  /** Morale at which an ordered assault still has the authority to drive every rank forward. */
+  committedAttackMorale: 55,
+  /** March pace retained while a committed assault is pinned in contact. */
+  committedAttackPinnedSpeed: 0.5,
+  /** Below this enemy survival share, instinct treats the target as vulnerable. */
+  vulnerableEnemyStrength: 0.35,
+  /** Maximum extra chase distance when authority has completely collapsed. */
+  maximumExtraLeash: 520,
 } as const;
 
 /* ------------------------------------------------------------------ combat */
@@ -618,6 +632,10 @@ export const CONTACT = {
   shockDecay: 0.99,
   /** Converts the press of bodies into ground yielded by a formation. */
   pressureScale: 4.5,
+  /** Smaller contacts can fight and pin, but cannot displace a whole regiment. */
+  minimumPressureShare: 0.05,
+  /** Contact share at which the press applies its full physical displacement. */
+  fullPressureShare: 0.12,
   /** Hard cap on group displacement from combat pressure in one tick. */
   maximumYieldPerTick: 2.2,
 
@@ -844,6 +862,11 @@ export const FIELD_SUPPORT = {
    * to his feet, so withdrawing a regiment costs real time in the battle line.
    */
   healPerTick: 0.13,
+  /**
+   * Healing loses pace as a wound closes. Surgeons restore fighting fitness,
+   * but cannot return a battered man to untouched condition during a battle.
+   */
+  diminishingRecoveryFloor: 0.08,
   /** Only one man in this many is looked at each tick. Bounds the whole cost. */
   healStride: 4,
   /** Extra fatigue shed per tick by a fully tended regiment out of contact. */

@@ -154,7 +154,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
     declineRatio: 3.5,
     declineMass: 1400,
     massedAssault: 2,
-    withdrawSpentBelow: 0.4,
+    withdrawSpentBelow: 0.1,
   },
   warlord: {
     id: 'warlord',
@@ -175,7 +175,7 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyDefinition> = {
     declineRatio: 5,
     declineMass: 2200,
     massedAssault: 3,
-    withdrawSpentBelow: 0.55,
+    withdrawSpentBelow: 0.1,
   },
 };
 

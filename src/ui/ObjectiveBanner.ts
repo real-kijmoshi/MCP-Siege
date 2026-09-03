@@ -28,8 +28,12 @@ export class ObjectiveBanner {
   private readonly outcomeRegiments = document.getElementById('outcome-regiments');
 
   private decided = false;
+  private previousOwnStatus: ObjectiveReport['yourKing']['status'] = 'safe';
 
-  public constructor() {
+  public constructor(
+    private readonly onOutcome: (outcome: ObjectiveReport['outcome']) => void = () => {},
+    private readonly onCapture: () => void = () => {},
+  ) {
     document
       .getElementById('outcome-restart')
       ?.addEventListener('click', () => window.location.reload());
@@ -46,9 +50,16 @@ export class ObjectiveBanner {
     this.renderOwn(report);
     this.renderEnemy(report);
 
+    const ownStatus = report.yourKing.status;
+    if (ownStatus !== 'safe' && this.previousOwnStatus === 'safe') {
+      this.onCapture();
+    }
+    this.previousOwnStatus = ownStatus;
+
     if (report.outcome === 'ongoing' || this.decided) return;
     this.decided = true;
     this.renderOutcome(report);
+    this.onOutcome(report.outcome);
   }
 
   private renderOwn(report: ObjectiveReport): void {

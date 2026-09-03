@@ -15,7 +15,10 @@ export class AlertFeed {
   private readonly container = document.getElementById('alert-feed');
   private readonly shown = new Set<string>();
 
-  public constructor(private readonly onFocus: (x: number, y: number) => void = () => {}) {}
+  public constructor(
+    private readonly onFocus: (x: number, y: number) => void = () => {},
+    private readonly onAlert: (severity: BattleAlert['severity']) => void = () => {},
+  ) {}
 
   public push(alerts: readonly BattleAlert[]): void {
     if (this.container === null) return;
@@ -24,6 +27,7 @@ export class AlertFeed {
     for (const alert of [...alerts].reverse()) {
       if (this.shown.has(alert.id)) continue;
       this.shown.add(alert.id);
+      this.onAlert(alert.severity);
 
       const element = document.createElement('button');
       element.type = 'button';

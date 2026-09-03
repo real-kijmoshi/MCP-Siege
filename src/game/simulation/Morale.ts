@@ -155,7 +155,11 @@ export function advanceMorale(state: GameState): void {
     group.morale = Math.max(0, Math.min(ceiling, group.morale + delta));
     group.moraleState = moraleStateOf(group.morale);
 
-    if (!group.routing && group.moraleState === 'routing') {
+    if (
+      !group.routing &&
+      group.moraleState === 'routing' &&
+      survival < MORALE.emergencyRetreatStrength
+    ) {
       // The group breaks: it drops its orders and streams for the rear.
       group.routing = true;
       group.path = [];

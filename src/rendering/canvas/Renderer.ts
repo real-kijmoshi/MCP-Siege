@@ -7,7 +7,7 @@ import { FogLayer } from './FogLayer';
 import { ObjectiveLayer } from './ObjectiveLayer';
 import { PALETTE } from './palette';
 import { PlanLayer } from './PlanLayer';
-import { TerrainLayer } from './TerrainLayer';
+import { DetailedTerrainLayer } from './DetailedTerrainLayer';
 import { UnitLayer } from './UnitLayer';
 import type { RenderSnapshot } from './RenderSnapshot';
 
@@ -33,7 +33,9 @@ export class Renderer {
   public hoveredZone: ZoneId | undefined;
 
   private readonly context: CanvasRenderingContext2D;
-  private readonly terrain = new TerrainLayer();
+  // The tactical style uses the authored pixel terrain without the hundreds
+  // of decorative props and animated flourishes of the archived full style.
+  private readonly terrain = new DetailedTerrainLayer(undefined, 'terrain');
   private readonly fog = new FogLayer();
   private readonly units = new UnitLayer();
   private readonly effects = new EffectsLayer();

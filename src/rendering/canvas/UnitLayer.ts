@@ -1,5 +1,4 @@
 import {
-  CATEGORY_TOKEN,
   CORPSE_LIFETIME_TICKS,
   FORMATION_PROFILES,
   STRENGTH_ESTIMATE_GRANULARITY,
@@ -52,7 +51,11 @@ const CAPACITY = 10_000;
  * effectively never drawn. It is low enough now to be visible in normal play.
  */
 const DETAIL_ZOOM = 0.34;
-const BLOB_ZOOM = 0.2;
+// Keep the opening command view calm: at this scale individual soldier blocks
+// are too small to identify and turn each regiment into a field of confetti.
+// Formation footprints preserve frontage, depth, allegiance and position; the
+// men resolve as soon as the commander deliberately zooms in.
+const BLOB_ZOOM = 0.5;
 
 /**
  * Zoom at which a man stops being a silhouette and becomes a whole figure.
@@ -759,11 +762,11 @@ export class UnitLayer {
       // one mark that answers "where is the battle" from across the map.
       if (engaged) this.drawContactRing(context, camera, state, x, y, spread);
 
-      const text = this.labelText(state, group, isPlayer);
+      const isSelected = selected.has(group.id);
+      const text = this.labelText(state, group, isPlayer, isSelected);
       if (!this.claimLabel(camera, x, labelY, text.length)) continue;
 
       const unit = 1 / camera.zoom;
-      const isSelected = selected.has(group.id);
       const iconSize = 14 * unit;
       const textWidth = context.measureText(text).width;
       const plateWidth = textWidth + iconSize + 14 * unit;
@@ -796,7 +799,7 @@ export class UnitLayer {
       context.fillText(text, x + iconSize / 2 + 2 * unit, labelY);
 
       // Morale is the player's own business; an enemy's is not observable.
-      if (!isPlayer) continue;
+      if (!isPlayer || (!isSelected && !engaged)) continue;
 
       const barWidth = snap(84 * unit);
       const barHeight = Math.max(PIXEL / 2, 4 * unit);
@@ -961,26 +964,19 @@ export class UnitLayer {
     return group.members.length;
   }
 
-  /**
-   * The dominant troop type of a group, as a three-letter token.
-   *
-   * Recomputed per frame from the pool rather than cached, because a group's
-   * composition shifts as it takes casualties and a stale token would lie
-   * about exactly the matchup the player is trying to read.
-   */
-  private roleToken(state: GameState, group: ArmyGroup): string {
-    return CATEGORY_TOKEN[this.primaryRole(state, group)];
-  }
-
-  private labelText(state: GameState, group: ArmyGroup, isPlayer: boolean): string {
-    const token = this.roleToken(state, group);
-    if (isPlayer) return `${token} ${group.name}  ${group.members.length}`;
+  private labelText(
+    state: GameState,
+    group: ArmyGroup,
+    isPlayer: boolean,
+    isSelected: boolean,
+  ): string {
+    if (isPlayer) return isSelected ? `${group.name}  ${group.members.length}` : group.name;
     // An enemy count is an estimate by eye, rounded exactly as intelligence
     // rounds it, so the map never tells the player more than the Marshal gets.
     const estimate =
       Math.round(group.members.length / STRENGTH_ESTIMATE_GRANULARITY) *
       STRENGTH_ESTIMATE_GRANULARITY;
-    return `${token} ${group.name}  ~${estimate}`;
+    return `${group.name}  ~${estimate}`;
   }
 
   /**

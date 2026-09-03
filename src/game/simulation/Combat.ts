@@ -47,6 +47,8 @@ let contactCounts = new Int32Array(64);
 let arcCounts = new Int32Array(64 * CONTACT.arcCount);
 let pressureX = new Float32Array(64);
 let pressureY = new Float32Array(64);
+/** Melee bodies contributing pressure against each group this tick. */
+let pressureCounts = new Int32Array(64);
 /** Friendly neighbours counted this tick, and how many men were asked. */
 let crowdSum = new Int32Array(64);
 let crowdSamples = new Int32Array(64);
@@ -67,6 +69,7 @@ function ensureContactBuffers(groupCount: number): void {
     arcCounts.fill(0, 0, groupCount * CONTACT.arcCount);
     pressureX.fill(0, 0, groupCount);
     pressureY.fill(0, 0, groupCount);
+    pressureCounts.fill(0, 0, groupCount);
     crowdSum.fill(0, 0, groupCount);
     crowdSamples.fill(0, 0, groupCount);
     shockImpulse.fill(0, 0, groupCount);
@@ -80,6 +83,7 @@ function ensureContactBuffers(groupCount: number): void {
   arcCounts = new Int32Array(capacity * CONTACT.arcCount);
   pressureX = new Float32Array(capacity);
   pressureY = new Float32Array(capacity);
+  pressureCounts = new Int32Array(capacity);
   crowdSum = new Int32Array(capacity);
   crowdSamples = new Int32Array(capacity);
   shockImpulse = new Float32Array(capacity);
@@ -560,6 +564,7 @@ export function advanceCombat(state: GameState): void {
           (isInBarrier(x, y) ? CONTACT.crossingPressure : 1);
         pressureX[defenderSlot] = (pressureX[defenderSlot] ?? 0) + (dx / distance) * momentum;
         pressureY[defenderSlot] = (pressureY[defenderSlot] ?? 0) + (dy / distance) * momentum;
+        pressureCounts[defenderSlot] = (pressureCounts[defenderSlot] ?? 0) + 1;
       }
     }
 
@@ -641,6 +646,18 @@ function applyCombatPressure(state: GameState): void {
     const magnitude = Math.hypot(x, y);
     if (magnitude < 0.001) continue;
 
+    // A few men can fight, kill and pin the files immediately in front of
+    // them, but they cannot bodily drive an intact regiment across the map.
+    // Require a meaningful share of the defending formation to be under
+    // pressure, then ramp smoothly to full effect as another rank joins in.
+    const contactShare = (pressureCounts[slot] ?? 0) / Math.max(1, group.members.length);
+    if (contactShare <= CONTACT.minimumPressureShare) continue;
+    const participation = Math.min(
+      1,
+      (contactShare - CONTACT.minimumPressureShare) /
+        (CONTACT.fullPressureShare - CONTACT.minimumPressureShare),
+    );
+
     const stanceResistance =
       group.stance === 'hold_ground' ? 1.5 : group.stance === 'defensive' ? 1.2 : 1;
     const formationResistance =
@@ -652,7 +669,8 @@ function applyCombatPressure(state: GameState): void {
       CONTACT.maximumYieldPerTick,
       (magnitude / Math.max(1, group.members.length)) *
         CONTACT.pressureScale /
-        (stanceResistance * formationResistance * moraleResistance * enduranceResistance),
+        (stanceResistance * formationResistance * moraleResistance * enduranceResistance) *
+        participation,
     );
     const nextX = group.anchor.x + (x / magnitude) * yielded;
     const nextY = group.anchor.y + (y / magnitude) * yielded;

@@ -90,6 +90,8 @@ function tendWounded(state: GameState, group: ArmyGroup): void {
     const hp = units.hp[index] ?? 0;
     const ceiling = UNIT_STATS[units.categoryOf(index)].maxHitPoints;
     if (hp >= ceiling) continue;
-    units.hp[index] = Math.min(ceiling, hp + recovery);
+    const missingShare = Math.max(0, (ceiling - hp) / ceiling);
+    const diminishing = Math.max(FIELD_SUPPORT.diminishingRecoveryFloor, missingShare);
+    units.hp[index] = Math.min(ceiling, hp + recovery * diminishing);
   }
 }

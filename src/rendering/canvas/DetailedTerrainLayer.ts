@@ -129,7 +129,8 @@ interface Chimney {
   seed: number;
 }
 
-export class TerrainLayer {
+/** Preserved high-detail battlefield art for a future visual-style option. */
+export class DetailedTerrainLayer {
   private builtFor: BattleMapId | undefined;
   private readonly bitmap: HTMLCanvasElement;
   private readonly materials = new Uint8Array(ART_WIDTH * ART_HEIGHT);
@@ -140,7 +141,10 @@ export class TerrainLayer {
   /** Water pixels, in world coordinates, sampled for the shimmer overlay. */
   private ripples: Array<{ x: number; y: number; seed: number; length: number; shallow: boolean }> = [];
 
-  public constructor(mapId?: BattleMapId) {
+  public constructor(
+    mapId?: BattleMapId,
+    private readonly style: 'full' | 'balanced' | 'terrain' = 'full',
+  ) {
     this.bitmap = document.createElement('canvas');
     this.bitmap.width = ART_WIDTH;
     this.bitmap.height = ART_HEIGHT;
@@ -179,17 +183,100 @@ export class TerrainLayer {
     this.paintZoneGround();
     this.paintWater();
     this.paintRoads();
-    this.paintLoggingPaths();
+    if (this.style !== 'terrain') {
+      this.paintLoggingPaths();
+      this.paintCampGround();
+    }
     this.paintVillageGround();
-    this.paintCampGround();
     this.paintCrossings();
-    // Speckle last of the ground passes, so moss and pebbles land on roads and
-    // village earth too rather than only on whatever was painted first.
-    this.speckleGround();
+    // The archived full style keeps every pebble and moss patch. The default
+    // balanced style leaves broad areas quiet so units and roads read first.
+    if (this.style === 'full') this.speckleGround();
     this.markWaterEdges();
     this.resolveMaterials(colors);
-    this.scatterProps();
-    this.paintProps();
+    if (this.style === 'terrain') {
+      this.paintTacticalWaterMarks(colors);
+      this.scatterTacticalProps();
+      this.paintProps();
+    } else {
+      this.scatterProps();
+      this.paintProps();
+    }
+  }
+
+  /**
+   * Sparse, ordered current marks. They give the river direction and depth
+   * without bringing back the old field of random blue rectangles.
+   */
+  private paintTacticalWaterMarks(colors: Record<string, string>): void {
+    if (activeBattleMap().barrier?.kind !== 'river') return;
+    const context = this.bitmap.getContext('2d');
+    if (context === null) return;
+    const water = colors.river ?? PALETTE.river;
+    context.fillStyle = shade(water, 0.16);
+
+    for (let x = 28; x < ART_WIDTH - 20; x += 72) {
+      const center = Math.round(barrierCenterAt(x * ART_SCALE) / ART_SCALE);
+      for (const offset of [-5, 4]) {
+        const y = center + offset;
+        const index = y * ART_WIDTH + x;
+        if (this.materials[index] !== M_WATER) continue;
+        const length = 5 + ((x / 72) % 3);
+        context.fillRect(x, y, length, 1);
+      }
+    }
+  }
+
+  /**
+   * Landmark shorthand for command zoom: two to five authored pixel sprites
+   * per location, enough to recognize the ground without filling it.
+   */
+  private scatterTacticalProps(): void {
+    const map = activeBattleMap();
+    for (const zone of activeZones()) {
+      const r = zone.radius;
+      switch (zone.terrain) {
+        case 'forest':
+          this.props.push(
+            { x: zone.center.x - r * 0.32, y: zone.center.y + r * 0.08, sprite: TREE_PINE },
+            { x: zone.center.x - r * 0.08, y: zone.center.y - r * 0.2, sprite: TREE_OAK },
+            { x: zone.center.x + r * 0.2, y: zone.center.y + r * 0.14, sprite: TREE_PINE },
+            { x: zone.center.x + r * 0.38, y: zone.center.y - r * 0.1, sprite: TREE_BIRCH },
+          );
+          break;
+        case 'village':
+          this.props.push(
+            { x: zone.center.x - r * 0.26, y: zone.center.y - r * 0.08, sprite: COTTAGE_THATCH },
+            { x: zone.center.x + r * 0.08, y: zone.center.y - r * 0.18, sprite: COTTAGE_TILE },
+            { x: zone.center.x + r * 0.3, y: zone.center.y + r * 0.14, sprite: COTTAGE_THATCH },
+            { x: zone.center.x - r * 0.1, y: zone.center.y + r * 0.24, sprite: WELL },
+          );
+          break;
+        case 'hill':
+          this.props.push(
+            { x: zone.center.x, y: zone.center.y - r * 0.18, sprite: WATCHTOWER },
+            { x: zone.center.x - r * 0.3, y: zone.center.y + r * 0.16, sprite: CRAG },
+            { x: zone.center.x + r * 0.3, y: zone.center.y + r * 0.22, sprite: CRAG },
+          );
+          break;
+        case 'ridge':
+          this.props.push(
+            { x: zone.center.x - r * 0.22, y: zone.center.y, sprite: CRAG },
+            { x: zone.center.x + r * 0.2, y: zone.center.y + r * 0.08, sprite: RUIN_ARCH },
+          );
+          break;
+        default:
+          break;
+      }
+
+      if (zone.id === map.playerHomeZone || zone.id === map.enemyHomeZone) {
+        this.props.push(
+          { x: zone.center.x - r * 0.22, y: zone.center.y + r * 0.14, sprite: TENT },
+          { x: zone.center.x + r * 0.02, y: zone.center.y - r * 0.02, sprite: TENT_BIG },
+          { x: zone.center.x + r * 0.26, y: zone.center.y + r * 0.16, sprite: TENT },
+        );
+      }
+    }
   }
 
   /** Zone bodies: fields, woodland floor, hillsides, village earth, rock. */
@@ -254,7 +341,9 @@ export class TerrainLayer {
           }
           // Bare rock breaking the turf at the crown, with scree spilling below.
           this.fillBlob(cx, cy - radius * 0.06, radius * 0.22, radius * 0.13, M_ROCK, 0.5, zone.id + 71);
-          this.scatterInBlob(cx, cy, radius * 0.9, radius * 0.6, M_SCREE, 0.07, zone.id + 83, [M_HILL, M_CONTOUR, M_ROCK]);
+          if (this.style !== 'terrain') {
+            this.scatterInBlob(cx, cy, radius * 0.9, radius * 0.6, M_SCREE, 0.07, zone.id + 83, [M_HILL, M_CONTOUR, M_ROCK]);
+          }
           break;
         case 'village':
           this.fillBlob(cx, cy, radius * 0.82, radius * 0.7, M_EARTH, 0.18, zone.id);
@@ -268,7 +357,9 @@ export class TerrainLayer {
             const lift = (band + 1) * radius * 0.06;
             this.outlineBlob(cx, cy - lift, radius * scale, radius * scale * 0.55, M_SCREE, zone.id + band * 13);
           }
-          this.scatterInBlob(cx, cy, radius * 0.95, radius * 0.66, M_PEBBLE, 0.07, zone.id + 41, [M_ROCK, M_SCREE]);
+          if (this.style !== 'terrain') {
+            this.scatterInBlob(cx, cy, radius * 0.95, radius * 0.66, M_PEBBLE, 0.07, zone.id + 41, [M_ROCK, M_SCREE]);
+          }
           break;
         default:
           break;
@@ -291,7 +382,11 @@ export class TerrainLayer {
         const wobbleBottom = (artHash(x, 29) - 0.5) * 1.2;
         const top = Math.round(center - half + wobbleTop);
         const bottom = Math.round(center + half + wobbleBottom);
-        for (let y = top; y <= bottom; y += 1) this.set(x, y, rock ? M_ROCK : M_WATER);
+        for (let y = top; y <= bottom; y += 1) {
+          const deepChannel =
+            this.style === 'terrain' && !rock && Math.abs(y - center) < half * 0.34;
+          this.set(x, y, rock ? M_ROCK : deepChannel ? M_REFLECT : M_WATER);
+        }
       }
     }
 
@@ -319,7 +414,9 @@ export class TerrainLayer {
     // single hard-edged line.
     for (const route of roads) this.paintRoadPass(route, 4.25, M_ROAD_EDGE, 17);
     for (const route of roads) this.paintRoadPass(route, 2.75, M_ROAD, 17);
-    for (const route of roads) this.paintRoadRuts(route, 17);
+    if (this.style !== 'terrain') {
+      for (const route of roads) this.paintRoadRuts(route, 17);
+    }
   }
 
   private paintRoadPass(route: readonly ZoneId[], halfWidth: number, material: number, salt: number): void {
@@ -417,8 +514,9 @@ export class TerrainLayer {
       const seed = zone.id.length * 53 + zone.id.charCodeAt(0);
 
       // Lanes first, so the square is laid over where they meet.
-      for (let lane = 0; lane < 5; lane += 1) {
-        const angle = (lane / 5) * Math.PI * 2 + artHash(seed, lane) * 0.6;
+      const laneCount = this.style === 'terrain' ? 3 : 5;
+      for (let lane = 0; lane < laneCount; lane += 1) {
+        const angle = (lane / laneCount) * Math.PI * 2 + artHash(seed, lane) * 0.6;
         this.stampLine(
           zone.center.x,
           zone.center.y,
@@ -433,7 +531,8 @@ export class TerrainLayer {
       this.fillBlob(cx, cy, radius * 0.16, radius * 0.13, M_COBBLE, 0.16, seed + 11);
 
       // Garden strips behind the houses, out toward the edge of the village.
-      for (let plot = 0; plot < 7; plot += 1) {
+      const plotCount = this.style === 'terrain' ? 3 : 7;
+      for (let plot = 0; plot < plotCount; plot += 1) {
         const angle = artHash(seed + plot, 61) * Math.PI * 2;
         const reach = (0.46 + artHash(seed + plot, 67) * 0.28) * radius;
         this.fillBlob(
@@ -605,7 +704,8 @@ export class TerrainLayer {
     for (const crossing of activeCrossings()) {
       const cx = Math.round(crossing.center.x / ART_SCALE);
       const centerY = barrierCenterAt(crossing.center.x) / ART_SCALE;
-      const halfWidth = Math.round(Math.min(crossing.radius * 1.05, 520) / ART_SCALE / 2);
+      const bridgeScale = this.style === 'terrain' ? 0.78 : 1.05;
+      const halfWidth = Math.round(Math.min(crossing.radius * bridgeScale, 520) / ART_SCALE / 2);
       const top = Math.round(centerY - half - 4);
       const bottom = Math.round(centerY + half + 4);
 
@@ -616,7 +716,8 @@ export class TerrainLayer {
         }
       }
       // Plank seams, so a bridge reads as carpentry rather than as a brown bar.
-      for (let x = cx - halfWidth + 2; x < cx + halfWidth; x += 3) {
+      const seam = this.style === 'terrain' ? 4 : 3;
+      for (let x = cx - halfWidth + 2; x < cx + halfWidth; x += seam) {
         for (let y = top; y <= bottom; y += 1) this.set(x, y, M_DECK_EDGE);
       }
       // Rails along both banks.
@@ -625,9 +726,21 @@ export class TerrainLayer {
         this.set(x, bottom, M_DECK_EDGE);
       }
 
+      // Stone abutments visually seat the narrower tactical bridge in both
+      // banks instead of leaving a timber rectangle floating over the water.
+      if (this.style === 'terrain') {
+        for (let x = cx - halfWidth - 2; x <= cx + halfWidth + 2; x += 1) {
+          for (let depth = 1; depth <= 3; depth += 1) {
+            this.set(x, top - depth, M_ROCK);
+            this.set(x, bottom + depth, M_ROCK);
+          }
+        }
+      }
+
       // The bridge's reflection, thrown downstream onto open water. Broken into
       // dashes by the same hash that ripples the surface, because a solid bar
       // of dark water would read as a second, sunken bridge.
+      if (this.style === 'terrain') continue;
       for (let x = cx + halfWidth + 1; x <= cx + halfWidth + 8; x += 1) {
         for (let y = top + 2; y <= bottom - 2; y += 1) {
           if (this.materials[y * ART_WIDTH + x] !== M_WATER) continue;
@@ -646,10 +759,10 @@ export class TerrainLayer {
         const index = y * ART_WIDTH + x;
         if (source[index] !== M_WATER) continue;
         if (
-          source[index - 1] !== M_WATER ||
-          source[index + 1] !== M_WATER ||
-          source[index - ART_WIDTH] !== M_WATER ||
-          source[index + ART_WIDTH] !== M_WATER
+          !isWaterMaterial(source[index - 1]) ||
+          !isWaterMaterial(source[index + 1]) ||
+          !isWaterMaterial(source[index - ART_WIDTH]) ||
+          !isWaterMaterial(source[index + ART_WIDTH])
         ) {
           this.materials[index] = M_WATER_EDGE;
         } else if (nearBank(source, x, y)) {
@@ -867,8 +980,9 @@ export class TerrainLayer {
     // an ash-country river would be the one thing on the field out of key.
     const water = colors.river ?? PALETTE.river;
     const bank = colors.riverEdge ?? PALETTE.riverEdge;
-    ramp[M_WATER] = [shade(water, -0.3), water];
-    ramp[M_WATER_EDGE] = [colors.riverEdge ?? PALETTE.riverEdge, PALETTE.foam];
+    const quietWater = shade(water, -0.22);
+    ramp[M_WATER] = this.style === 'terrain' ? [quietWater, quietWater] : [shade(water, -0.3), water];
+    ramp[M_WATER_EDGE] = this.style === 'terrain' ? [bank, bank] : [bank, PALETTE.foam];
     ramp[M_ROAD] = [colors.road ?? PALETTE.road, PALETTE.sandDark];
     ramp[M_ROAD_EDGE] = [PALETTE.earthDark, PALETTE.earth];
     ramp[M_DECK] = [colors.crossing ?? PALETTE.crossing, PALETTE.timber];
@@ -881,8 +995,10 @@ export class TerrainLayer {
     const moss = colors.forestCanopy ?? PALETTE.moss;
     ramp[M_MOSS] = [shade(moss, -0.24), moss];
     ramp[M_PEBBLE] = [PALETTE.pebble, PALETTE.scree];
-    ramp[M_SHALLOW] = [bank, shade(bank, 0.22)];
-    ramp[M_REFLECT] = [shade(water, -0.55), shade(water, -0.3)];
+    const shallow = shade(bank, 0.08);
+    ramp[M_SHALLOW] = this.style === 'terrain' ? [shallow, shallow] : [bank, shade(bank, 0.22)];
+    const deepWater = shade(water, -0.38);
+    ramp[M_REFLECT] = this.style === 'terrain' ? [deepWater, deepWater] : [shade(water, -0.55), shade(water, -0.3)];
     ramp[M_GARDEN] = [PALETTE.gardenDark, PALETTE.garden];
     ramp[M_COBBLE] = [PALETTE.cobbleDark, PALETTE.cobble];
     ramp[M_TRACK] = [colors.road ?? PALETTE.road, PALETTE.sandDark];
@@ -899,7 +1015,7 @@ export class TerrainLayer {
         if (pair === undefined) continue;
         // Coarse patches preserve the pixel-art grain without covering the
         // ground in a checkerboard of competing colours.
-        const bright = artHash(x >> 2, y >> 2) > 0.84;
+        const bright = artHash(x >> 2, y >> 2) > (this.style === 'terrain' ? 0.985 : 0.84);
         const rgb = bright ? pair[1] : pair[0];
         const offset = index * 4;
         data[offset] = rgb[0];
@@ -935,7 +1051,7 @@ export class TerrainLayer {
           const spread = zone.radius * (0.16 + artHash(seed + stand, 109) * 0.12);
           // Sized from the stand's own area rather than from a flat count, so a
           // wood is a canopy you cannot see the floor through at any map size.
-          const trees = Math.round((spread * spread) / 260) + 8;
+          const trees = Math.round((spread * spread) / (this.style === 'full' ? 260 : 620)) + 5;
 
           for (let n = 0; n < trees; n += 1) {
             const angle = artHash(seed + stand * 31 + n, 3) * Math.PI * 2;
@@ -953,7 +1069,9 @@ export class TerrainLayer {
         }
 
         // Loose growth between the stands, so the wood has no visible seams.
-        const strays = Math.round((zone.radius * zone.radius) / 5200);
+        const strays = Math.round(
+          (zone.radius * zone.radius) / (this.style === 'full' ? 5200 : 13_000),
+        );
         for (let n = 0; n < strays; n += 1) {
           const angle = artHash(seed + n, 127) * Math.PI * 2;
           const distance = Math.sqrt(artHash(seed + n, 131)) * zone.radius * 0.96;
@@ -965,7 +1083,7 @@ export class TerrainLayer {
         }
 
         // A fringe of scrub, so a wood does not end on a hard line.
-        const fringe = Math.round(zone.radius / 34);
+        const fringe = Math.round(zone.radius / (this.style === 'full' ? 34 : 72));
         for (let n = 0; n < fringe; n += 1) {
           const angle = artHash(seed + n, 13) * Math.PI * 2;
           this.props.push({
@@ -977,7 +1095,7 @@ export class TerrainLayer {
 
         // Whatever lived here before the armies came. Deep in the wood only,
         // where a player who bothers to look will find it.
-        for (let n = 0; n < 2; n += 1) {
+        for (let n = 0; n < (this.style === 'full' ? 2 : 0); n += 1) {
           const angle = artHash(seed + n, 149) * Math.PI * 2;
           const distance = zone.radius * (0.24 + artHash(seed + n, 151) * 0.3);
           this.props.push({
@@ -1002,7 +1120,8 @@ export class TerrainLayer {
           const angle = (lane / lanes) * Math.PI * 2 + artHash(seed, lane) * 0.6;
           const along = Math.cos(angle);
           const across = -Math.sin(angle);
-          const houses = 4 + Math.floor(artHash(seed + lane, 19) * 3);
+          const houses =
+            (this.style === 'full' ? 4 : 2) + Math.floor(artHash(seed + lane, 19) * 3);
 
           for (let n = 0; n < houses; n += 1) {
             const reach = zone.radius * (0.26 + (n / houses) * 0.58);
@@ -1283,9 +1402,12 @@ export class TerrainLayer {
   public draw(context: CanvasRenderingContext2D, camera: Camera, tick = 0): void {
     context.imageSmoothingEnabled = false;
     context.drawImage(this.bitmap, 0, 0, MAP_WIDTH, MAP_HEIGHT);
+    if (this.style === 'terrain') return;
     this.drawWaterShimmer(context, camera, tick);
-    this.drawTorches(context, camera, tick);
-    this.drawSmoke(context, camera, tick);
+    if (this.style === 'full') {
+      this.drawTorches(context, camera, tick);
+      this.drawSmoke(context, camera, tick);
+    }
     this.drawBanners(context, camera, tick);
   }
 
@@ -1473,6 +1595,9 @@ export class TerrainLayer {
       ) {
         continue;
       }
+      // Keep the strategic view quiet. Crossings are permanent navigation
+      // decisions; every other place name appears on demand under the cursor.
+      if (!zone.crossing && zone.id !== hoveredZone) continue;
       const label = zone.name.toUpperCase();
       const labelY = zone.center.y - Math.min(zone.radius * 0.58, 230);
       const width = context.measureText(label).width + 16 * unit;
@@ -1508,15 +1633,19 @@ export class TerrainLayer {
 function nearBank(source: Uint8Array, x: number, y: number): boolean {
   for (let reach = 2; reach <= 5; reach += 1) {
     if (
-      source[y * ART_WIDTH + x - reach] !== M_WATER ||
-      source[y * ART_WIDTH + x + reach] !== M_WATER ||
-      source[(y - reach) * ART_WIDTH + x] !== M_WATER ||
-      source[(y + reach) * ART_WIDTH + x] !== M_WATER
+      !isWaterMaterial(source[y * ART_WIDTH + x - reach]) ||
+      !isWaterMaterial(source[y * ART_WIDTH + x + reach]) ||
+      !isWaterMaterial(source[(y - reach) * ART_WIDTH + x]) ||
+      !isWaterMaterial(source[(y + reach) * ART_WIDTH + x])
     ) {
       return true;
     }
   }
   return false;
+}
+
+function isWaterMaterial(material: number | undefined): boolean {
+  return material === M_WATER || material === M_REFLECT;
 }
 
 /** Lightens or darkens a hex colour. `amount` runs from -1 (black) to 1 (white). */

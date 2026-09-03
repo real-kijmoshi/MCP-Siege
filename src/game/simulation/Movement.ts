@@ -1,4 +1,5 @@
 import {
+  COMMAND_AUTHORITY,
   CONTACT,
   FORMATION_PROFILES,
   PHYSICS,
@@ -67,7 +68,19 @@ function groupSpeed(state: GameState, group: ArmyGroup): number {
 function contactSpeedFactor(group: ArmyGroup): number {
   if (group.routing || group.order.kind === 'retreat') return 1;
   const pinned = Math.min(1, group.engagement / CONTACT.pinEngagement);
-  return 1 - pinned * (1 - CONTACT.pinnedSpeed);
+  const committedAttack =
+    (group.order.kind === 'attack_zone' || group.order.kind === 'attack_group') &&
+    group.stance === 'aggressive' &&
+    (engagementAssessment[3] ?? 0) * 2 < group.members.length &&
+    group.morale >= COMMAND_AUTHORITY.committedAttackMorale;
+  // An attack backed by enough command authority is a push by the regiment,
+  // not a private chase by whichever front-rank men acquired targets first.
+  // Keep the anchor advancing through contact so every rank's formation slot
+  // follows the assault. Shaken formations still stall and yield normally.
+  const pinnedSpeed = committedAttack
+    ? COMMAND_AUTHORITY.committedAttackPinnedSpeed
+    : CONTACT.pinnedSpeed;
+  return 1 - pinned * (1 - pinnedSpeed);
 }
 
 /**
@@ -371,7 +384,7 @@ function advanceUnits(state: GameState, group: ArmyGroup): void {
   fillFormationSlots(group.formation, count, group.anchor, group.facing, slotBufferX, slotBufferY);
 
   // How far from the group's anchor its men will chase a target.
-  const leash = STANCE_PROFILES[group.stance].engagementRadius;
+  const orderedLeash = STANCE_PROFILES[group.stance].engagementRadius;
   const terrain = terrainAt(group.anchor.x, group.anchor.y);
   const playerHash = movementHashes[FACTION_PLAYER];
   const enemyHash = movementHashes[FACTION_ENEMY];
@@ -417,6 +430,23 @@ function advanceUnits(state: GameState, group: ArmyGroup): void {
 
       const leashX = enemyX - group.anchor.x;
       const leashY = enemyY - group.anchor.y;
+      const targetSlot = units.group[target] ?? -1;
+      const targetGroup = targetSlot >= 0 ? state.groups[targetSlot] : undefined;
+      const targetSurvival =
+        targetGroup === undefined
+          ? 1
+          : targetGroup.members.length / Math.max(1, targetGroup.initialStrength);
+      // Morale is command authority made concrete. Confident troops keep the
+      // exact leash they were ordered; shaken troops increasingly trust their
+      // instinct and run after an enemy that looks ready to collapse.
+      const authority = Math.max(0, Math.min(1, group.morale / 100));
+      const vulnerability = Math.max(
+        0,
+        1 - targetSurvival / COMMAND_AUTHORITY.vulnerableEnemyStrength,
+      );
+      const leash =
+        orderedLeash +
+        COMMAND_AUTHORITY.maximumExtraLeash * (1 - authority) * vulnerability;
       if (
         tdx * tdx + tdy * tdy > reach * reach &&
         leashX * leashX + leashY * leashY <= leash * leash

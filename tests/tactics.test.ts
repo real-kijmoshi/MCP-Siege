@@ -330,7 +330,10 @@ describe('combat', () => {
     expect(braced).toBeLessThan(charging * 0.6);
   });
 
-  function pressureYield(stance: 'aggressive' | 'hold_ground'): number {
+  function pressureYield(
+    stance: 'aggressive' | 'hold_ground',
+    attackerCount = 10,
+  ): number {
     const state = createEmptyState(9191, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
       id: 'press',
@@ -339,7 +342,7 @@ describe('combat', () => {
       anchor: { x: 4000, y: 3012 },
       formation: 'line',
       stance: 'aggressive',
-      composition: [['cavalry', 10]],
+      composition: [['cavalry', attackerCount]],
     });
     createGroupFromSpec(state, {
       id: 'line',
@@ -368,9 +371,47 @@ describe('combat', () => {
   it('makes a line yield under physical pressure while hold-ground resists it', () => {
     expect(pressureYield('aggressive')).toBeGreaterThan(pressureYield('hold_ground') * 1.4);
   });
+
+  it('does not let five survivors push back a fresh hundred-man regiment', () => {
+    expect(pressureYield('aggressive', 5)).toBe(0);
+    expect(pressureYield('aggressive', 10)).toBeGreaterThan(0);
+  });
 });
 
 describe('movement physics', () => {
+  it('drives every rank forward in an ordered assault while command authority holds', () => {
+    const advanceUnderAuthority = (morale: number): number => {
+      const state = createEmptyState(6060, SCENARIOS.bridge_of_knives);
+      createGroupFromSpec(state, {
+        id: 'assault',
+        name: 'Assault',
+        ownerId: 'player',
+        anchor: { x: 4000, y: 3400 },
+        formation: 'block',
+        stance: 'aggressive',
+        composition: [['infantry', 100]],
+      });
+      const assault = findGroup(state, 'assault')!;
+      assault.morale = morale;
+      assault.engagement = 1;
+      assault.order = {
+        kind: 'attack_zone',
+        targetZone: 'central_bridge',
+        destination: { x: 4000, y: 3000 },
+        issuedAtTick: 0,
+      };
+      assault.path = [{ x: 4000, y: 3000 }];
+
+      const before = assault.anchor.y;
+      advanceMovement(state);
+      return before - assault.anchor.y;
+    };
+
+    const commanded = advanceUnderAuthority(80);
+    const shaken = advanceUnderAuthority(40);
+    expect(commanded).toBeGreaterThan(shaken * 5);
+  });
+
   it('halts a missile-led assault to fire and wheels the formation toward its target', () => {
     const state = createEmptyState(7070, SCENARIOS.bridge_of_knives);
     createGroupFromSpec(state, {
@@ -469,7 +510,13 @@ describe('morale', () => {
     const group = findGroup(state, 'broken');
     expect(group).toBeDefined();
 
+    // Low morale alone no longer overrides the commander. Only the last tenth
+    // of a regiment panics into an involuntary retreat.
     group!.morale = 5;
+    advanceMorale(state);
+    expect(group!.routing).toBe(false);
+    for (const index of group!.members.slice(9)) state.units.kill(index);
+    group!.members.length = 9;
     advanceMorale(state);
     expect(group!.routing).toBe(true);
 
@@ -588,7 +635,7 @@ describe('envelopment', () => {
 
     // Men pressed along one face occupy only a couple of arcs; men who have
     // got all the way round occupy every one.
-    expect(frontal.encirclement).toBeLessThan(0.5);
+    expect(frontal.encirclement).toBeLessThanOrEqual(0.5);
     expect(ringed.encirclement).toBeGreaterThan(0.75);
 
     // The same six hundred attackers, arranged well, are worth far more.

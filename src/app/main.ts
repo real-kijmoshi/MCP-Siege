@@ -7,10 +7,12 @@ import { GameQueries } from '../game/queries/GameQueries';
 import { SimulationEngine } from '../game/simulation/Engine';
 import { activeGroups } from '../game/simulation/GameState';
 import { activeZoneIds } from '../game/simulation/Zones';
+import { visibilityAt } from '../game/simulation/Visibility';
 import { Input } from '../rendering/canvas/Input';
 import { Minimap } from '../rendering/canvas/Minimap';
 import { Renderer } from '../rendering/canvas/Renderer';
 import { RenderSnapshot } from '../rendering/canvas/RenderSnapshot';
+import { SoundManager } from '../audio/SoundManager';
 import { AlertFeed, Toast } from '../ui/AlertFeed';
 import { FieldJournal } from '../ui/FieldJournal';
 import { ArmyList } from '../ui/ArmyList';
@@ -123,12 +125,19 @@ async function bootstrap(): Promise<void> {
   const minimapCanvas = requireCanvas('minimap');
   const minimap = new Minimap(minimapCanvas);
 
-  const alertFeed = new AlertFeed((x, y) => renderer.camera.centerOn(x, y));
+  const sound = new SoundManager();
+  const alertFeed = new AlertFeed(
+    (x, y) => renderer.camera.centerOn(x, y),
+    (severity) => sound.playAlert(severity),
+  );
   const toast = new Toast();
   // Pixel glyphs replace every placeholder in the shell before it is shown,
   // so no Unicode stand-in is ever on screen even for a frame.
   mountIcons();
-  const objectiveBanner = new ObjectiveBanner();
+  const objectiveBanner = new ObjectiveBanner(
+    (outcome) => sound.play(outcome === 'player_victory' ? 'victory' : 'defeat'),
+    () => sound.play('capture'),
+  );
   const fieldJournal = new FieldJournal();
   // Give a first-time commander time to read the field. The opening assault is
   // only seconds away on Captain, so starting the clock under the briefing
@@ -167,6 +176,7 @@ async function bootstrap(): Promise<void> {
 
   const commandBar = new CommandBar(engine, renderer.selection, (message) => {
     beginFromOpening();
+    sound.play('order');
     toast.show(message);
     battleUx?.showCommand(message);
     firstOrders?.dismiss();
@@ -174,6 +184,7 @@ async function bootstrap(): Promise<void> {
 
   const input = new Input(battlefieldCanvas, minimapCanvas, minimap, renderer, engine, {
     onSelectionChange: () => {
+      sound.play('select');
       commandBar.update();
       battleUx?.update(renderer.selection, speed);
     },
@@ -186,10 +197,12 @@ async function bootstrap(): Promise<void> {
       setSpeed(steps[Math.max(0, Math.min(steps.length - 1, current + delta))] ?? 1);
     },
     onNotice: (message) => {
+      sound.play('acknowledge');
       toast.show(message);
     },
     onOrderIssued: (message) => {
       beginFromOpening();
+      sound.play('order');
       toast.show(message);
       battleUx?.showCommand(message);
       firstOrders?.dismiss();
@@ -220,6 +233,7 @@ async function bootstrap(): Promise<void> {
 
   let accumulator = 0;
   let previous = performance.now();
+  let lastCombatAudioTick = 0;
   const stepMs = 1000 / TICKS_PER_SECOND;
   const renderSnapshot = new RenderSnapshot(engine.getState().units.capacity);
   renderSnapshot.capture(engine.getState());
@@ -275,6 +289,16 @@ async function bootstrap(): Promise<void> {
     alertFeed.push(queries.getAlerts('player', 6));
     commandBar.update();
     battleUx.update(renderer.selection, speed);
+
+    // Combat audio follows the same fog boundary as the effects layer: only
+    // blows the commander can actually see produce sound, and each blow sounds
+    // once, on the tick it was recorded.
+    for (const event of state.combatEvents) {
+      if (event.tick <= lastCombatAudioTick) continue;
+      lastCombatAudioTick = event.tick;
+      if (visibilityAt(state, 'player', event.x, event.y) !== 2) continue;
+      sound.playCombat(event.kind);
+    }
 
     if (state.objective.outcome !== 'ongoing' && speed !== 0) {
       speed = 0;

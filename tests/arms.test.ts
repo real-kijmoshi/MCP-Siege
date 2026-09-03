@@ -111,7 +111,6 @@ describe('artillery', () => {
     // wait longer than the unlimbering time is proof the battery is in action.
     const engine = new SimulationEngine({ scenarioId: 'salt_tide', difficultyId: 'captain', seed: 4 });
     const state = engine.getState();
-
     engine.dispatch('human', {
       type: 'order_groups',
       playerId: 'player',

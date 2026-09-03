@@ -16,6 +16,7 @@ export class FirstOrders {
   private dismissed = false;
 
   public constructor(scenario: ScenarioDefinition, onBegin: () => void) {
+    document.body.classList.add('showing-first-orders');
     const title = document.getElementById('first-orders-title');
     // Battle orders are authored non-empty, but a designed operation is not
     // authored: fall back to the objective rather than an empty card.
@@ -38,6 +39,7 @@ export class FirstOrders {
   public dismiss(): void {
     if (this.dismissed || this.element === null) return;
     this.dismissed = true;
+    document.body.classList.remove('showing-first-orders');
     this.element.classList.add('leaving');
     window.setTimeout(() => this.element?.remove(), 400);
   }

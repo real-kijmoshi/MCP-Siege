@@ -163,7 +163,7 @@ describe('the three commanders', () => {
     // to: every condition relief looks for. Cut to just under the threshold
     // rather than to nothing, so the regiment is a candidate for relief without
     // being so far gone that it simply breaks and runs on its own.
-    const spent = Math.floor(group.initialStrength * difficulty.withdrawSpentBelow) - 20;
+    const spent = Math.floor(group.initialStrength * 0.2);
     for (const index of group.members.slice(spent)) state.units.kill(index);
     group.members.length = Math.min(group.members.length, spent);
     group.morale = 70;
@@ -192,9 +192,10 @@ describe('the three commanders', () => {
     }
   }, 600_000);
 
-  it('relieves a worn regiment only above the easiest commander', async () => {
+  it('never relieves a regiment until fewer than ten percent remain', async () => {
     expect(DIFFICULTIES.levy.withdrawSpentBelow).toBe(0);
     expect((await observe('levy', 22)).relievedWorn).toBe(false);
-    expect((await observe('warlord', 22)).relievedWorn).toBe(true);
+    expect(DIFFICULTIES.captain.withdrawSpentBelow).toBe(0.1);
+    expect(DIFFICULTIES.warlord.withdrawSpentBelow).toBe(0.1);
   }, 600_000);
 });
