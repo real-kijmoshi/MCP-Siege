@@ -383,6 +383,202 @@ export const ROLE_SPRITES: Record<string, Sprite> = {
   },
 };
 
+/* -------------------------------------------------------------- the ranks */
+
+/**
+ * The men on the field, as figures rather than counters.
+ *
+ * A soldier drawn on the battlefield cannot be a `Sprite`: eight thousand of
+ * them are painted every frame, and reading a character grid per man would
+ * cost sixty-four cells each. So a figure is instead a handful of rectangles
+ * grouped by ink, which lets the whole army be drawn ink by ink — every
+ * shadow in one fill, every shaft in the next — no matter how many different
+ * kinds of troops are standing on the field.
+ *
+ * Coordinates are grid cells with the origin between the man's feet and `y`
+ * rising, so a figure is authored the way it is seen. Five cells across is one
+ * unit block, which is what ties a drawn man to the ground he occupies.
+ *
+ * Only five inks are used, and all five are already in the palette: the same
+ * shadow the canopy casts, the same timber the palisades are cut from, the
+ * same dressed stone as the keeps for anything steel, sand for skin and linen,
+ * and the regiment's own colour for cloth. A soldier is therefore made of the
+ * country he is standing in.
+ */
+
+export const FIGURE_SHADOW = 0;
+export const FIGURE_WOOD = 1;
+export const FIGURE_BODY = 2;
+export const FIGURE_SKIN = 3;
+export const FIGURE_METAL = 4;
+export const FIGURE_LAYERS = 5;
+
+export interface FigureCell {
+  readonly layer: number;
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+  /**
+   * Drawn at command zoom as well as close to.
+   *
+   * The core cells are the ones that carry the silhouette — the shaft of a
+   * spear, the barrel of a horse, the bed of an engine. A commander looking at
+   * the whole valley still has to be able to tell one arm from another, and
+   * these are the cells that tell him.
+   */
+  readonly core?: boolean;
+}
+
+const shadow = (x: number, y: number, w: number, h: number, core = false): FigureCell =>
+  ({ layer: FIGURE_SHADOW, x, y, w, h, core });
+const wood = (x: number, y: number, w: number, h: number, core = false): FigureCell =>
+  ({ layer: FIGURE_WOOD, x, y, w, h, core });
+const cloth = (x: number, y: number, w: number, h: number, core = false): FigureCell =>
+  ({ layer: FIGURE_BODY, x, y, w, h, core });
+const skin = (x: number, y: number, w: number, h: number, core = false): FigureCell =>
+  ({ layer: FIGURE_SKIN, x, y, w, h, core });
+const steel = (x: number, y: number, w: number, h: number, core = false): FigureCell =>
+  ({ layer: FIGURE_METAL, x, y, w, h, core });
+
+/**
+ * Every troop type, drawn facing right. Facing left is the same art mirrored.
+ *
+ * Legs are cut in shadow rather than cloth, which is what makes a man read as
+ * a man at this size: the ground shows between them, so a rank is a row of
+ * figures rather than a row of dominoes.
+ */
+export const FIGURES: Record<string, readonly FigureCell[]> = {
+  /** Sword and shield. The plainest figure, and the one all the others answer to. */
+  infantry: [
+    shadow(-2.1, 0, 4.2, 0.8, true),
+    shadow(-1.3, 0.5, 1.1, 2.1),
+    shadow(0.2, 0.5, 1.1, 2.1),
+    cloth(-1.6, 2.2, 3.2, 2.6, true),
+    skin(-0.8, 4.7, 1.6, 1),
+    steel(-1.3, 5.5, 2.6, 1.2, true),
+    steel(2.1, 2.6, 0.8, 4),
+    steel(-3, 2.3, 1.3, 2.2),
+  ],
+
+  /** The shaft is the whole point: a spear block should read as a hedge. */
+  spearman: [
+    shadow(-2.1, 0, 4.2, 0.8, true),
+    shadow(-1.3, 0.5, 1.1, 2.1),
+    shadow(0.2, 0.5, 1.1, 2.1),
+    cloth(-1.6, 2.2, 3.2, 2.6, true),
+    skin(-0.9, 4.7, 1.8, 1.1),
+    steel(-1.3, 5.6, 2.6, 1.2),
+    wood(1.9, 1.4, 0.8, 8, true),
+    steel(1.7, 9.2, 1.2, 1.8, true),
+  ],
+
+  /** Broader, helmed to the eyes, and carrying more iron than anyone else. */
+  heavy_infantry: [
+    shadow(-2.4, 0, 4.8, 0.8, true),
+    shadow(-1.5, 0.5, 1.2, 2.1),
+    shadow(0.3, 0.5, 1.2, 2.1),
+    cloth(-1.9, 2.1, 3.8, 2.8, true),
+    steel(-2.1, 4.2, 4.2, 0.8),
+    skin(-0.7, 4.9, 1.4, 0.7),
+    steel(-1.6, 5.4, 3.2, 1.6, true),
+    steel(2.5, 2.2, 1.1, 3.6),
+    steel(-3.4, 2.1, 1.4, 2.6),
+  ],
+
+  /** The bow is drawn as three cells of a curve, which is enough to read as one. */
+  archer: [
+    shadow(-2, 0, 4, 0.8, true),
+    shadow(-1.2, 0.5, 1, 2.1),
+    shadow(0.2, 0.5, 1, 2.1),
+    cloth(-1.5, 2.2, 3, 2.5, true),
+    skin(-0.9, 4.6, 1.8, 1.1),
+    cloth(-1.3, 5.5, 2.6, 1),
+    wood(2.2, 2.2, 0.8, 0.9),
+    wood(2.8, 3, 0.8, 2.6, true),
+    wood(2.2, 5.5, 0.8, 0.9),
+  ],
+
+  /** A long barrel held level: unmistakable beside a bow at any distance. */
+  handgunner: [
+    shadow(-2, 0, 4, 0.8, true),
+    shadow(-1.2, 0.5, 1, 2.1),
+    shadow(0.2, 0.5, 1, 2.1),
+    cloth(-1.5, 2.2, 3, 2.5, true),
+    skin(-0.9, 4.6, 1.8, 1.1),
+    steel(-1.3, 5.5, 2.6, 1.1),
+    wood(0.4, 3.2, 1.8, 0.9),
+    steel(2, 3.7, 3.4, 0.8, true),
+  ],
+
+  /** Hooded, unarmoured and small. He is not meant to look like a line of battle. */
+  scout: [
+    shadow(-1.7, 0, 3.4, 0.7, true),
+    shadow(-1.1, 0.4, 0.9, 1.9),
+    shadow(0.2, 0.4, 0.9, 1.9),
+    cloth(-1.3, 2, 2.6, 2.2, true),
+    skin(-0.8, 4.1, 1.6, 1),
+    cloth(-1.2, 4.9, 2.4, 1.1, true),
+    steel(1.7, 2.4, 0.7, 2.2),
+  ],
+
+  /** Linen, a cross on the chest, and a satchel. No weapon at all. */
+  surgeon: [
+    shadow(-1.8, 0, 3.6, 0.7, true),
+    shadow(-1.1, 0.4, 0.9, 1.9),
+    shadow(0.2, 0.4, 0.9, 1.9),
+    cloth(-1.4, 2, 2.8, 2.5, true),
+    skin(-0.5, 2.6, 1, 1.6),
+    skin(-1.1, 3.1, 2.2, 0.6),
+    skin(-0.9, 4.4, 1.8, 1.1),
+    skin(-1.3, 5.3, 2.6, 1, true),
+    wood(-2.8, 2.2, 1.2, 1.6),
+  ],
+
+  /** Horse first, man second. The barrel and the lance are what carry at distance. */
+  cavalry: [
+    shadow(-3.3, 0, 6.6, 0.8, true),
+    shadow(-2.4, 0.4, 0.9, 1.6),
+    shadow(-0.5, 0.4, 0.9, 1.6),
+    shadow(1.4, 0.4, 0.9, 1.6),
+    wood(-3, 1.7, 5.6, 2, true),
+    wood(2.2, 2.5, 1.4, 1.8),
+    wood(3.1, 3.9, 1.7, 1),
+    wood(-3.7, 2.3, 0.9, 1.6),
+    cloth(-1.1, 3.5, 2.2, 2.2, true),
+    skin(-0.6, 5.6, 1.4, 0.9),
+    steel(-1, 6.4, 2.2, 1.1, true),
+    wood(-0.2, 4.8, 5.2, 0.6, true),
+    steel(4.8, 4.7, 1.4, 0.8),
+  ],
+
+  /** A trebuchet: bed, frame, and an arm thrown up into the air. */
+  siege: [
+    shadow(-4.2, 0, 8.4, 0.8, true),
+    shadow(-3, 0.2, 2, 1.5),
+    shadow(1.2, 0.2, 2, 1.5),
+    wood(-3.6, 1.4, 7.2, 1.4, true),
+    wood(-2.3, 2.6, 1, 2.7),
+    wood(1.4, 2.6, 1, 2.7),
+    wood(-0.4, 2.8, 1, 2.2, true),
+    wood(0.4, 4.8, 1, 2.2, true),
+    wood(1.2, 6.8, 1, 2, true),
+    steel(1.4, 8.6, 1.8, 1.2),
+    steel(-3.8, 2.7, 1.1, 1.2),
+  ],
+
+  /** The longest thing on the field, and the one a commander must be able to find. */
+  cannon: [
+    shadow(-4.6, 0, 9.2, 0.8, true),
+    shadow(-3.2, 0.2, 2.1, 1.6),
+    shadow(0.9, 0.2, 2.1, 1.6),
+    wood(-4, 1.4, 6.6, 1.4, true),
+    steel(-2.4, 2.6, 6.6, 1.4, true),
+    steel(4.1, 2.3, 1.2, 2),
+    steel(-3.1, 2.7, 0.9, 1.2),
+  ],
+};
+
 /* ------------------------------------------------------------ command glyphs */
 
 /** Crossed swords: two full blades, two guards, two grips. */

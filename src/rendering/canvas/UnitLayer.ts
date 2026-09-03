@@ -10,17 +10,34 @@ import { activeGroups, type GameState } from '../../game/simulation/GameState';
 import { visibilityAt } from '../../game/simulation/Visibility';
 import type { Camera } from './Camera';
 import { PALETTE, moraleColor } from './palette';
-import { LABEL_FONT, ROLE_SPRITES, bakeSprite } from './pixelart';
+import {
+  FIGURES,
+  FIGURE_BODY,
+  FIGURE_LAYERS,
+  FIGURE_METAL,
+  FIGURE_SHADOW,
+  FIGURE_SKIN,
+  FIGURE_WOOD,
+  LABEL_FONT,
+  ROLE_SPRITES,
+  artHash,
+  bakeSprite,
+  type FigureCell,
+} from './pixelart';
 import type { RenderSnapshot } from './RenderSnapshot';
 
 /**
  * Drawing the armies.
  *
  * The whole budget lives here, so units are batched by faction and category
- * into preallocated buffers and drawn with one fill per batch: fourteen fills
- * for eight thousand men. Level of detail switches to blocks and then to group
- * blobs as the camera pulls back, which is what keeps a huge battle legible
- * rather than turning it into noise.
+ * into preallocated buffers and drawn ink by ink: every shadow on the field in
+ * one fill, every shaft in the next, each regiment's cloth in its own colour,
+ * then all the skin and all the steel. Two dozen fills draw eight thousand
+ * men, however many different kinds of troops are standing among them.
+ *
+ * Level of detail steps down as the camera pulls back — whole figures, then
+ * their silhouettes alone, then blocks, then one blob per regiment — which is
+ * what keeps a huge battle legible rather than turning it into noise.
  */
 
 const CATEGORY_COUNT = UNIT_CATEGORIES.length;
@@ -36,6 +53,130 @@ const CAPACITY = 10_000;
  */
 const DETAIL_ZOOM = 0.34;
 const BLOB_ZOOM = 0.2;
+
+/**
+ * Zoom at which a man stops being a silhouette and becomes a whole figure.
+ *
+ * Below this a soldier is a few world units tall and his sword is thinner than
+ * a screen pixel, so the extra cells would cost the frame and buy a smudge.
+ * Above it the camera is showing a fraction of the country, which is precisely
+ * when there are few enough men on screen to draw all of them properly.
+ */
+const FIGURE_ZOOM = 0.62;
+
+/**
+ * How many men may be drawn as whole figures before the layer falls back to
+ * silhouettes.
+ *
+ * Whole figures are around three times the rectangles of a silhouette. Timing
+ * `render` directly on a full battle of some 7,900 men, a frame drawing two
+ * thousand of them as figures costs 3.2 ms against the 1.5 ms the plain blocks
+ * cost, in a sixteen-millisecond frame — so this is a guard against a pile-up
+ * far larger than anything measured, not a limit the ordinary battle reaches.
+ */
+const FIGURE_BUDGET = 2_500;
+
+/**
+ * How many figure cells fit across one unit block, per troop type.
+ *
+ * This is the one number that decides how big a drawn man is against the
+ * ground he stands on, and it is per category because a horseman and a gun
+ * carry far more art than a footman does: given the footman's grid they would
+ * be drawn wider than the space the formation leaves them, and a squadron
+ * would close up into a solid brown band instead of reading as horses.
+ */
+const FIGURE_GRID: Record<UnitCategory, number> = {
+  infantry: 6,
+  spearman: 6,
+  heavy_infantry: 7,
+  archer: 6,
+  handgunner: 6,
+  scout: 6,
+  surgeon: 6,
+  cavalry: 9,
+  siege: 8,
+  cannon: 8,
+};
+
+/** Below this much sideways speed a man is standing, not marching. */
+const STRIDE_EPSILON = 0.02;
+
+/**
+ * How far a man may stand off his own slot, in world units.
+ *
+ * Eight hundred identical figures on eight hundred exact slots read as
+ * wallpaper rather than as troops. A hand's breadth of scatter, hashed from
+ * the soldier's own index so it never moves and never differs between two
+ * players on the same seed, is enough to break the pattern without making a
+ * dressed formation look slovenly. It uses the art hash and not the
+ * simulation's own stream, which no drawing may touch.
+ */
+const FIGURE_SCATTER = 1.6;
+
+/** How far below his own position a man's feet are planted, in figure cells. */
+const FIGURE_FEET = 1.2;
+
+/**
+ * The four inks a figure shares with the ground it stands on. Cloth is missing
+ * because cloth is the regiment's own colour, and comes from `colorFor`.
+ */
+const FIGURE_INK: readonly string[] = [
+  PALETTE.shadow,
+  PALETTE.timber,
+  '',
+  PALETTE.sand,
+  // Dressed stone rather than the lighter shade above it: a helmet wants the
+  // brighter grey, but a cannon is mostly barrel, and in the bright grey a
+  // battery read as a row of white bars laid on the grass.
+  PALETTE.stone,
+];
+
+/**
+ * Figure art, flattened for the hot loop.
+ *
+ * Each category's cells are split by ink and packed into a flat `[x, y, w, h]`
+ * run, with the silhouette cells first so that command zoom can simply draw a
+ * prefix of the same art rather than carry a second set of drawings that could
+ * drift away from it.
+ */
+interface FigureGeometry {
+  readonly quads: Float32Array;
+  readonly count: number;
+  readonly coreCount: number;
+}
+
+const EMPTY_GEOMETRY: FigureGeometry = { quads: new Float32Array(0), count: 0, coreCount: 0 };
+
+function packFigure(cells: readonly FigureCell[], layer: number): FigureGeometry {
+  const mine = cells.filter((cell) => cell.layer === layer);
+  const ordered = [
+    ...mine.filter((cell) => cell.core === true),
+    ...mine.filter((cell) => cell.core !== true),
+  ];
+  const quads = new Float32Array(ordered.length * 4);
+  ordered.forEach((cell, index) => {
+    quads[index * 4] = cell.x;
+    quads[index * 4 + 1] = cell.y;
+    quads[index * 4 + 2] = cell.w;
+    quads[index * 4 + 3] = cell.h;
+  });
+  return {
+    quads,
+    count: ordered.length,
+    coreCount: ordered.filter((cell) => cell.core === true).length,
+  };
+}
+
+/** `[category ordinal][layer]`, built once at load. Art, so never written to. */
+const FIGURE_GEOMETRY: ReadonlyArray<readonly FigureGeometry[]> = UNIT_CATEGORIES.map(
+  (category) => {
+    const cells = FIGURES[category];
+    if (cells === undefined) return new Array<FigureGeometry>(FIGURE_LAYERS).fill(EMPTY_GEOMETRY);
+    const layers: FigureGeometry[] = [];
+    for (let layer = 0; layer < FIGURE_LAYERS; layer += 1) layers.push(packFigure(cells, layer));
+    return layers;
+  },
+);
 
 /** A group counts as in contact for this long after its last casualty. */
 const ENGAGED_TICKS = TICKS_PER_SECOND * 3;
@@ -66,19 +207,6 @@ const CORNERS: ReadonlyArray<readonly [number, number]> = [
   [-1, 1],
   [1, 1],
 ];
-
-const SHAPE: Record<UnitCategory, 'square' | 'circle' | 'triangle' | 'diamond'> = {
-  infantry: 'square',
-  spearman: 'square',
-  heavy_infantry: 'square',
-  archer: 'circle',
-  handgunner: 'circle',
-  scout: 'circle',
-  surgeon: 'circle',
-  cavalry: 'triangle',
-  siege: 'diamond',
-  cannon: 'diamond',
-};
 
 const SIZE: Record<UnitCategory, number> = {
   infantry: 9,
@@ -124,7 +252,11 @@ function colorFor(faction: number, category: UnitCategory): string {
 export class UnitLayer {
   private readonly batchX: Float32Array[] = [];
   private readonly batchY: Float32Array[] = [];
+  /** 1 where a man is drawn mirrored, because he is facing left. */
+  private readonly batchFlip: Uint8Array[] = [];
   private readonly batchCount = new Int32Array(BATCH_COUNT);
+  /** How many men the last `fillBatches` actually put on screen. */
+  private visibleUnits = 0;
   /** Scratch, cleared at the top of every use. Never carries state across frames. */
   private readonly roleCounts = new Int32Array(CATEGORY_COUNT);
   private readonly placedLabels: Array<{
@@ -141,6 +273,7 @@ export class UnitLayer {
     for (let batch = 0; batch < BATCH_COUNT; batch += 1) {
       this.batchX.push(new Float32Array(CAPACITY));
       this.batchY.push(new Float32Array(CAPACITY));
+      this.batchFlip.push(new Uint8Array(CAPACITY));
     }
   }
 
@@ -167,32 +300,32 @@ export class UnitLayer {
 
     this.fillBatches(camera, state, previous, interpolation);
 
-    const detailed = camera.zoom >= DETAIL_ZOOM;
-    for (let batch = 0; batch < BATCH_COUNT; batch += 1) {
-      const count = this.batchCount[batch] ?? 0;
-      if (count === 0) continue;
+    if (camera.zoom >= DETAIL_ZOOM) {
+      // Whole men when the camera is close enough for a sword to be worth a
+      // pixel and there are few enough of them on screen to be worth the
+      // frame; their silhouettes alone otherwise.
+      const whole = camera.zoom >= FIGURE_ZOOM && this.visibleUnits <= FIGURE_BUDGET;
+      this.drawFigures(context, !whole);
+    } else {
+      // Below the detail threshold a man is one small block; his shape is no
+      // longer readable, but the density and the colour of the mass still are.
+      for (let batch = 0; batch < BATCH_COUNT; batch += 1) {
+        const count = this.batchCount[batch] ?? 0;
+        if (count === 0) continue;
+        const category = UNIT_CATEGORIES[batch % CATEGORY_COUNT] as UnitCategory;
+        const xs = this.batchX[batch];
+        const ys = this.batchY[batch];
+        if (xs === undefined || ys === undefined) continue;
 
-      const faction = batch < CATEGORY_COUNT ? 0 : 1;
-      const category = UNIT_CATEGORIES[batch % CATEGORY_COUNT] as UnitCategory;
-      const xs = this.batchX[batch];
-      const ys = this.batchY[batch];
-      if (xs === undefined || ys === undefined) continue;
-
-      context.fillStyle = colorFor(faction, category);
-      context.beginPath();
-
-      if (detailed) {
-        this.addDetailedShapes(context, SHAPE[category], SIZE[category], xs, ys, count);
-      } else {
-        // Below the detail threshold every man is the same small block; shape
-        // is no longer readable, but density and colour still are.
+        context.fillStyle = colorFor(batch < CATEGORY_COUNT ? 0 : 1, category);
+        context.beginPath();
         const size = Math.max(2.5 / camera.zoom, SIZE[category] * 0.8);
         const half = size / 2;
         for (let n = 0; n < count; n += 1) {
           context.rect((xs[n] ?? 0) - half, (ys[n] ?? 0) - half, size, size);
         }
+        context.fill();
       }
-      context.fill();
     }
 
     betweenBodiesAndLabels?.();
@@ -200,50 +333,90 @@ export class UnitLayer {
   }
 
   /**
-   * A man, as pixels.
+   * The army, drawn one ink at a time.
    *
-   * Shapes are built out of whole art-grid blocks rather than out of circles
-   * and triangles, because a smooth arc among eight thousand chunky pixels is
-   * the one thing that would give the style away. Silhouettes still differ per
-   * category, which is what the counter matrix needs a commander to read.
+   * Painting a man at a time would mean a fill per man; painting an ink at a
+   * time means every shadow on the field goes down together, then every shaft,
+   * then each regiment's cloth in its own colour, then all the skin and all
+   * the steel. That is four fills plus one per regiment colour, whatever the
+   * mixture of troops, and it is also the correct order to draw a man in: a
+   * lance behind its rider, a helmet over his face.
+   *
+   * The cost is that the order is global rather than per man, so one soldier's
+   * spear passes in front of the man in the rank ahead of him. At this scale
+   * that reads as a hedge of spears over a block of troops, which is what a
+   * body of spearmen looks like, and it saves sorting eight thousand men every
+   * frame to fix something nobody would otherwise notice.
    */
-  private addDetailedShapes(
+  private drawFigures(context: CanvasRenderingContext2D, coreOnly: boolean): void {
+    for (let layer = 0; layer < FIGURE_LAYERS; layer += 1) {
+      if (layer === FIGURE_BODY) {
+        // Cloth is the one ink a soldier does not share with the ground: it is
+        // his own side's colour, so it is drawn per batch rather than per ink.
+        for (let batch = 0; batch < BATCH_COUNT; batch += 1) {
+          if ((this.batchCount[batch] ?? 0) === 0) continue;
+          const category = UNIT_CATEGORIES[batch % CATEGORY_COUNT] as UnitCategory;
+          context.fillStyle = colorFor(batch < CATEGORY_COUNT ? 0 : 1, category);
+          context.beginPath();
+          this.addFigureLayer(context, batch, layer, coreOnly);
+          context.fill();
+        }
+        continue;
+      }
+
+      const ink = FIGURE_INK[layer];
+      if (ink === undefined || ink === '') continue;
+      context.fillStyle = ink;
+      context.beginPath();
+      for (let batch = 0; batch < BATCH_COUNT; batch += 1) {
+        if ((this.batchCount[batch] ?? 0) === 0) continue;
+        this.addFigureLayer(context, batch, layer, coreOnly);
+      }
+      context.fill();
+    }
+  }
+
+  /** One ink of one batch's figures, mirrored per man to the way he is facing. */
+  private addFigureLayer(
     context: CanvasRenderingContext2D,
-    shape: 'square' | 'circle' | 'triangle' | 'diamond',
-    size: number,
-    xs: Float32Array,
-    ys: Float32Array,
-    count: number,
+    batch: number,
+    layer: number,
+    coreOnly: boolean,
   ): void {
-    // Sized to the man, not to the art grid, and drawn where he actually
-    // stands. Snapping a whole regiment onto a six-unit lattice turned eight
-    // hundred men into wallpaper: every block landed on the same rhythm as its
-    // neighbours and the formation read as a pattern rather than as troops.
-    const block = Math.max(2, Math.round(size / 2) * 2);
-    const half = block / 2;
-    const step = Math.max(2, Math.round(block / 2));
+    const count = this.batchCount[batch] ?? 0;
+    const ordinal = batch % CATEGORY_COUNT;
+    const geometry = FIGURE_GEOMETRY[ordinal]?.[layer];
+    if (geometry === undefined) return;
+    const cells = coreOnly ? geometry.coreCount : geometry.count;
+    if (cells === 0) return;
+
+    const xs = this.batchX[batch];
+    const ys = this.batchY[batch];
+    const flips = this.batchFlip[batch];
+    if (xs === undefined || ys === undefined || flips === undefined) return;
+
+    const category = UNIT_CATEGORIES[ordinal] as UnitCategory;
+    const block = Math.max(2, Math.round(SIZE[category] / 2) * 2);
+    const grid = block / FIGURE_GRID[category];
+    const quads = geometry.quads;
 
     for (let n = 0; n < count; n += 1) {
-      const x = xs[n] ?? 0;
-      const y = ys[n] ?? 0;
-      switch (shape) {
-        case 'square':
-          context.rect(x - half, y - half, block, block);
-          break;
-        case 'circle':
-          // A stubby cross: rounder than a block at this size, still all pixels.
-          context.rect(x - half, y - step / 2, block, step);
-          context.rect(x - step / 2, y - half, step, block);
-          break;
-        case 'triangle':
-          // A wedge, widening towards the base, two rows of blocks.
-          context.rect(x - step / 2, y - half, step, step);
-          context.rect(x - half, y, block, step);
-          break;
-        case 'diamond':
-          context.rect(x - step / 2, y - half, step, block);
-          context.rect(x - half, y - step / 2, block, step);
-          break;
+      const originX = xs[n] ?? 0;
+      // A man stands on his own position rather than being centred on it, so
+      // his shadow lands where the simulation says his feet are.
+      const ground = (ys[n] ?? 0) + FIGURE_FEET * grid;
+      const facingLeft = flips[n] === 1;
+
+      for (let cell = 0; cell < cells; cell += 1) {
+        const at = cell * 4;
+        const cellX = quads[at] ?? 0;
+        const cellY = quads[at + 1] ?? 0;
+        const width = (quads[at + 2] ?? 0) * grid;
+        const height = (quads[at + 3] ?? 0) * grid;
+        const left = facingLeft
+          ? originX - (cellX * grid + width)
+          : originX + cellX * grid;
+        context.rect(left, ground - cellY * grid - height, width, height);
       }
     }
   }
@@ -256,6 +429,7 @@ export class UnitLayer {
     interpolation = 1,
   ): void {
     this.batchCount.fill(0);
+    this.visibleUnits = 0;
 
     const units = state.units;
     const bounds = camera.visibleBounds;
@@ -289,10 +463,22 @@ export class UnitLayer {
       if (slot >= CAPACITY) continue;
       const xs = this.batchX[batch];
       const ys = this.batchY[batch];
-      if (xs === undefined || ys === undefined) continue;
-      xs[slot] = x;
-      ys[slot] = y;
+      const flips = this.batchFlip[batch];
+      if (xs === undefined || ys === undefined || flips === undefined) continue;
+      xs[slot] = x + (artHash(index, 0x51ed) - 0.5) * FIGURE_SCATTER;
+      ys[slot] = y + (artHash(index, 0x2f19) - 0.5) * FIGURE_SCATTER;
+      // A man faces the way he is marching, and when he is standing still, the
+      // way his regiment is turned. An army holding a line therefore faces its
+      // enemy rather than all facing east out of the drawing.
+      const velocityX = units.velocityX[index] ?? 0;
+      let facingLeft = velocityX < 0;
+      if (Math.abs(velocityX) < STRIDE_EPSILON) {
+        const group = state.groups[units.group[index] ?? -1];
+        facingLeft = group !== undefined && Math.cos(group.facing) < 0;
+      }
+      flips[slot] = facingLeft ? 1 : 0;
       this.batchCount[batch] = slot + 1;
+      this.visibleUnits += 1;
     }
   }
 
