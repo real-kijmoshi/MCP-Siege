@@ -44,7 +44,7 @@ export async function registerWarCouncilTools(
       name: 'list_operations',
       title: 'List operations',
       description:
-        'Every operation the War Council can send an army to: the four authored ones and the ' +
+        'Every operation the War Council can send an army to: the authored ones and the ' +
         'designed operation currently on the table, each with its ground, its order of battle, ' +
         'the trick it turns on, and which regiment carries each king. Also lists the ' +
         'battlefields and the three enemy commanders. Start here. Read-only.',

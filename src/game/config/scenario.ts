@@ -30,14 +30,16 @@ import {
  * The authored operations.
  *
  * An operation is a map, a deployment on it, and a written enemy commander. All
- * four are fought by the same twenty-six regiments under the same ids, because one
- * stable order of battle is what lets a single WebMCP surface, a single roster
+ * of them are fought by the same twenty-six regiments under the same ids, because
+ * one stable order of battle is what lets a single WebMCP surface, a single roster
  * and a single enemy commander serve every battle — and it is what makes a
  * designed operation (`config/customBattle.ts`) indistinguishable from an
  * authored one at every layer above this file.
  *
  * Each operation exists to pose one problem the others do not:
  *
+ *   0.   First Command — the trade itself, and nothing else. One road, one
+ *        bridge, one regiment at a time, and a quiet minute to begin in.
  *   I.   Bridge of Knives — a trap. The centre is bait, and the whole
  *        operation turns on how long you can bear to leave it there.
  *   II.  The Ember Gate — two ways through a wall, both of them two-way. The
@@ -47,9 +49,9 @@ import {
  *   IV.  The Open Hand — no feature on the whole field. Two open ends, and two
  *        bodies of horse already going round them.
  *
- * Openings are quiet enough to command by hand, and every timeline deliberately
- * overloads a single human a few minutes in — which is the moment the Marshal
- * earns its place.
+ * Openings are quiet enough to command by hand, and every timeline after the
+ * teaching battle deliberately overloads a single human a few minutes in —
+ * which is the moment the Marshal earns its place.
  */
 
 export interface GroupSpec {
@@ -386,6 +388,83 @@ function redeploy(groups: readonly GroupSpec[], changes: GroupChanges): GroupSpe
   return groups.map((group) => ({ ...group, ...changes[group.id] }));
 }
 
+/* ----------------------------------------------- 0. First Command: the drill */
+
+/**
+ * River Vale again, and deliberately so.
+ *
+ * The teaching battle is fought on the ground the first real operation is
+ * fought on, because a commander who has learned this field once should
+ * recognise it when the trap is laid on it. Everything else about it is the
+ * opposite of Bridge of Knives: nothing is bait, nothing is hidden, and no
+ * decision is punished for being made a minute late.
+ *
+ * The Crown army stands in one body on the Central Field with the guns and the
+ * bows on Central Hill behind it, the horse out on either shoulder where a
+ * beginner can see them, and King Aldric a long way to the rear. There is no
+ * flank to hold and no second front: the Ashen come down the one road, over the
+ * one bridge, a regiment at a time, and the first of them does not step off
+ * until the second minute — which is the whole point. The opening is quiet
+ * enough to read the field, name a zone and give an order without anything
+ * being lost while you do it.
+ *
+ * The rest of the Ashen host is drawn up around its own base and stays there
+ * for the length of the timetable. It is not absent — a commander who marches
+ * north early meets all of it — but it is not sent, so a player who holds the
+ * near bank and then crosses fights the battle the timetable below describes,
+ * in the order it describes it.
+ */
+const TUTORIAL_PLAYER = redeploy(CROWN_ARMY, {
+  vanguard: { anchor: { x: 4600, y: 3900 }, formation: 'line', stance: 'defensive' },
+  hedge: { anchor: { x: 4000, y: 3150 }, formation: 'double_line', stance: 'hold_ground' },
+  ironbacks: { anchor: { x: 4700, y: 3250 }, formation: 'line', stance: 'hold_ground' },
+  longbows: { anchor: { x: 4300, y: 3450 }, formation: 'double_line', stance: 'defensive' },
+  arquebusiers: { anchor: { x: 3650, y: 3450 }, formation: 'double_line', stance: 'defensive' },
+  hammers: { anchor: { x: 4980, y: 3080 } },
+  culverins: { anchor: { x: 4650, y: 3650 } },
+  greyriders: { anchor: { x: 2600, y: 3450 } },
+  lancers: { anchor: { x: 6200, y: 3300 } },
+  outrunners: { anchor: { x: 5350, y: 3250 } },
+  fenmen: { anchor: { x: 3400, y: 3900 }, formation: 'block', stance: 'defensive' },
+  field_hospital: { anchor: { x: 4000, y: 4300 } },
+  kingsguard: { anchor: { x: 4000, y: 4650 }, formation: 'square', stance: 'hold_ground' },
+});
+
+const TUTORIAL_ENEMY = redeploy(ASHEN_ARMY, {
+  cinder_host: { anchor: { x: 4000, y: 1900 }, formation: 'line', stance: 'aggressive' },
+  blackforge: { anchor: { x: 4400, y: 1620 }, stance: 'hold_ground' },
+  thornspears: { anchor: { x: 3650, y: 1450 }, stance: 'hold_ground' },
+  emberbows: { anchor: { x: 4050, y: 1300 }, formation: 'double_line' },
+  ash_shot: { anchor: { x: 4450, y: 1250 } },
+  black_guns: { anchor: { x: 3800, y: 1050 } },
+  slagworks: { anchor: { x: 4450, y: 950 } },
+  ash_riders: { anchor: { x: 2500, y: 1500 }, stance: 'defensive' },
+  dusk_riders: { anchor: { x: 5700, y: 1550 }, stance: 'defensive' },
+  crow_scouts: { anchor: { x: 5100, y: 1750 } },
+  ashen_surgeons: { anchor: { x: 4400, y: 640 } },
+  ember_reserve: { anchor: { x: 3750, y: 820 } },
+  ashen_guard: { anchor: { x: 4000, y: 560 } },
+});
+
+const TUTORIAL_SCRIPT: readonly ScriptedAiOrder[] = [
+  // A minute of nothing but a scout, so the first orders are given in peace.
+  { atSeconds: 40, groupId: 'crow_scouts', order: 'scout', targetZone: 'enemy_outer_defense', formation: 'loose' },
+  // Then one regiment, on the one road, announced by a long approach march.
+  { atSeconds: 70, groupId: 'cinder_host', order: 'move', targetZone: 'enemy_outer_defense', formation: 'column' },
+  { atSeconds: 120, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column', stance: 'aggressive' },
+  { atSeconds: 185, groupId: 'cinder_host', order: 'attack_zone', targetZone: 'central_field', formation: 'line', stance: 'aggressive' },
+  // A second regiment once the first has been met, and not before.
+  { atSeconds: 250, groupId: 'blackforge', order: 'attack_zone', targetZone: 'central_bridge', formation: 'column', stance: 'aggressive' },
+  { atSeconds: 315, groupId: 'blackforge', order: 'attack_zone', targetZone: 'central_field', formation: 'line', stance: 'aggressive' },
+  // The bows come up to the bank, which is the lesson about standing in range.
+  { atSeconds: 380, groupId: 'emberbows', order: 'move', targetZone: 'enemy_outer_defense', formation: 'loose' },
+  // And one wing of horse tries the eastern bridge, which is the lesson about
+  // leaving a crossing unwatched. One wing only: the other never moves.
+  { atSeconds: 440, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'east_crossing', formation: 'wedge', stance: 'aggressive' },
+  { atSeconds: 505, groupId: 'dusk_riders', order: 'attack_zone', targetZone: 'east_field', formation: 'wedge' },
+  { atSeconds: 570, groupId: 'thornspears', order: 'defend_zone', targetZone: 'enemy_outer_defense', formation: 'double_line', stance: 'hold_ground' },
+];
+
 /* ------------------------------------------- I. Bridge of Knives: the trap */
 
 /**
@@ -627,6 +706,42 @@ const OPEN_HAND_SCRIPT: readonly ScriptedAiOrder[] = [
 /* ------------------------------------------------------------------ registry */
 
 export const SCENARIOS: Record<AuthoredScenarioId, ScenarioDefinition> = {
+  tutorial: {
+    id: 'tutorial',
+    mapId: 'river_vale',
+    numeral: '0',
+    name: 'First Command',
+    location: 'The Vale Water, upstream',
+    summary:
+      'Your first field, and a quiet one. The whole Crown army stands in one body on the ' +
+      'Central Field, the guns and the bows on the hill behind it, and King Aldric a long way ' +
+      'to the rear. The Ashen come down one road and over one bridge, a regiment at a time, and ' +
+      'the first of them does not move until the second minute. Nothing here is bait and nothing ' +
+      'is hidden: it is the trade, at the speed you can learn it.',
+    briefingLine: 'One road, one bridge, one regiment at a time. Take the minute you are given.',
+    twist: 'Their host is drawn up but not sent. Only what the timetable moves will come at you.',
+    objective: 'Hold the Central Field, then cross the bridge and take the Ashen King.',
+    pressure: 'Gentle',
+    duration: '6–12 min',
+    tags: ['Tutorial', 'One front', 'Forgiving'],
+    battleOrders: [
+      'Hold the Central Field — let them come to you',
+      'Put the bows and the guns on Central Hill',
+      'Cross the bridge and take the Ashen King',
+    ],
+    battleFacts: [
+      '~4,000 Ashen, most of them idle',
+      'One contested crossing',
+      'A quiet first minute',
+    ],
+    playerArmyName: 'Crownlands',
+    enemyArmyName: 'Ashen Host',
+    playerGroups: TUTORIAL_PLAYER,
+    enemyGroups: TUTORIAL_ENEMY,
+    kingSpecs: KING_SPECS,
+    aiScript: TUTORIAL_SCRIPT,
+    origin: 'authored',
+  },
   bridge_of_knives: {
     id: 'bridge_of_knives',
     mapId: 'river_vale',

@@ -8,11 +8,17 @@ import type { ScenarioDefinition } from './scenario';
  * be sprung at the right moment, an assault through one of two gaps with the
  * other one open behind you, a sovereign stranded on the wrong side of a tidal
  * channel, and a field with no feature on it at all, where both flanks are the
- * commander's own to hold. A fifth kind of battle exists — the one laid on the
+ * commander's own to hold. Another kind of battle exists — the one laid on the
  * War Council table, which a Marshal may rewrite through WebMCP — and that one
  * is `custom`.
+ *
+ * `tutorial` stands first because it is the battle that teaches the other four.
+ * It is an operation in every sense they are — one map, one deployment, one
+ * written commander — and it is listed first rather than treated as a mode,
+ * because a teaching battle that is not a real battle teaches the wrong thing.
  */
 export const AUTHORED_SCENARIO_IDS = [
+  'tutorial',
   'bridge_of_knives',
   'ember_gate',
   'salt_tide',
@@ -20,7 +26,7 @@ export const AUTHORED_SCENARIO_IDS = [
 ] as const;
 export type AuthoredScenarioId = (typeof AUTHORED_SCENARIO_IDS)[number];
 
-/** An operation is either one of the authored three, or a designed one. */
+/** An operation is either one of the authored ones, or a designed one. */
 export type ScenarioId = AuthoredScenarioId | 'custom';
 
 export const DIFFICULTY_IDS = ['levy', 'captain', 'warlord'] as const;

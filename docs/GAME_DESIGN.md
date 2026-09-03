@@ -123,12 +123,13 @@ Three things follow from it:
 
 ## Intentionally limited scope
 
-Four authored operations, one for each authored battlefield, plus the designed
-operation on the War Council table — whose ground is the commander's to choose.
-Three deterministic enemy command presets, one battle at a time. Maps are *written*, never generated: each one is
-hand-placed ground with hand-placed roads, and the four share one size, one fog
-grid and one camera. The authored operations are hand-written too — a
-deployment and a timetable each. The one thing that is not hand-written is the
+Four authored operations, one for each authored battlefield, plus a teaching
+battle laid on the first of those battlefields and the designed operation on the
+War Council table — whose ground is the commander's to choose. Three
+deterministic enemy command presets, one battle at a time. Maps are *written*,
+never generated: each one is hand-placed ground with hand-placed roads, and the
+four share one size, one fog grid and one camera. The authored operations are
+hand-written too — a deployment and a timetable each. The one thing that is not hand-written is the
 operation an external Marshal designs for itself, and even that is assembled
 from the same named ground by the same builder, then validated before anything
 is raised on it. Non-goals: multiplayer, accounts, persistence, campaigns, base
@@ -147,11 +148,26 @@ Reinforcements are a manpower counter and timed waves — enough to give the top
 bar something true to show and to supply the "reinforcements arrive" beat. They
 are not an economy and should not become one.
 
-## The four operations
+## The operations
 
 Four, not seven — one for each battlefield. Each exists to pose a problem the
 other three do not, and an operation that only changed where the regiments
-started was cut rather than kept.
+started was cut rather than kept. The teaching battle in front of them is the
+one exception, and it earns the exception by posing the problem of the trade
+itself.
+
+**0. First Command** (River Vale) is the drill, and it is a real operation
+rather than a mode: one map, one deployment, one written commander, the same
+twenty-six regiments and the same rules. Everything about it is the inverse of
+the battle it shares its ground with. The whole Crown army stands in one body on
+the Central Field with the guns and the bows on the hill behind it and the King
+far to the rear; nothing is bait, nothing is held back for a moment that has to
+be judged, and the first Ashen regiment does not step off until the second
+minute. They come down one road, over one bridge, one regiment at a time, and
+the rest of their host is drawn up but never sent — so a commander who holds the
+near bank and then crosses fights exactly the battle the briefing describes. It
+is deliberately fought on River Vale, so that the ground is already familiar
+when Bridge of Knives lays a trap on it.
 
 **I. Bridge of Knives** (River Vale) is a trap, and the deployment is the whole
 operation. The centre is a corps of bows and a wall of spears standing alone at
