@@ -37,6 +37,17 @@ or WebMCP behaviour changed; this is `UnitLayer` and `pixelart.ts` only.
   soldier's own velocity, and fall back to his regiment's facing when he is
   standing, so a line holding ground faces its enemy instead of all facing east
   out of the drawing.
+- **And he marches.** A moving soldier swaps his legs and rises on the step, on
+  a two-frame cycle — at this size a leg is two pixels, and anything smoother
+  than a swap would be a blur rather than a step. The phase comes off the tick
+  clock, never the frame clock, so the army halts mid-stride when the battle is
+  paused as every other moving thing on this map does; men standing in the line
+  do not step at all, so a halted formation is still rather than jogging on the
+  spot. Which foot a man leads with is hashed from his index rather than taken
+  from its parity, which would put every neighbour in a rank on the opposite
+  foot and leave the line zigzagging instead of marching. The gait is skipped
+  at command zoom, where the legs are not drawn and bobbing a two-pixel
+  silhouette would only make the mass shimmer. Wheeled engines do not step.
 - **Four rungs of detail, one set of drawings.** Cells are flagged as
   silhouette-carrying and packed first, so command zoom draws a prefix of the
   same art rather than a second set of drawings that could drift from it:
@@ -52,7 +63,9 @@ or WebMCP behaviour changed; this is `UnitLayer` and `pixelart.ts` only.
   than anything measured rather than a limit ordinary play reaches.
 - **Driven in a browser.** All ten troop types, an enemy army in contact and
   every level-of-detail rung were checked on the running game with no console
-  errors.
+  errors. The gait was proven by pausing a battle mid-march and re-rendering
+  the same frozen state four ticks apart: with every position identical, the
+  frames still differ, which is the animation and nothing else.
 
 # The War Council
 
