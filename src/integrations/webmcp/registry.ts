@@ -168,6 +168,71 @@ export async function registerWebMcpTools(
     },
 
     {
+      name: 'get_doctrine',
+      title: 'Get doctrine',
+      description:
+        'The rulebook, as numbers: every arm with what it beats and what beats it, every formation ' +
+        'with what it actually multiplies, the stances, the ground, and the mechanics that decide ' +
+        'battles here — flanks and encirclement, the charge, pursuit, crossings, the press, ' +
+        'exhaustion, the line of fire and morale. Read this once before you give your first order. ' +
+        'It is the difference between commanding this battlefield and commanding a remembered one: ' +
+        'the counters are specific, spears beat horse at 2.4x, shot goes through armour that turns ' +
+        'arrows, and a blow in the rear is worth half again as much as one to the front. Optionally ' +
+        'pass sections to re-read one part. Read-only, and the same for both sides.',
+      inputSchema: schemas.DOCTRINE_SCHEMA,
+      annotations: { readOnlyHint: true },
+      execute: (input) => handlers.getDoctrine(input),
+    },
+    {
+      name: 'assess_engagement',
+      title: 'Assess an engagement',
+      description:
+        'Price a fight before you order it. Give your groups and either a known enemy group or a ' +
+        'zone, and this runs the same counter table, formation, stance, ground, press and ' +
+        'exhaustion terms the simulation runs, and reports the arithmetic: what each of your ' +
+        'regiments delivers, what is costing it, how long each side takes to break, a verdict, the ' +
+        'matchups that decide it, and what would change the answer. Bound by fog: enemy strength ' +
+        'is the rounded estimate from intelligence, their arms are only those that have been seen, ' +
+        'and their formation, stance and morale are stated as unknown rather than assumed. Use it ' +
+        'before committing anything you would not like to lose. Read-only.',
+      inputSchema: schemas.ASSESS_ENGAGEMENT_SCHEMA,
+      annotations: { readOnlyHint: true },
+      execute: (input) => handlers.assessEngagement(input),
+    },
+    {
+      name: 'estimate_march',
+      title: 'Estimate a march',
+      description:
+        'How long regiments take to reach a named zone, along the route they would actually take, ' +
+        'priced over the ground they cross. Horse, foot and guns do not arrive together — a ' +
+        'battery moves at a sixth of the pace of cavalry and loses two thirds of that in a wood — ' +
+        'so this is what makes a timed plan possible instead of a sequence with no clock in it. ' +
+        'Reports the distance, the time, the named ground on the way, whether the route threads a ' +
+        'crossing, whether the group is pinned and cannot leave, and how far apart they will ' +
+        'arrive. Omit groupIds to time the whole army. Read-only.',
+      inputSchema: schemas.ESTIMATE_MARCH_SCHEMA,
+      annotations: { readOnlyHint: true },
+      execute: (input) => handlers.estimateMarch(input),
+    },
+    {
+      name: 'watch_battle',
+      title: 'Wait for something to happen',
+      description:
+        'Wait on the battle instead of polling it. Name up to four things to watch for — a ' +
+        'regiment\'s morale falling, a force reaching a zone, ground being lost, enemy horse ' +
+        'appearing, your king coming under threat, or simply a stretch of time — and this returns ' +
+        'the moment any one of them holds, or when the battle time you budgeted runs out. It comes ' +
+        'back with what changed while you waited: men lost, morale moved, regiments broken, ' +
+        'surrounded, pinned or masked, ground that changed hands, forces newly sighted or lost ' +
+        'from sight, and every alert raised. Give an order, then wait on the thing that would ' +
+        'change your mind. Time is battle time, so pausing the game pauses the wait rather than ' +
+        'expiring it. Read-only.',
+      inputSchema: schemas.WATCH_BATTLE_SCHEMA,
+      annotations: { readOnlyHint: true },
+      execute: (input) => handlers.watchBattle(input),
+    },
+
+    {
       name: 'order_group',
       title: 'Order groups',
       description:

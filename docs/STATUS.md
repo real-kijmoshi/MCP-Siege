@@ -7,6 +7,59 @@ for each battlefield — and an external Marshal can now design an operation of
 its own, on ground of its own choosing, and fight it. No simulation rule
 changed: combat, morale, fog, the objective and the command queue are untouched.
 
+# The Marshal's Own Instruments
+
+The tool surface could describe the battle and change it, and could not help an
+agent *judge* it. Four tools have been added — twenty-two to twenty-six — and no
+simulation rule changed: combat, morale, fog, the objective and the command queue
+are untouched, and the one engine change is a read-only tick subscription.
+
+- **`get_doctrine`: the rulebook, as numbers.** Every arm with what it beats and
+  what beats it, every formation with what it actually multiplies, the stances,
+  the ground, and ten mechanics with their real thresholds — flanks and
+  encirclement, the charge, pursuit, crossings, the press, exhaustion, the line
+  of fire, morale, pinning. Every figure is read out of `config/battle.ts`
+  rather than restated, and a test walks the whole counter matrix to prove the
+  manual cannot drift from the tuning. It takes no state and answers the same
+  for both sides: this is documentation, not intelligence.
+- **`assess_engagement`: the fight, priced before it is ordered.** The same
+  counter table, formation, stance, ground, press and exhaustion terms the
+  simulation runs, over what the commanding side actually knows, reported as
+  arithmetic rather than a verdict alone: what each regiment delivers, what is
+  costing it, seconds to break either way, the matchups that decide it, and what
+  would change the answer.
+- **Only the men on the front fight, and that is the whole tool.** The first
+  model summed whole regiments and called eight hundred foot against three
+  hundred and twenty-five armoured men *decisive*; the simulation destroys the
+  eight hundred. Contact grows with the square root of a body's strength and is
+  bounded by the smaller of the two, and a longer weapon puts more ranks into
+  it — fitted against duels run in the simulation itself. Eleven matchups are
+  now projected and then actually fought in a test: every verdict comes out on
+  the side the battle does, and an even melee is projected within a factor of
+  two of the casualties it produces.
+- **`estimate_march`: a plan with a clock in it.** Distance and time along the
+  route the group would actually take, sampled every forty paces so a wood is
+  priced where it lies rather than assumed to be the ground the regiment is
+  standing on. It names the ground on the way, flags a route that threads a
+  crossing, reports a regiment pinned and unable to leave, adds the seconds a
+  battery must stand still before it can fire, and says how far apart the army
+  will arrive.
+- **`watch_battle`: waiting instead of polling.** The trigger vocabulary could
+  fire an order and never a report, so an agent had to guess how long to sleep
+  before reading again. The same closed vocabulary now ends a wait, and the call
+  returns with what changed while it waited: men lost, morale moved, regiments
+  broken, surrounded, pinned or masked, ground that changed hands, forces newly
+  sighted or lost from sight, and every alert raised. Time is counted in ticks,
+  so pausing the game pauses the wait; a game that has genuinely stopped is
+  reported as paused rather than left to hang.
+- **The boundary is unchanged.** The digest is a difference between two
+  projections that have already been through the fog, so it can never report a
+  change on something unseen; the assessment prices the enemy from contacts, not
+  from the truth, and refuses ground where nothing has been seen with "this is
+  an absence of intelligence, not an absence of troops"; conditions are the same
+  fog-safe predicate the conditional orders fire on. No coordinate and no
+  soldier crosses.
+
 # Pixel-Art Soldiers
 
 Every man on the battlefield was a flat single-colour block — a square, circle,
@@ -766,8 +819,15 @@ decision into no decision at all.
   something, and the new terms are strong enough that the enemy AI may need to
   learn to answer them.
 - Run one complete model-driven WebMCP session end to end. The tool surface is
-  covered in node and Chrome reports all 21 tools registered, but no external
-  model has fought a whole battle through it yet.
+  covered in node and Chrome reports the whole tool set registered, but no
+  external model has fought a whole battle through it yet. The four judging
+  tools especially want a live reading: whether a Marshal actually calls
+  `get_doctrine` before its first order, and whether `watch_battle` changes how
+  it paces itself, cannot be learned from tests.
+- Give the assessment a reading for a fight that is *not* frontal. It states
+  plainly that it excludes the charge, the flank and encirclement, and those are
+  the three things worth more than anything in the sum — so the one question it
+  cannot yet answer is the one a good commander most wants answered.
 - A player who issues no orders at all still does not reach a decision inside
   thirty minutes: he holds his line, the enemy bleeds down to about half, and
   nothing closes it out. That is a defensible reading of "you are a spectator if

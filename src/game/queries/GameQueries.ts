@@ -10,7 +10,7 @@ import {
   UNIT_STATS,
 } from '../config/battle';
 import { DIFFICULTIES } from '../config/matches';
-import { describeCondition } from '../simulation/Conditions';
+import { describeCondition, evaluateCondition } from '../simulation/Conditions';
 import { activeGroups, findGroup, type GameState } from '../simulation/GameState';
 import { ZONES, activeZones, useBattleMap, zoneAt } from '../simulation/Zones';
 import { visibilityAt } from '../simulation/Visibility';
@@ -23,11 +23,16 @@ import {
   type BattleAlert,
   type Front,
   type MoraleState,
+  type PlanCondition,
   type PlanStep,
   type PlayerId,
   type UnitCategory,
   type ZoneId,
 } from '../types/domain';
+import { assessEngagement, type EngagementAssessment, type EngagementInput } from './Assessment';
+import { describeChanges, type BattleSnapshot, type ChangeDigest } from './Changes';
+import { getDoctrine, type Doctrine } from './Doctrine';
+import { estimateMarch, type MarchReport } from './March';
 
 /**
  * Visibility-safe projections.
@@ -753,12 +758,16 @@ export class GameQueries {
     const nextActions =
       visibleContacts.length === 0
         ? [
+            'Call get_doctrine once if you have not: the counters, the ground and the mechanics are specific to this battlefield.',
             'Call get_armies for commandable group ids.',
             'Call get_strategic_zones, then order scouts toward decisive ground.',
+            'Call watch_battle on enemy_enters_zone rather than reading again in a moment.',
           ]
         : [
+            'Call assess_engagement before committing anything to a fight.',
+            'Call estimate_march before timing anything: horse, foot and guns do not arrive together.',
             'Call get_front_status to compare committed strength by front.',
-            'Call get_armies before issuing or revising orders.',
+            'Order, then call watch_battle on what would change your mind.',
           ];
 
     return {
@@ -869,6 +878,79 @@ export class GameQueries {
   public getPlanForOverlay(playerId: PlayerId) {
     void playerId;
     return this.currentPlan(this.state());
+  }
+
+  /* ---------------------------------------------------- the Marshal's own */
+
+  /**
+   * The rulebook. It reads no state and is the same for both sides, which is
+   * exactly why it is safe: this is the manual, not intelligence.
+   */
+  public getDoctrine(): Doctrine {
+    return getDoctrine();
+  }
+
+  /**
+   * Prices a fight before it is ordered, over what this side actually knows.
+   * The enemy half of the sum comes from contacts, so it is as coarse as the
+   * intelligence behind it and says so.
+   */
+  public assessEngagement(playerId: PlayerId, input: EngagementInput): EngagementAssessment {
+    return assessEngagement(this.state(), playerId, input);
+  }
+
+  /** How long a march takes, over the ground the group would actually cross. */
+  public estimateMarch(
+    playerId: PlayerId,
+    groupIds: readonly string[],
+    targetZone: ZoneId,
+  ): MarchReport {
+    return estimateMarch(this.state(), playerId, groupIds, targetZone);
+  }
+
+  /* ------------------------------------------------------------ watching */
+
+  /**
+   * A point of comparison for `changesSince`.
+   *
+   * Everything in it has already been through the fog, so a difference taken
+   * against it can never reveal something that was never visible.
+   */
+  public snapshot(playerId: PlayerId): BattleSnapshot {
+    const state = this.state();
+    return {
+      tick: state.currentTick,
+      armies: this.getArmies(playerId),
+      zones: this.getStrategicZones(playerId),
+      contacts: this.getIntelligence(playerId),
+      alerts: [...state.alerts],
+      objective: this.summariseObjective(this.getObjective(playerId)),
+    };
+  }
+
+  public changesSince(playerId: PlayerId, before: BattleSnapshot): ChangeDigest {
+    return describeChanges(before, this.snapshot(playerId));
+  }
+
+  /**
+   * Whether a trigger from the standing-order vocabulary holds right now.
+   *
+   * The same predicate the conditional orders fire on, so a Marshal that waits
+   * on a condition and a Marshal that arms an order on it are talking about the
+   * same event. Evaluated against this side's own intelligence, so a wait can
+   * never resolve on something the side cannot see.
+   */
+  public conditionHolds(playerId: PlayerId, condition: PlanCondition, armedAtTick: number): boolean {
+    return evaluateCondition(this.state(), playerId, condition, armedAtTick);
+  }
+
+  /** The current tick, for a caller measuring a wait in battle time. */
+  public currentTick(): number {
+    return this.state().currentTick;
+  }
+
+  public battleOutcome(): BattleOutcome {
+    return this.state().objective.outcome;
   }
 
   /* --------------------------------------------------------------- misc */

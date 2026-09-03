@@ -58,8 +58,12 @@ describe('registration', () => {
     expect(registered).toContain('set_conditional_order');
     expect(registered).toContain('deploy_custom_formation');
     expect(registered).toContain('get_objective');
+    expect(registered).toContain('get_doctrine');
+    expect(registered).toContain('assess_engagement');
+    expect(registered).toContain('estimate_march');
+    expect(registered).toContain('watch_battle');
     expect(new Set(registered).size).toBe(registered.length);
-    expect(registered.length).toBe(22);
+    expect(registered.length).toBe(26);
   });
 
   it('reports unavailability rather than throwing when the API is absent', async () => {

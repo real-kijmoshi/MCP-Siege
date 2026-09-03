@@ -52,6 +52,16 @@ import { enemyAiCommands } from './EnemyAi';
 export type CommandResultListener = (command: GameCommand, result: CommandResult) => void;
 
 /**
+ * Notified after every completed tick.
+ *
+ * Read-only, and outside the simulation rather than part of it: listeners run
+ * after every system has advanced, and nothing they do may write state. It
+ * exists so an external Marshal can wait on the battle instead of polling it,
+ * and so that waiting is driven by battle time rather than the wall clock.
+ */
+export type TickListener = (state: GameState) => void;
+
+/**
  * The simulation.
  *
  * It owns the only mutable game state in the application. Human input, the
@@ -63,6 +73,7 @@ export class SimulationEngine {
   private readonly state: GameState;
   private readonly queue = new CommandQueue();
   private readonly resultListeners = new Set<CommandResultListener>();
+  private readonly tickListeners = new Set<TickListener>();
   private readonly results = new Map<string, CommandResult>();
 
   public constructor(options?: number | Partial<SimulationOptions>) {
@@ -101,7 +112,11 @@ export class SimulationEngine {
     // still animate and report, but nothing manoeuvres and no order is
     // accepted; anything already queued is failed rather than left pending, so
     // a Marshal call cannot hang waiting on a result that will never come.
-    if (this.state.objective.outcome !== 'ongoing') return this.rejectQueuedCommands();
+    if (this.state.objective.outcome !== 'ongoing') {
+      const rejected = this.rejectQueuedCommands();
+      this.announceTick();
+      return rejected;
+    }
 
     // The enemy and any conditional that just came true submit ordinary
     // commands, which land alongside the player's in the same ordered queue.
@@ -124,6 +139,7 @@ export class SimulationEngine {
     advanceAlerts(this.state);
     this.pruneCombatEvents();
 
+    this.announceTick();
     return tickResults;
   }
 
@@ -172,6 +188,17 @@ export class SimulationEngine {
   public onCommandResult(listener: CommandResultListener): () => void {
     this.resultListeners.add(listener);
     return () => this.resultListeners.delete(listener);
+  }
+
+  /** Subscribes to completed ticks. The listener must only read. */
+  public onTick(listener: TickListener): () => void {
+    this.tickListeners.add(listener);
+    return () => this.tickListeners.delete(listener);
+  }
+
+  private announceTick(): void {
+    // A copy, so a listener that unsubscribes itself cannot disturb the walk.
+    for (const listener of [...this.tickListeners]) listener(this.state);
   }
 
   public get pendingCommandCount(): number {

@@ -96,13 +96,16 @@ morale bars, which is the view you actually want when three fronts are moving.
 
 ## What the Marshal can do
 
-Twenty-two tools. Reads are fog-limited; every write goes through the same
+Twenty-six tools. Reads are fog-limited; every write goes through the same
 `CommandQueue` as your own clicks.
 
 **Read** — `get_battle_overview`, `get_objective`, `get_armies`,
 `get_army_details`, `get_visible_enemies`, `get_intelligence`,
 `get_front_status`, `get_alerts`, `get_strategic_zones`, `get_active_orders`,
 `get_plan`
+
+**Judge** — `get_doctrine`, `assess_engagement`, `estimate_march`,
+`watch_battle`
 
 **Command** — `order_group`, `deploy_custom_formation`, `reorganize_armies`,
 `set_conditional_order`, `cancel_conditional_order`, `focus_siege`,
@@ -122,6 +125,38 @@ around a zone, with a different formation, stance, and behavior for each. The
 game derives passable destinations from those semantic slots. `reorganize_armies`
 can also detach a troop category — for example the archers or surgeons from a
 mixed reserve — into a new regiment. Soldier pool indices remain private.
+
+### The Marshal's own instruments
+
+Four of those tools exist so an agent commands *this* battlefield rather than a
+remembered one.
+
+`get_doctrine` is the rulebook as numbers, read straight out of the game's own
+tuning so it cannot drift from it: every arm with what it beats and what beats
+it, what each formation actually multiplies, and the mechanics that decide
+battles here — flanks and encirclement, the charge, pursuit, crossings, the
+press, exhaustion, the line of fire, morale. Without it an agent plays on folk
+memory of other games, puts horse into spears, and has no way to find out it was
+wrong.
+
+`assess_engagement` prices a fight before it is ordered. Give it your regiments
+and an enemy you have seen, and it runs the same counter table, formation,
+stance, ground and exhaustion terms the simulation runs, and hands back the
+arithmetic: what each regiment delivers, what is costing it, how long each side
+takes to break, the matchups that decide it, and what would change the answer. It
+counts only the men on the front, which is why it will tell you that eight
+hundred foot lose to three hundred and twenty-five armoured men — and the
+simulation agrees, in a test that fights both.
+
+`estimate_march` times a march along the route the regiment would actually take,
+priced over the ground it crosses. Horse, foot and guns do not arrive together;
+this is what turns a sequence of orders into a plan with a clock in it.
+
+`watch_battle` waits. Name up to four things — a regiment's morale falling, a
+force reaching a zone, ground lost, your king threatened — and the call returns
+the moment one of them holds, with a digest of everything that changed while it
+waited. An agent that would otherwise guess how long to sleep before reading
+again can now give an order and wait on the thing that would change its mind.
 
 ### Plan Mode
 

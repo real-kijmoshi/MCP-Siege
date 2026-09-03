@@ -6,10 +6,12 @@ import {
   FATIGUE,
   FIRE,
   FORMATION_PROFILES,
+  HIGH_GROUND_FIRE,
   REACQUISITION_STRIDE,
   STANCE_PROFILES,
   UNIT_STATS,
   counterMultiplier,
+  terrainDefenceModifier,
   type UnitStats,
 } from '../config/battle';
 import { FACTION_ENEMY, FACTION_PLAYER, type ArmyGroup, type CombatEvent } from '../types/domain';
@@ -327,16 +329,16 @@ function computeDamage(
   }
 
   const defenderTerrain = terrainAt(units.x[defender] ?? 0, units.y[defender] ?? 0);
-  if (defenderTerrain === 'village') damage *= 0.78;
-  else if (defenderTerrain === 'hill') damage *= 0.82;
-  else if (defenderTerrain === 'forest') {
-    damage *= stats.range >= 100 ? 0.7 : attackerCategory === 'cavalry' ? 0.72 : 0.86;
-  }
+  damage *= terrainDefenceModifier(
+    defenderTerrain,
+    stats.range >= 100,
+    attackerCategory === 'cavalry',
+  );
   if (
     stats.range >= 100 &&
     terrainAt(units.x[attacker] ?? 0, units.y[attacker] ?? 0) === 'hill'
   ) {
-    damage *= 1.12;
+    damage *= HIGH_GROUND_FIRE;
   }
 
   damage *= 0.9 + nextRandom(state.random) * 0.2;

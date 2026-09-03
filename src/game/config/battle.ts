@@ -873,6 +873,45 @@ export const PHYSICS = {
   groupPersonalSpace: 150,
 } as const;
 
+/**
+ * What standing on a piece of ground is worth to the man being attacked on it.
+ *
+ * These were three numbers buried in the damage function, and then the same
+ * three numbers written out again wherever the ground had to be explained — in
+ * the manual the Marshal reads and in the sum that prices a fight before it is
+ * ordered. Three copies of a balance figure is two too many: the whole promise
+ * of publishing the rules is that they are the rules the simulation runs.
+ *
+ * Woods are the one ground that treats its attackers differently: a shaft
+ * disappears into the canopy, a horse cannot get up to pace between the trunks,
+ * and a man with a sword barely notices.
+ */
+export const TERRAIN_DEFENCE = {
+  village: { melee: 0.78, missile: 0.78, cavalry: 0.78 },
+  hill: { melee: 0.82, missile: 0.82, cavalry: 0.82 },
+  forest: { melee: 0.86, missile: 0.7, cavalry: 0.72 },
+} as const;
+
+/**
+ * What a missile arm gains by shooting from a hill onto lower ground.
+ *
+ * Small beside `FIRE.elevationRelief`, which is the real reason to take the
+ * crest: the twelve percent is the shot, the relief is being able to take it
+ * at all.
+ */
+export const HIGH_GROUND_FIRE = 1.12;
+
+/** Damage a defender on this ground takes, where 1 is the open field. */
+export function terrainDefenceModifier(
+  terrain: string,
+  missile: boolean,
+  cavalry = false,
+): number {
+  const cover = TERRAIN_DEFENCE[terrain as keyof typeof TERRAIN_DEFENCE];
+  if (cover === undefined) return 1;
+  return missile ? cover.missile : cavalry ? cover.cavalry : cover.melee;
+}
+
 /** March pace on ground that disrupts ranks, by broad troop role. */
 export function terrainSpeedModifier(category: UnitCategory, terrain: string): number {
   // Guns fare worse off level ground than anything else on the field. A battery

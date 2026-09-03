@@ -121,6 +121,33 @@ Three things follow from it:
   *ground*: the valley itself is always drawn, because a plan has to be drawn on
   something.
 
+## What the Marshal is given
+
+The Marshal shares the commander's surface, not a privileged one: it reads
+through the same fog and writes through the same queue. What it does get, which
+a human gets from the screen, is a way to *judge*.
+
+- **The rules, as numbers.** The counter table, the formation profiles, the
+  stances, the ground and the mechanics are published as data read out of the
+  game's own tuning. An agent that has to infer the rules from prose plays a
+  remembered game instead of this one; one that can read them plays this one.
+  The manual is not intelligence — it is the same for both sides and says
+  nothing about the battle.
+- **An engagement priced before it is ordered.** The depth of the combat model
+  is worth nothing if it is invisible from outside. The assessment runs the real
+  multipliers over what the commanding side actually knows, counts only the men
+  who would be on the front, and states what it is leaving out — the charge, the
+  flank, the enemy's own formation and morale — rather than pretending to it.
+- **A clock.** Marches are timed over the ground they cross, because the whole
+  point of three arms at three paces is that they do not arrive together.
+- **A way to wait.** Triggers already existed, but they could only fire an
+  order. The same closed vocabulary now fires a *report*, so an agent can give
+  an order and wait on the thing that would change its mind instead of guessing
+  how long to sleep.
+
+None of these lets the Marshal see anything the fog hides, address a soldier, or
+name a coordinate.
+
 ## Intentionally limited scope
 
 Four authored operations, one for each authored battlefield, plus the designed

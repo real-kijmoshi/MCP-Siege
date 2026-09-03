@@ -431,6 +431,100 @@ export function createToolSchemas(zoneIds: readonly ZoneId[] = ZONE_IDS) {
     additionalProperties: false,
   } as const;
 
+  /**
+   * The trigger vocabulary again, minus the two kinds that mean nothing to a
+   * wait. `immediate` would return before the battle had moved, and
+   * `after_step` belongs to a plan rather than to the clock.
+   */
+  const WATCH_CONDITION_SCHEMA = {
+    type: 'object',
+    description: 'Something to wait for, from the same closed vocabulary standing orders use.',
+    oneOf: CONDITION_SCHEMA.oneOf.filter(
+      (branch) => branch.properties.kind.const !== 'immediate' && branch.properties.kind.const !== 'after_step',
+    ),
+  } as const;
+
+  const WATCH_BATTLE_SCHEMA = {
+    type: 'object',
+    properties: {
+      conditions: {
+        type: 'array',
+        items: WATCH_CONDITION_SCHEMA,
+        minItems: 1,
+        maxItems: 4,
+        description:
+          'Wait until any one of these holds. Name the thing that would change your mind, not the ' +
+          'thing you expect.',
+      },
+      timeoutSeconds: {
+        type: 'number',
+        minimum: 2,
+        maximum: 180,
+        description:
+          'Battle seconds to wait before giving up. Pausing the game pauses this rather than ' +
+          'expiring it.',
+      },
+    },
+    required: ['conditions', 'timeoutSeconds'],
+    additionalProperties: false,
+  } as const;
+
+  const ASSESS_ENGAGEMENT_SCHEMA = {
+    type: 'object',
+    oneOf: [
+      {
+        type: 'object',
+        properties: {
+          groupIds: { ...groupIdsSchema, maxItems: 8 },
+          targetGroupId: {
+            ...groupIdSchema,
+            description: 'A known enemy id from get_intelligence.',
+          },
+        },
+        required: ['groupIds', 'targetGroupId'],
+        additionalProperties: false,
+      },
+      {
+        type: 'object',
+        properties: {
+          groupIds: { ...groupIdsSchema, maxItems: 8 },
+          targetZone: zoneSchema,
+        },
+        required: ['groupIds', 'targetZone'],
+        additionalProperties: false,
+      },
+    ],
+  } as const;
+
+  const ESTIMATE_MARCH_SCHEMA = {
+    type: 'object',
+    properties: {
+      groupIds: {
+        ...groupIdsSchema,
+        minItems: 0,
+        description: 'Groups to time. Omit for every regiment under your command.',
+      },
+      targetZone: zoneSchema,
+    },
+    required: ['targetZone'],
+    additionalProperties: false,
+  } as const;
+
+  const DOCTRINE_SCHEMA = {
+    type: 'object',
+    properties: {
+      sections: {
+        type: 'array',
+        items: { type: 'string', enum: ['arms', 'formations', 'stances', 'terrain', 'mechanics', 'playbook'] },
+        minItems: 1,
+        maxItems: 6,
+        uniqueItems: true,
+        description: 'Return only these parts. Omit for the whole manual.',
+      },
+    },
+    additionalProperties: false,
+  } as const;
+
   const PLAN_ID_SCHEMA = {
     type: 'object',
     properties: { planId: { type: 'string', minLength: 1, description: 'Id from get_plan.' } },
@@ -440,17 +534,21 @@ export function createToolSchemas(zoneIds: readonly ZoneId[] = ZONE_IDS) {
 
   return {
     ARMY_DETAILS_SCHEMA,
+    ASSESS_ENGAGEMENT_SCHEMA,
     CANCEL_CONDITIONAL_SCHEMA,
     CONDITION_SCHEMA,
     CREATE_PLAN_SCHEMA,
     DEPLOY_FORMATION_SCHEMA,
     DIRECT_REINFORCEMENTS_SCHEMA,
+    DOCTRINE_SCHEMA,
+    ESTIMATE_MARCH_SCHEMA,
     FOCUS_SIEGE_SCHEMA,
     MODIFY_PLAN_SCHEMA,
     ORDER_GROUP_SCHEMA,
     PLAN_ID_SCHEMA,
     REORGANIZE_SCHEMA,
     SET_CONDITIONAL_SCHEMA,
+    WATCH_BATTLE_SCHEMA,
   };
 }
 

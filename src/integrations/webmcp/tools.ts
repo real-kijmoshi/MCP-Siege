@@ -2,6 +2,15 @@ import { TICKS_PER_SECOND } from '../../game/config/battle';
 import type { SimulationEngine } from '../../game/simulation/Engine';
 import { activeZoneIds, useBattleMap } from '../../game/simulation/Zones';
 import { GameQueries, QueryError } from '../../game/queries/GameQueries';
+import { AssessmentError, type EngagementInput } from '../../game/queries/Assessment';
+import { MarchError } from '../../game/queries/March';
+import type { Doctrine } from '../../game/queries/Doctrine';
+import {
+  createBattleWatch,
+  MAXIMUM_WATCH_CONDITIONS,
+  MAXIMUM_WATCH_SECONDS,
+  MINIMUM_WATCH_SECONDS,
+} from './watch';
 import type {
   CommandResult,
   FormationAssignment,
@@ -66,6 +75,11 @@ export interface WebMcpToolHandlers {
   getActiveOrders: () => ToolResult<unknown>;
   getPlan: () => ToolResult<unknown>;
   getObjective: () => ToolResult<unknown>;
+  getDoctrine: (input: unknown) => ToolResult<unknown>;
+  assessEngagement: (input: unknown) => ToolResult<unknown>;
+  estimateMarch: (input: unknown) => ToolResult<unknown>;
+
+  watchBattle: (input: unknown) => Promise<ToolResult<unknown>>;
 
   orderGroup: (input: unknown) => Promise<ToolResult<unknown>>;
   reorganizeArmies: (input: unknown) => Promise<ToolResult<unknown>>;
@@ -92,7 +106,16 @@ function readSafely<T>(read: () => T): ToolResult<T> {
   try {
     return toolSuccess(read());
   } catch (error) {
+    // Every refusal carries its own reason and, where there is one, the move
+    // that would make the call succeed. A Marshal that is told only "failed"
+    // guesses again; one that is told "scout it first" scouts.
     if (error instanceof QueryError) return toolFailure(error.code, error.message);
+    if (error instanceof AssessmentError || error instanceof MarchError) {
+      return toolFailure(error.code, error.message, error.suggestions);
+    }
+    if (error instanceof InputError) {
+      return toolFailure('INVALID_INPUT', error.message, error.suggestions);
+    }
     return toolFailure('QUERY_FAILED', error instanceof Error ? error.message : 'Query failed.');
   }
 }
@@ -193,6 +216,7 @@ function parseStep(raw: unknown): Omit<PlanStep, 'id' | 'index'> {
 
 export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandlers {
   const { engine, queries } = context;
+  const watch = createBattleWatch(engine, queries, PLAYER);
 
   /** Dispatches a command and resolves with the simulation's own verdict. */
   const submit = async (payload: GameCommandPayload): Promise<ToolResult<unknown>> => {
@@ -299,6 +323,123 @@ export function createWebMcpToolHandlers(context: ToolContext): WebMcpToolHandle
       }),
 
     getObjective: () => readSafely(() => queries.getObjective(PLAYER)),
+
+    /* ------------------------------------------- the Marshal's instruments */
+
+    getDoctrine: (raw) =>
+      readSafely(() => {
+        const input = asObject(raw ?? {});
+        rejectUnknown(input, ['sections']);
+        const doctrine = queries.getDoctrine();
+        if (input.sections === undefined) return doctrine;
+
+        const sections = requireStringArray(input, 'sections', 1, 6);
+        const allowed: Array<keyof Doctrine> = [
+          'arms',
+          'formations',
+          'stances',
+          'terrain',
+          'mechanics',
+          'playbook',
+        ];
+        const filtered: Partial<Doctrine> & { note: string } = { note: doctrine.note };
+        for (const section of sections) {
+          if (!(allowed as string[]).includes(section)) {
+            throw new InputError(`"${section}" is not part of the manual.`, [
+              `Sections: ${allowed.join(', ')}.`,
+            ]);
+          }
+          Object.assign(filtered, { [section]: doctrine[section as keyof Doctrine] });
+        }
+        return filtered;
+      }),
+
+    assessEngagement: (raw) =>
+      readSafely(() => {
+        useBattleMap(engine.getState().mapId);
+        const input = asObject(raw);
+        rejectUnknown(input, ['groupIds', 'targetGroupId', 'targetZone']);
+        const targetGroupId = optionalString(input, 'targetGroupId', 64);
+        const targetZone = optionalEnum<ZoneId>(input, 'targetZone', activeZoneIds());
+        if ((targetGroupId === undefined) === (targetZone === undefined)) {
+          throw new InputError('Give exactly one of targetGroupId or targetZone.', [
+            'Call get_intelligence for enemy ids, or get_strategic_zones for ground.',
+          ]);
+        }
+        const request: EngagementInput = {
+          groupIds: requireStringArray(input, 'groupIds', 1, 8),
+          ...(targetGroupId !== undefined ? { targetGroupId } : {}),
+          ...(targetZone !== undefined ? { targetZone } : {}),
+        };
+        return queries.assessEngagement(PLAYER, request);
+      }),
+
+    estimateMarch: (raw) =>
+      readSafely(() => {
+        useBattleMap(engine.getState().mapId);
+        const input = asObject(raw);
+        rejectUnknown(input, ['groupIds', 'targetZone']);
+        const targetZone = requireEnum<ZoneId>(input, 'targetZone', activeZoneIds());
+        const groupIds =
+          input.groupIds === undefined ? [] : requireStringArray(input, 'groupIds', 0, 12);
+        return queries.estimateMarch(PLAYER, groupIds, targetZone);
+      }),
+
+    /**
+     * The one read that takes time.
+     *
+     * It resolves the moment something the caller named happens rather than on
+     * a guess about how long to sleep, so an agent stops burning its turns on
+     * pictures that have not changed.
+     */
+    watchBattle: async (raw) => {
+      try {
+        useBattleMap(engine.getState().mapId);
+        const input = asObject(raw);
+        rejectUnknown(input, ['conditions', 'timeoutSeconds']);
+
+        const rawConditions = input.conditions;
+        if (
+          !Array.isArray(rawConditions) ||
+          rawConditions.length < 1 ||
+          rawConditions.length > MAXIMUM_WATCH_CONDITIONS
+        ) {
+          throw new InputError(
+            `"conditions" must contain between 1 and ${MAXIMUM_WATCH_CONDITIONS} triggers.`,
+          );
+        }
+
+        const conditions = rawConditions.map((entry) => {
+          const condition = parseCondition(entry);
+          if (condition.kind === 'immediate' || condition.kind === 'after_step') {
+            throw new InputError(`"${condition.kind}" is not something to wait for.`, [
+              'Wait on morale_below, strength_below, enemy_enters_zone, friendly_zone_lost, ' +
+                'enemy_unit_type_visible, timer_elapsed or king_besieged.',
+            ]);
+          }
+          return condition;
+        });
+
+        const result = await watch({
+          conditions,
+          timeoutSeconds: requireNumber(
+            input,
+            'timeoutSeconds',
+            MINIMUM_WATCH_SECONDS,
+            MAXIMUM_WATCH_SECONDS,
+          ),
+        });
+        return toolSuccess(result);
+      } catch (error) {
+        if (error instanceof InputError) {
+          return toolFailure('INVALID_INPUT', error.message, error.suggestions);
+        }
+        return toolFailure(
+          'TOOL_FAILED',
+          error instanceof Error ? error.message : 'The tool failed.',
+        );
+      }
+    },
 
     /* -------------------------------------------------------- commands */
 
