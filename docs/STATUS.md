@@ -7,6 +7,18 @@ for each battlefield — and an external Marshal can now design an operation of
 its own, on ground of its own choosing, and fight it. No simulation rule
 changed: combat, morale, fog, the objective and the command queue are untouched.
 
+# Pixel-Art Unit Shading Pass
+
+Detailed-zoom soldiers were flat single-colour blocks — a square, circle,
+triangle or diamond per category, all one shade. `UnitLayer` now adds a
+contact shadow at the feet and a metal glint at the crown of every detailed
+unit, drawn from the same shadow and stone-light inks the terrain and keeps
+already use. Both accents are batched across every category and faction in
+one pass each, so the change costs exactly two more `fill()` calls for the
+whole battlefield regardless of how many troop types are on the field — the
+existing per-category body fills, and the low-LOD block and blob paths, are
+unchanged. No simulation, command, query or WebMCP behaviour is touched.
+
 # The War Council
 
 - **One material vocabulary.** The lobby was a serif war room over a

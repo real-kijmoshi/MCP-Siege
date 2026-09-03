@@ -195,6 +195,22 @@ export class UnitLayer {
       context.fill();
     }
 
+    // A contact shadow and a metal glint, added over every batch's block in
+    // two more fills total rather than per category: enough shading to read
+    // as a little pixel-art soldier — dark at the feet, bright at the crown —
+    // without spending more of the frame's fill budget than the flat blocks did.
+    if (detailed) {
+      context.fillStyle = PALETTE.shadow;
+      context.beginPath();
+      this.addUnitAccents(context, 'shadow');
+      context.fill();
+
+      context.fillStyle = PALETTE.stoneLight;
+      context.beginPath();
+      this.addUnitAccents(context, 'helm');
+      context.fill();
+    }
+
     betweenBodiesAndLabels?.();
     this.drawGroupMarkers(context, camera, state, selected, previous, interpolation);
   }
@@ -244,6 +260,42 @@ export class UnitLayer {
           context.rect(x - step / 2, y - half, step, block);
           context.rect(x - half, y - step / 2, block, step);
           break;
+      }
+    }
+  }
+
+  /**
+   * The shadow and the glint, over every batch already filled this frame.
+   *
+   * Reusing the same batch buffers the body pass just wrote means this costs
+   * two fills for the whole battlefield, not two per category: a shadow block
+   * sits low and wide where a man's feet meet the ground, a glint sits small
+   * and centred where his helm would catch the light. Same accent for every
+   * shape and category, because the point is depth, not another silhouette.
+   */
+  private addUnitAccents(
+    context: CanvasRenderingContext2D,
+    mode: 'shadow' | 'helm',
+  ): void {
+    for (let batch = 0; batch < BATCH_COUNT; batch += 1) {
+      const count = this.batchCount[batch] ?? 0;
+      if (count === 0) continue;
+
+      const category = UNIT_CATEGORIES[batch % CATEGORY_COUNT] as UnitCategory;
+      const xs = this.batchX[batch];
+      const ys = this.batchY[batch];
+      if (xs === undefined || ys === undefined) continue;
+
+      const block = Math.max(2, Math.round(SIZE[category] / 2) * 2);
+      const half = block / 2;
+      const width = mode === 'shadow' ? block * 0.6 : block * 0.42;
+      const height = Math.max(1, block * (mode === 'shadow' ? 0.22 : 0.28));
+      const offsetY = mode === 'shadow' ? half - height * 0.5 : -half + height * 0.5;
+
+      for (let n = 0; n < count; n += 1) {
+        const x = xs[n] ?? 0;
+        const y = (ys[n] ?? 0) + offsetY;
+        context.rect(x - width / 2, y - height / 2, width, height);
       }
     }
   }
