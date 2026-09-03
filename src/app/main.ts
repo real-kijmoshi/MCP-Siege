@@ -15,6 +15,7 @@ import { RenderSnapshot } from '../rendering/canvas/RenderSnapshot';
 import { AlertFeed, Toast } from '../ui/AlertFeed';
 import { FieldJournal } from '../ui/FieldJournal';
 import { ArmyList } from '../ui/ArmyList';
+import { BattleUx } from '../ui/BattleUx';
 import { CommandBar } from '../ui/CommandBar';
 import { FirstOrders } from '../ui/FirstOrders';
 import { ObjectiveBanner } from '../ui/ObjectiveBanner';
@@ -105,10 +106,12 @@ async function bootstrap(): Promise<void> {
   let speed = 0;
   let openingHold = true;
   let firstOrders: FirstOrders | undefined;
+  let battleUx: BattleUx | undefined;
   let topBar: TopBar;
   const setSpeed = (next: number): void => {
     speed = next;
     topBar.syncSpeed(speed);
+    battleUx?.update(renderer.selection, speed);
     if (next > 0 && openingHold) {
       openingHold = false;
       firstOrders?.dismiss();
@@ -135,11 +138,15 @@ async function bootstrap(): Promise<void> {
   const commandBar = new CommandBar(engine, renderer.selection, (message) => {
     beginFromOpening();
     toast.show(message);
+    battleUx?.showCommand(message);
     firstOrders?.dismiss();
   });
 
   const input = new Input(battlefieldCanvas, minimapCanvas, minimap, renderer, engine, {
-    onSelectionChange: () => commandBar.update(),
+    onSelectionChange: () => {
+      commandBar.update();
+      battleUx?.update(renderer.selection, speed);
+    },
     onTogglePause: () => {
       setSpeed(speed === 0 ? 1 : 0);
     },
@@ -148,12 +155,27 @@ async function bootstrap(): Promise<void> {
       const current = steps.indexOf(speed);
       setSpeed(steps[Math.max(0, Math.min(steps.length - 1, current + delta))] ?? 1);
     },
+    onNotice: (message) => {
+      toast.show(message);
+    },
     onOrderIssued: (message) => {
       beginFromOpening();
       toast.show(message);
+      battleUx?.showCommand(message);
       firstOrders?.dismiss();
     },
   });
+
+  battleUx = new BattleUx({
+    zoomIn: () => input.zoomIn(),
+    zoomOut: () => input.zoomOut(),
+    focusSelection: () => input.focusSelection(),
+    focusKing: () => input.focusKing(),
+    selectAll: () => input.selectAll(),
+    clearSelection: () => input.clearSelection(),
+    frameBattlefield: () => frameBattlefield(renderer),
+  });
+  battleUx.update(renderer.selection, speed);
 
   frameBattlefield(renderer);
 
@@ -222,6 +244,7 @@ async function bootstrap(): Promise<void> {
     });
     alertFeed.push(queries.getAlerts('player', 6));
     commandBar.update();
+    battleUx.update(renderer.selection, speed);
 
     if (state.objective.outcome !== 'ongoing' && speed !== 0) {
       speed = 0;

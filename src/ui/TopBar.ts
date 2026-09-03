@@ -10,6 +10,9 @@ export class TopBar {
   private readonly morale = document.getElementById('stat-morale');
   private readonly status = document.getElementById('webmcp-status');
   private readonly statusLabel = document.getElementById('webmcp-label');
+  private readonly battleState = document.getElementById('battle-state');
+  private readonly battleStateLabel = document.getElementById('battle-state-label');
+  private readonly battleStateHint = document.getElementById('battle-state-hint');
 
   public constructor(onSpeed: (speed: number) => void) {
     const buttons = document.querySelectorAll<HTMLButtonElement>('.speed-control button');
@@ -32,6 +35,15 @@ export class TopBar {
       const selected = Number(button.dataset.speed ?? '1') === speed;
       button.classList.toggle('active', selected);
       button.setAttribute('aria-pressed', String(selected));
+    }
+
+    const paused = speed === 0;
+    if (this.battleState !== null) this.battleState.dataset.state = paused ? 'paused' : 'running';
+    if (this.battleStateLabel !== null) {
+      this.battleStateLabel.textContent = paused ? 'PAUSED' : speed === 1 ? 'LIVE' : `LIVE · ${speed}×`;
+    }
+    if (this.battleStateHint !== null) {
+      this.battleStateHint.textContent = paused ? 'Space to resume' : 'Space to pause';
     }
   }
 

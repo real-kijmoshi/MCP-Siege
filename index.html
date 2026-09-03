@@ -116,6 +116,15 @@
 
         <div class="spacer"></div>
 
+        <div class="battle-state" id="battle-state" data-state="paused" aria-live="polite">
+          <span class="battle-state-dot" aria-hidden="true"></span>
+          <span><b id="battle-state-label">PAUSED</b><small id="battle-state-hint">Space to resume</small></span>
+        </div>
+
+        <button class="top-action" id="help-button" type="button" aria-label="Open command guide" aria-controls="help-dialog" aria-expanded="false" aria-keyshortcuts="?">
+          <b>?</b><span>GUIDE</span>
+        </button>
+
         <div class="speed-control" role="group" aria-label="Simulation speed">
           <button type="button" data-speed="0" id="speed-pause" class="active" title="Pause [Space]" aria-label="Pause battle" aria-pressed="true">❚❚</button>
           <button type="button" data-speed="1" aria-label="Normal speed" aria-pressed="false">1×</button>
@@ -132,12 +141,48 @@
       <main class="stage">
         <aside class="army-list" aria-label="Army groups">
           <h2><span>ARMY GROUPS</span><span id="army-list-count"></span></h2>
+          <div class="army-tools">
+            <label class="army-search">
+              <span class="sr-only">Find a regiment</span>
+              <input id="army-search" type="search" placeholder="FIND REGIMENT…" autocomplete="off" />
+              <button id="army-search-clear" type="button" aria-label="Clear regiment search">×</button>
+            </label>
+            <div class="army-filters" role="group" aria-label="Filter regiments">
+              <button type="button" data-army-filter="all" class="active" aria-pressed="true">ALL</button>
+              <button type="button" data-army-filter="attention" aria-pressed="false"><span aria-hidden="true">!</span> NEEDS ATTENTION</button>
+            </div>
+          </div>
           <div id="army-list-body"></div>
         </aside>
 
         <div class="map-wrap">
           <canvas id="battlefield" aria-label="Battlefield" aria-describedby="battlefield-help" tabindex="0"></canvas>
           <p class="sr-only" id="battlefield-help">Select regiments from the army list, then use the command buttons or keyboard controls. Press Tab to cycle regiments, Control A to select all, and Space to pause.</p>
+
+          <div class="battle-toolbar" role="toolbar" aria-label="Battlefield view and selection">
+            <div class="toolbar-group">
+              <button type="button" id="view-zoom-out" title="Zoom out [Z]" aria-label="Zoom out">−</button>
+              <button type="button" id="view-zoom-in" title="Zoom in [X]" aria-label="Zoom in">+</button>
+              <button type="button" id="view-fit-battlefield" title="Show the whole battlefield" aria-label="Show whole battlefield">⌗</button>
+            </div>
+            <div class="toolbar-group">
+              <button type="button" id="view-focus-selection" title="Focus selected regiments [F]">FOCUS</button>
+              <button type="button" id="view-focus-king" title="Focus your king [H]">KING</button>
+            </div>
+            <div class="toolbar-group selection-tools">
+              <button type="button" id="selection-all" title="Select the whole army [Ctrl+A]">ALL</button>
+              <button type="button" id="selection-clear" title="Clear selection [Esc]">CLEAR</button>
+            </div>
+          </div>
+
+          <div class="interaction-guide" id="interaction-guide" data-state="select" aria-live="polite">
+            <span class="guide-badge" id="guide-badge">1</span>
+            <span class="guide-copy">
+              <strong id="guide-title">Select a regiment</strong>
+              <small id="guide-detail">Left-click a unit or roster row. Drag a box for several.</small>
+            </span>
+            <kbd>?</kbd>
+          </div>
 
           <div class="objective-strip" id="objective-strip" aria-label="Objective">
             <div class="objective" id="objective-own" data-status="safe">
@@ -259,6 +304,43 @@
         <div class="formation-menu" id="formation-menu" hidden></div>
         <div class="formation-menu stance-menu" id="stance-menu" hidden></div>
       </footer>
+    </div>
+
+    <div class="help-overlay" id="help-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <section class="help-card" tabindex="-1">
+        <header>
+          <div><small>FIELD MANUAL</small><h2 id="help-title">Command without friction</h2></div>
+          <button type="button" id="help-close" aria-label="Close command guide">×</button>
+        </header>
+        <div class="help-grid">
+          <article>
+            <span class="help-number">1</span>
+            <h3>Select forces</h3>
+            <p>Click a regiment, drag across several, or use the roster. Hold <kbd>Shift</kbd> to build a selection.</p>
+          </article>
+          <article>
+            <span class="help-number">2</span>
+            <h3>Issue orders</h3>
+            <p><kbd>Right-click</kbd> moves or attacks. Hold <kbd>Shift</kbd> to queue a route and <kbd>Ctrl</kbd> to attack-move.</p>
+          </article>
+          <article>
+            <span class="help-number">3</span>
+            <h3>Read the field</h3>
+            <p>Blue, green and amber roster bars show strength, morale and vigour. Red labels require attention now.</p>
+          </article>
+        </div>
+        <div class="shortcut-grid" aria-label="Keyboard shortcuts">
+          <span><kbd>WASD</kbd><b>Pan</b></span>
+          <span><kbd>Z / X</kbd><b>Zoom</b></span>
+          <span><kbd>F</kbd><b>Focus selection</b></span>
+          <span><kbd>H</kbd><b>Your king</b></span>
+          <span><kbd>Tab</kbd><b>Next regiment</b></span>
+          <span><kbd>Ctrl+A</kbd><b>Select all</b></span>
+          <span><kbd>Esc</kbd><b>Clear selection</b></span>
+          <span><kbd>Space</kbd><b>Pause / resume</b></span>
+        </div>
+        <footer><span>Press <kbd>?</kbd> anytime</span><button type="button" id="help-done">RETURN TO BATTLE</button></footer>
+      </section>
     </div>
 
     <div class="fatal-screen" id="fatal-screen" hidden role="alertdialog" aria-modal="true" aria-labelledby="fatal-title">
