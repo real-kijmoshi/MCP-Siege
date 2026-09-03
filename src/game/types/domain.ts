@@ -473,6 +473,21 @@ export interface CombatEvent {
   tick: number;
 }
 
+/**
+ * A dead soldier kept only so the renderer can lay him out and fade him. Purely
+ * cosmetic and bounded; nothing in the simulation reads it back.
+ */
+export interface CorpseRecord {
+  x: number;
+  y: number;
+  category: UnitCategory;
+  /** Faction slot inside the typed arrays: `FACTION_PLAYER` or `FACTION_ENEMY`. */
+  owner: number;
+  /** 1 when the man faced left, so the body lies the right way. */
+  flip: 0 | 1;
+  deathTick: number;
+}
+
 /* ----------------------------------------------------------------- alerts */
 
 export const ALERT_SEVERITIES = ['info', 'warning', 'critical'] as const;

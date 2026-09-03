@@ -60,46 +60,207 @@ palette default. Ash country was therefore dithered against spring grass and
 carried a green static over the whole map. Both shades, and now the water and
 the moss too, are derived from the map's own colour.
 
-# The Teaching Battle
+# Battlefield Road Art Pass
 
-A fifth authored operation stands in front of the other four: **First Command**,
-numeral 0, fought on River Vale. It is an operation in every sense the others
-are — one map, one deployment, one written enemy commander, the same twenty-six
-regiments, the same engine, the same objective — and it is registered, listed,
-described and launched through exactly the paths they are. No simulation,
-command, query or WebMCP rule changed to make room for it.
+Battlefield roads now read as traveled ground rather than dark wires laid over
+the map. The terrain bake lays the entire road network in three deterministic
+passes: a broad earthen shoulder, a warmer compacted center, and sparse broken
+cart ruts. That network-wide order keeps later branches from painting dark
+verges across junctions. Each authored straight leg also receives a small,
+stable perpendicular bow and low-frequency wander, so roads keep their tactical
+destinations while approaching them like worn paths instead of ruler lines.
 
-- **A battle, not a mode.** `tutorial` is an `AuthoredScenarioId` like any
-  other, so it appears in the War Council list, in `list_operations`, in
-  `select_operation`'s enum and in every test that iterates the authored
-  operations, without one branch anywhere asking whether the battle in hand is
-  the teaching one. A teaching battle that is not a real battle teaches the
-  wrong game.
-- **The inverse of the battle it shares its ground with.** It is fought on River
-  Vale on purpose: the ground is already familiar when Bridge of Knives lays a
-  trap on it. Where that operation hides both wings and baits the centre, this
-  one puts the whole Crown army in one body on the Central Field, the guns and
-  bows on Central Hill behind it, the horse out on either shoulder in plain
-  sight, and King Aldric far to the rear.
-- **A quiet minute to begin in.** The timetable opens with a scout and nothing
-  else; the Cinder Host does not step off until the second minute and arrives
-  over the central bridge alone. Blackforge follows only once the first regiment
-  has been met, the Emberbows come up to the bank after that, and one wing of
-  horse — one, never both — tries the eastern crossing late. Measured on the
-  intended commander, the player takes his first casualty at 154 seconds against
-  84 in Bridge of Knives on the same ground and seed.
-- **Drawn up but not sent.** The rest of the Ashen host stands around its own
-  base for the length of the script. It is not absent, and a commander who
-  marches north early meets all of it; it is simply not ordered forward, so the
-  battle happens in the order the briefing describes it.
-- **Verified.** `npm run typecheck`, `npm run test` and `npm run build` all
-  pass. The operation satisfies the standards every authored one is held to
-  without those tests being relaxed: it deploys both armies on legal ground, its
-  script names only River Vale zones and only regiments that exist, it raises
-  thirteen regiments and a sovereign a side, its opening deployment is
-  materially different from the other four, and it fights to a decision under an
-  aggressive commander. The one test changed is the War Council listing, which
-  asserts the operation list exactly and now expects the teaching battle first.
+The work remains bake-only: it adds no per-frame allocation or simulation state,
+does not alter navigation, and consumes no simulation randomness.
+
+# Council Portrait Redrawn as Pixel Art
+
+The portrait is now baked the way the battlefield itself is baked. `TerrainLayer`
+writes one material per art pixel into a low-resolution index buffer and blows it
+up with nearest-neighbour sampling; `ui/LobbyMap.ts` now does the same at a
+coarser grain — 320 × 200 art pixels for the whole 8,000 × 5,000 field, resolved
+once and enlarged six times with smoothing off. The softened, stretched buffer of
+the resolution pass below is gone with it: blurring a chart made woods and hills
+read as stains and the river as a smooth band, which is a picture of a different
+game than the one behind the seal.
+
+What the grain buys is that everything on the chart is now the thing it is. A
+wood is a floor of canopy with pines, oaks and scrub standing on it; a village is
+earth with cottages and a hall; a hill carries three contour rings and a
+watchtower; water has a bank a pixel wide, a bridge has deck boards and rails,
+and a ridge has a lit stone crest with rubble along it and a defile of trodden
+earth where it can be passed — a plank bridge over a mountain spine was the one
+thing on the old ashfall chart that could not be believed. Roads are stamped as
+metalling with a verge, the whole net's verges laid before any of its cores,
+because road by road each step's verge buried the core the step before it had put
+down and the net came out as dark earth with no road in it.
+
+The armies are counters rather than blocks: a plate sized by the weight standing
+there, carrying the stencil of the arm most of the regiment carries, with a
+shadow under it and a lit top edge. Kings are ringed in gold with the crown over
+them. A map that authors its own earth now derives its own second ground shade
+from it, instead of taking the palette's — that was scattering spring-green
+confetti over ash country.
+
+Repainting stays inside a frame: sixty-four thousand art pixels, one typed-array
+resolve, one enlargement.
+
+# Council Text Weight Pass
+
+The council screen had been answering every question a first-time commander
+might have, all at once, on one screen: an intro paragraph, a note about the
+blank battle, the operation summary, its twist, three battle orders, three
+commander cards, a paragraph describing the chosen commander, and three numbered
+steps about what deploying does. It read as a page of instructions with a battle
+somewhere behind it.
+
+The information is all still reachable; less of it is standing on the screen at
+once. The ledger intro is one sentence, the blank-battle note is gone from the
+ledger (the blank operation's own briefing already says it), the two section
+headings dropped their second labels, the commander description moved onto each
+commander card as its hover title, and the three deploy steps are one dim line
+above the seal — what winning looks like is already the first thing under HOW
+YOU WIN.
+
+# Council Plain Speech Pass
+
+The council screen never said who you were, what its three choices did, or
+what pressing the seal would get you. It now opens with one sentence — you
+command the Crown, choose a battle, the first is the gentlest, then set how
+hard the enemy fights and deploy — and the rest of the screen answers the
+questions that sentence raises. The map key names the sides instead of the
+factions (`YOUR ARMY`, `THE ENEMY`), each roster header carries a `YOURS` or
+`ENEMY` tag rather than relying on blue against red, and the section headings
+say what they are for (`YOUR ORDERS · HOW YOU WIN`, `ENEMY COMMANDER · HOW
+HARD THEY FIGHT`).
+
+A three-step `WHEN YOU DEPLOY` note now sits with the seal, in the space that
+was empty above it: the battle opens paused, you click a regiment rather than
+a man and right-click the ground you want it on, and you win by breaking the
+guard around the enemy king and holding where he stands. Nothing else on the
+council said any of that, and a commander who has never played had no way to
+find it out before committing an army.
+
+The ledger's tempo word — `RISING`, `DELIBERATE`, `IMMEDIATE`, `BUILDING` —
+told a first-time commander nothing he could act on and is replaced by how
+long the battle runs. A designed operation is not timed, so it keeps the word
+that says where it came from.
+
+# Council Portrait Resolution Pass
+
+The battlefield portrait is drawn at six samples per art pixel — a 1920 × 1200
+buffer resolved down by the browser — instead of a 320 × 200 buffer blown up
+with `image-rendering: pixelated`. River banks, wood edges, hill outlines and
+the road net are now the shapes the map data describes rather than staircases,
+and roads are stroked as one path per road rather than a chain of stamped dots.
+
+The land is then laid down softened: the terrain buffer goes through an
+offscreen canvas and is drawn back under a two-pixel blur, over an unblurred
+copy of itself so the blur's own faded rim falls on the same ground rather than
+a pale edge. The ground's grain is half its old size and steps through two
+blends of a map's own greens instead of jumping to the brightest, and woods and
+hills keep a solid body — the old rim fray ate half of each disc, which
+softened became a wisp. Crossings, regiment blocks and the crowns are drawn
+after the blur and stay sharp, so tokens read as tokens on a painted map.
+
+Terrain is written into a `Uint32Array` over `ImageData` in one pass; only the
+markers and the frame are canvas calls, so the higher resolution costs a
+typed-array fill rather than two million fills. The portrait remains derived
+entirely from map and deployment data, so a Marshal's own operation still gets
+a true picture of its ground.
+
+## What the first cut of this cost
+
+Repainting the portrait took **46–71 ms**, which is a visible stall every time
+a commander looks at a different battle. It is now **~14 ms**, under one frame.
+Four things were paying for it:
+
+- **The blur ran at plate size.** A blur costs work per pixel it covers, and it
+  covered 2.3 million of them (~27 ms). The land is now softened at 960 × 600,
+  a quarter of the area, before it is enlarged.
+- **The land was enlarged twice** — sharp, then blurred over it — so the most
+  expensive operation in the class ran two times. Sharp and blurred are now
+  composited at the small size and enlarged once, and the resampler is asked
+  for bilinear rather than the expensive filter, which buys nothing over ground
+  that has already been softened.
+- **A dither cell was `fill`ed rather than written.** `TypedArray.fill` over two
+  elements costs more in call overhead than the two assignments it performs,
+  and that ran a hundred and forty thousand times per repaint. Cells and
+  barrier columns are now direct indexed writes, and a cell row is written once
+  and `copyWithin`-ed down instead of walked `GRAIN` times.
+- **Every buffer was cut fresh on every repaint.** They are allocated once with
+  the portrait and reused.
+
+# Council Layout and Type
+
+The council is two things beside a ledger: the ground, and the written sheet
+that ends in the seal. The written briefing, the enemy commander and the
+three-step deploy note are one scrolling sheet in the right column with the
+seal pinned below it, so the one control that commits an army is never
+scrolled off, and the portrait takes the whole of the other column.
+
+Four things that restated each other are gone: the reckoning table beside the
+seal (army totals and ground, all of it said elsewhere), the fact chips (the
+strengths again, in the loudest material on the page), and a full regimental
+order of battle that was tried under the portrait and read as a wall of names
+nobody needed before choosing a battle. What is left is what a commander
+actually decides with. The portrait grew into the space they were using: the
+table is no longer capped at a 1920 desk, and the plate takes up to 1560 px.
+
+The type scale went up a step throughout — nothing on this screen is below
+9 px now, where the smallest labels used to be 7 px — and the boxes cut to fit
+the old sizes grew with it.
+
+Operation names, locations and army names now reach the DOM as text nodes
+rather than through `innerHTML`. They are Marshal-writable through the council
+tools, and a designed operation's name had been interpolated into markup.
+
+# Terrain Readability Pass
+
+The baked battlefield now uses restrained 4×4 texture patches instead of dense
+per-pixel dither. Zone and river silhouettes are less ragged, while the map
+keeps its deterministic low-resolution pixel-art bake and the same gameplay
+geometry.
+
+# War Council Layout Pass
+
+The operation screen now has a deliberate four-part hierarchy: campaign ledger,
+battlefield portrait, written briefing and deployment decision. The 320 × 200
+map portrait keeps its native 8:5 aspect ratio instead of being stretched into a
+wide banner, while the briefing and commander controls occupy dedicated desktop
+columns. Operation and difficulty selection use clearer active states, the
+deployment seal is the strongest action on the screen, and responsive layouts
+collapse the same content for narrower windows without changing any council
+behavior or WebMCP boundary.
+
+# Selection Overlay Cleanup
+
+The selected-regiment movement and weapon-range dither fields were removed;
+selection now uses only the unobtrusive gold corner bracket and existing order
+markers.
+
+# Smaller Authored Field Forces
+
+The four built-in operations now deploy only the regiments their tactical idea
+needs: **6–8 per side instead of 13**. Bridge of Knives uses a deliberately
+legible six-regiment force per side: two frontline knight groups, one cavalry
+group, two bow groups and a small knight guard for the king. Ember Gate, the
+Salt Tide and the Open Hand use seven or eight. This removes five to seven
+roster rows and map labels from every opening while preserving each operation's
+king guard, tactical core and scripted opposition.
+
+- The Crown and Ashen arrays remain the stable source catalog, with one second
+  bow regiment added per side for the introductory force. `fieldForce` selects
+  each roster in an explicit order, so deployments remain deterministic and
+  WebMCP exposes only real regiments on the current field.
+- Advanced arms are reserved for the later operations instead of crowding the
+  first: Ember Gate introduces shot and siege, the Salt Tide introduces cannon,
+  and the Open Hand introduces field support.
+- Enemy timetables were trimmed with their rosters. Every scripted order still
+  names an existing regiment and a zone on the operation's own map.
+- Scenario behavior, objective ownership, fog filtering, the command queue and
+  simulation rules are unchanged. All four authored operations still fight to
+  a decision under the scenario test commander.
 
 # The Art Hash Returned Half a Number
 
@@ -855,6 +1016,8 @@ decision into no decision at all.
   regiment cycling, control groups, pause and speed.
 - Minimal UI: status strip, regiment roster, command row, transient alerts, and
   a dismissible opening brief. No Marshal panel of any kind.
+- The War Council ends in a prominent Begin Battle control that states the
+  committed army strength and makes clear that the battle opens paused.
 - Twenty-one WebMCP tools with strict schemas and runtime validation, registered
   through `document.modelContext` with abort-signal cleanup.
 - Plan Mode: draft, revise, execute and cancel, drawn over the battlefield as

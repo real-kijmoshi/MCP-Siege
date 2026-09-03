@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { TICKS_PER_SECOND } from '../src/game/config/battle';
 import { DIFFICULTIES, DIFFICULTY_IDS, type DifficultyId } from '../src/game/config/matches';
+import {
+  ASHEN_ARMY,
+  CROWN_ARMY,
+  SCENARIOS,
+  type ScenarioDefinition,
+} from '../src/game/config/scenario';
 import { SimulationEngine } from '../src/game/simulation/Engine';
 import { activeGroups, findGroup } from '../src/game/simulation/GameState';
 
@@ -34,6 +40,17 @@ function deployDefensively(engine: SimulationEngine): void {
   hold(['fenmen', 'greyriders', 'lancers'], 'player_base');
 }
 
+const FULL_VALE: ScenarioDefinition = {
+  ...SCENARIOS.bridge_of_knives,
+  id: 'custom',
+  origin: 'designed',
+  playerGroups: CROWN_ARMY,
+  enemyGroups: ASHEN_ARMY,
+  aiScript: SCENARIOS.bridge_of_knives.aiScript.filter(
+    (order) => order.groupId !== 'cinder_bowmen',
+  ),
+};
+
 interface Observed {
   /**
    * How often two or more enemy regiments were put onto one objective by a
@@ -50,7 +67,12 @@ interface Observed {
 }
 
 async function observe(difficultyId: DifficultyId, seed: number, seconds = 420): Promise<Observed> {
-  const engine = new SimulationEngine({ seed, difficultyId });
+  const engine = new SimulationEngine({
+    scenarioId: 'custom',
+    scenario: FULL_VALE,
+    seed,
+    difficultyId,
+  });
   const state = engine.getState();
   const together = new Map<string, number>();
   let massedOrders = 0;

@@ -78,7 +78,7 @@ describe('artillery', () => {
     // The whole distinction between a gun and a siege engine. A piece that has
     // moved this tick has its wait reset, so a battery walked forward with the
     // advance shoots at nothing for the entire march.
-    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 4 });
+    const engine = new SimulationEngine({ scenarioId: 'salt_tide', difficultyId: 'captain', seed: 4 });
     const state = engine.getState();
     const deploy = UNIT_STATS.cannon.deployTicks;
     expect(deploy).toBeGreaterThan(0);
@@ -88,7 +88,7 @@ describe('artillery', () => {
       playerId: 'player',
       groupIds: ['culverins'],
       order: 'attack_zone',
-      targetZone: 'central_bridge',
+      targetZone: 'long_causeway',
     });
 
     let sawARollingGun = false;
@@ -109,7 +109,7 @@ describe('artillery', () => {
   it('fires once it has been given ground to stand on', () => {
     // A gun only ever reaches the full reload by actually loosing a shot, so a
     // wait longer than the unlimbering time is proof the battery is in action.
-    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 4 });
+    const engine = new SimulationEngine({ scenarioId: 'salt_tide', difficultyId: 'captain', seed: 4 });
     const state = engine.getState();
 
     engine.dispatch('human', {
@@ -117,13 +117,13 @@ describe('artillery', () => {
       playerId: 'player',
       groupIds: ['vanguard', 'ironbacks', 'hedge'],
       order: 'attack_zone',
-      targetZone: 'central_bridge',
+      targetZone: 'long_causeway',
     });
     engine.dispatch('human', {
       type: 'focus_siege',
       playerId: 'player',
       siegeGroupId: 'culverins',
-      targetZone: 'central_bridge',
+      targetZone: 'long_causeway',
     });
 
     let fired = false;
@@ -137,7 +137,7 @@ describe('artillery', () => {
   });
 
   it('tells the commander his guns are still on their teams', () => {
-    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 4 });
+    const engine = new SimulationEngine({ scenarioId: 'salt_tide', difficultyId: 'captain', seed: 4 });
     const queries = new GameQueries(() => engine.getState());
 
     const before = queries.getArmies('player').find((army) => army.id === 'culverins');
@@ -148,7 +148,7 @@ describe('artillery', () => {
       playerId: 'player',
       groupIds: ['culverins'],
       order: 'attack_zone',
-      targetZone: 'central_bridge',
+      targetZone: 'long_causeway',
     });
     engine.step();
 
@@ -194,9 +194,9 @@ function convalesce(hospitalX: number, hospitalY: number): {
   morale: number;
   succour: number;
 } {
-  const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 7 });
+  const engine = new SimulationEngine({ scenarioId: 'open_hand', difficultyId: 'captain', seed: 7 });
   const state = engine.getState();
-  const reserve = findGroup(state, 'fenmen');
+  const reserve = findGroup(state, 'vanguard');
   const hospital = findGroup(state, 'field_hospital');
   if (reserve === undefined || hospital === undefined) throw new Error('missing regiment');
 
@@ -235,9 +235,9 @@ describe('the field hospital', () => {
   it('does nothing whatever for men who are still fighting', () => {
     // Care has to be something a commander buys by pulling a regiment out. If
     // it also arrived by leaving one in, holding ground would simply be free.
-    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 7 });
+    const engine = new SimulationEngine({ scenarioId: 'open_hand', difficultyId: 'captain', seed: 7 });
     const state = engine.getState();
-    const reserve = findGroup(state, 'fenmen');
+    const reserve = findGroup(state, 'vanguard');
     const hospital = findGroup(state, 'field_hospital');
     if (reserve === undefined || hospital === undefined) throw new Error('missing regiment');
 
@@ -254,10 +254,10 @@ describe('the field hospital', () => {
   });
 
   it('reports care on the roster the commander actually reads', () => {
-    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 7 });
+    const engine = new SimulationEngine({ scenarioId: 'open_hand', difficultyId: 'captain', seed: 7 });
     const queries = new GameQueries(() => engine.getState());
     const state = engine.getState();
-    const reserve = findGroup(state, 'fenmen');
+    const reserve = findGroup(state, 'vanguard');
     const hospital = findGroup(state, 'field_hospital');
     if (reserve === undefined || hospital === undefined) throw new Error('missing regiment');
 
@@ -265,7 +265,7 @@ describe('the field hospital', () => {
     station(state, hospital, 2100, 4600);
     engine.step();
 
-    const row = queries.getArmies('player').find((army) => army.id === 'fenmen');
+    const row = queries.getArmies('player').find((army) => army.id === 'vanguard');
     expect(row?.tended).toBe(true);
   });
 
@@ -274,7 +274,7 @@ describe('the field hospital', () => {
     // ever acquires a target or pins anybody by standing there.
     expect(UNIT_STATS.surgeon.attack).toBe(0);
 
-    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives', difficultyId: 'captain', seed: 7 });
+    const engine = new SimulationEngine({ scenarioId: 'open_hand', difficultyId: 'captain', seed: 7 });
     const state = engine.getState();
     const hospital = findGroup(state, 'field_hospital');
     const ironHost = findGroup(state, 'cinder_host');

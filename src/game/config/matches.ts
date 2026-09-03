@@ -11,14 +11,8 @@ import type { ScenarioDefinition } from './scenario';
  * commander's own to hold. Another kind of battle exists — the one laid on the
  * War Council table, which a Marshal may rewrite through WebMCP — and that one
  * is `custom`.
- *
- * `tutorial` stands first because it is the battle that teaches the other four.
- * It is an operation in every sense they are — one map, one deployment, one
- * written commander — and it is listed first rather than treated as a mode,
- * because a teaching battle that is not a real battle teaches the wrong thing.
  */
 export const AUTHORED_SCENARIO_IDS = [
-  'tutorial',
   'bridge_of_knives',
   'ember_gate',
   'salt_tide',

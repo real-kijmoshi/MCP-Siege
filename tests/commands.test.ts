@@ -4,19 +4,19 @@ import { findGroup } from '../src/game/simulation/GameState';
 
 describe('production command boundaries', () => {
   it('rejects a whole multi-group order atomically when one regiment cannot obey', () => {
-    const engine = new SimulationEngine();
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives' });
     const state = engine.getState();
     const legion = findGroup(state, 'vanguard')!;
-    const scouts = findGroup(state, 'outrunners')!;
-    scouts.routing = true;
-    scouts.morale = 0;
+    const cavalry = findGroup(state, 'greyriders')!;
+    cavalry.routing = true;
+    cavalry.morale = 0;
 
     const originalFormation = legion.formation;
     const originalOrder = legion.order;
     const command = engine.dispatch('human', {
       type: 'order_groups',
       playerId: 'player',
-      groupIds: ['vanguard', 'outrunners'],
+      groupIds: ['vanguard', 'greyriders'],
       order: 'move',
       destination: { x: 3000, y: 3600 },
       formation: 'wedge',
@@ -144,19 +144,19 @@ describe('production command boundaries', () => {
   });
 
   it('rejects a whole custom deployment when one regiment cannot obey', () => {
-    const engine = new SimulationEngine();
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives' });
     const legion = findGroup(engine.getState(), 'vanguard')!;
-    const scouts = findGroup(engine.getState(), 'outrunners')!;
+    const cavalry = findGroup(engine.getState(), 'greyriders')!;
     const originalFormation = legion.formation;
-    scouts.routing = true;
-    scouts.morale = 0;
+    cavalry.routing = true;
+    cavalry.morale = 0;
     const command = engine.dispatch('webmcp', {
       type: 'deploy_formation',
       playerId: 'player',
       targetZone: 'central_field',
       assignments: [
         { groupId: legion.id, slot: 'center', order: 'defend_zone', formation: 'wedge' },
-        { groupId: scouts.id, slot: 'far_left', order: 'move', formation: 'loose' },
+        { groupId: cavalry.id, slot: 'far_left', order: 'move', formation: 'loose' },
       ],
     });
 
@@ -168,7 +168,7 @@ describe('production command boundaries', () => {
   });
 
   it('detaches one troop category without exposing or losing soldiers', () => {
-    const engine = new SimulationEngine();
+    const engine = new SimulationEngine({ scenarioId: 'ember_gate' });
     const state = engine.getState();
     const source = findGroup(state, 'fenmen')!;
     const originalStrength = source.members.length;

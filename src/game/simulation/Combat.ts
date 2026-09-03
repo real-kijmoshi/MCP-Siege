@@ -12,7 +12,14 @@ import {
   counterMultiplier,
   type UnitStats,
 } from '../config/battle';
-import { FACTION_ENEMY, FACTION_PLAYER, type ArmyGroup, type CombatEvent } from '../types/domain';
+import {
+  FACTION_ENEMY,
+  FACTION_PLAYER,
+  categoryAt,
+  type ArmyGroup,
+  type CombatEvent,
+  type CorpseRecord,
+} from '../types/domain';
 import type { GameState } from './GameState';
 import { nextRandom } from './Random';
 import { SpatialHash } from './SpatialHash';
@@ -115,6 +122,23 @@ function recordEvent(state: GameState, attacker: number, event: CombatEvent): vo
 function groupOf(state: GameState, unitIndex: number): ArmyGroup | undefined {
   const slot = state.units.group[unitIndex] ?? -1;
   return slot < 0 ? undefined : state.groups[slot];
+}
+
+/** Fallen soldiers on the field, kept so the renderer can fade them out. */
+const MAX_CORPSES = 512;
+
+function recordCorpse(state: GameState, index: number, flip: boolean): void {
+  const units = state.units;
+  if (state.corpses.length >= MAX_CORPSES) state.corpses.shift();
+  const corpse: CorpseRecord = {
+    x: units.x[index] ?? 0,
+    y: units.y[index] ?? 0,
+    category: categoryAt(units.category[index] ?? 0),
+    owner: units.owner[index] ?? FACTION_ENEMY,
+    flip: flip ? 1 : 0,
+    deathTick: state.currentTick,
+  };
+  state.corpses.push(corpse);
 }
 
 /**
@@ -353,6 +377,10 @@ function applyDamage(state: GameState, defender: number, damage: number): void {
   }
 
   const group = groupOf(state, defender);
+  const velocityX = units.velocityX[defender] ?? 0;
+  let flip = velocityX < 0;
+  if (Math.abs(velocityX) < 0.02) flip = group !== undefined && Math.cos(group.facing) < 0;
+  recordCorpse(state, defender, flip);
   units.kill(defender);
   if (group !== undefined) {
     group.recentCasualties += 1;

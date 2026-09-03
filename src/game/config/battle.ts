@@ -11,6 +11,9 @@ import { UNIT_CATEGORIES, type Formation, type UnitCategory } from '../types/dom
 export const TICKS_PER_SECOND = 20;
 export const FIXED_STEP_MS = 1000 / TICKS_PER_SECOND;
 
+/** How long a fallen soldier stays on the ground before he fades away. */
+export const CORPSE_LIFETIME_TICKS = TICKS_PER_SECOND * 3;
+
 /** A deliberately large battlefield: several screens wide at default zoom. */
 export const MAP_WIDTH = 8000;
 export const MAP_HEIGHT = 5000;

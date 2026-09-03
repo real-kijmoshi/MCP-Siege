@@ -1,3 +1,4 @@
+import { CORPSE_LIFETIME_TICKS } from '../config/battle';
 import { buildScenario, resolveScenario } from '../config/scenario';
 import {
   resolveSimulationOptions,
@@ -123,6 +124,7 @@ export class SimulationEngine {
     advanceReinforcements(this.state);
     advanceAlerts(this.state);
     this.pruneCombatEvents();
+    this.pruneCorpses();
 
     return tickResults;
   }
@@ -204,6 +206,14 @@ export class SimulationEngine {
     let index = 0;
     while (index < events.length && (events[index]?.tick ?? 0) < cutoff) index += 1;
     if (index > 0) events.splice(0, index);
+  }
+
+  private pruneCorpses(): void {
+    const corpses = this.state.corpses;
+    const cutoff = this.state.currentTick - CORPSE_LIFETIME_TICKS;
+    let index = 0;
+    while (index < corpses.length && (corpses[index]?.deathTick ?? 0) < cutoff) index += 1;
+    if (index > 0) corpses.splice(0, index);
   }
 
   private applyCommand(command: GameCommand): CommandResult {

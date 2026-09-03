@@ -70,10 +70,37 @@ function requireCanvas(id: string): HTMLCanvasElement {
  * deploys somewhere different.
  */
 function frameBattlefield(renderer: Renderer): void {
-  // Start at command zoom. The previous opening framed only the player's
-  // deployment and often put the river, gaps, causeway and objective offscreen
-  // â€” precisely the ground a first order has to reason about.
   renderer.camera.fitBounds(0, 0, MAP_WIDTH, MAP_HEIGHT, 160);
+}
+
+/**
+ * Opens on the player's deployment, tighter than the whole-field command view.
+ *
+ * The first frame should contain every regiment the commander commands, but not
+ * the empty ground between them and the enemy. `frameBattlefield` stays bound to
+ * the "fit battlefield" button for when the whole ground needs reasoning about.
+ */
+function frameOpening(engine: SimulationEngine, renderer: Renderer): void {
+  const state = engine.getState();
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const group of activeGroups(state, 'player')) {
+    for (const index of group.members) {
+      const x = state.units.x[index] ?? 0;
+      const y = state.units.y[index] ?? 0;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+  if (left === Number.POSITIVE_INFINITY) {
+    frameBattlefield(renderer);
+    return;
+  }
+  renderer.camera.fitBounds(left, top, right, bottom);
 }
 
 async function bootstrap(): Promise<void> {
@@ -154,7 +181,7 @@ async function bootstrap(): Promise<void> {
       setSpeed(speed === 0 ? 1 : 0);
     },
     onSpeedChange: (delta) => {
-      const steps = [0, 1, 2, 4];
+      const steps = [0, 0.5, 1, 2, 4];
       const current = steps.indexOf(speed);
       setSpeed(steps[Math.max(0, Math.min(steps.length - 1, current + delta))] ?? 1);
     },
@@ -180,7 +207,7 @@ async function bootstrap(): Promise<void> {
   });
   battleUx.update(renderer.selection, speed);
 
-  frameBattlefield(renderer);
+  frameOpening(engine, renderer);
 
   window.addEventListener('resize', () => {
     // Only the viewport changes here. Re-framing would snatch the camera away

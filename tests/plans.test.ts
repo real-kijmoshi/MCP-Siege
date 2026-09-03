@@ -59,7 +59,7 @@ function ironCrossing() {
         note: 'Sweep the ford once the centre is committed.',
       },
       {
-        groupId: 'fenmen',
+        groupId: 'kingsguard',
         action: 'support',
         targetGroupId: 'vanguard',
         startCondition: { kind: 'morale_below', groupId: 'vanguard', value: 60 },
@@ -198,7 +198,7 @@ describe('plan mode', () => {
     expect(state.conditionals).toHaveLength(2);
 
     // The reserve has not moved: its trigger has not been met.
-    expect(findGroup(state, 'fenmen')?.order.kind).toBe('idle');
+    expect(findGroup(state, 'kingsguard')?.order.kind).toBe('idle');
   });
 
   it('refuses to execute the same plan twice', async () => {

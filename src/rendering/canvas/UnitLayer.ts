@@ -1,9 +1,9 @@
 import {
   CATEGORY_TOKEN,
+  CORPSE_LIFETIME_TICKS,
   FORMATION_PROFILES,
   STRENGTH_ESTIMATE_GRANULARITY,
   TICKS_PER_SECOND,
-  UNIT_STATS,
 } from '../../game/config/battle';
 import { UNIT_CATEGORIES, FACTION_PLAYER, type ArmyGroup, type UnitCategory } from '../../game/types/domain';
 import { activeGroups, type GameState } from '../../game/simulation/GameState';
@@ -215,6 +215,9 @@ const FIGURE_GEOMETRY: ReadonlyArray<readonly FigureGeometry[]> = UNIT_CATEGORIE
 /** A group counts as in contact for this long after its last casualty. */
 const ENGAGED_TICKS = TICKS_PER_SECOND * 3;
 
+/** How many ticks a man takes to collapse onto the ground once he falls. */
+const CORPSE_FALL_TICKS = 5;
+
 /**
  * The art grid, in world units.
  *
@@ -223,12 +226,6 @@ const ENGAGED_TICKS = TICKS_PER_SECOND * 3;
  * the whole field reads as one drawing rather than as sprites over vectors.
  */
 const PIXEL = 6;
-
-/** How far a regiment marches in ten seconds. The gold field shows exactly that. */
-const MARCH_PREVIEW_SECONDS = 10;
-
-/** Range fields are command feedback, not wallpaper; past this they are noise. */
-const MAX_RANGE_FIELDS = 3;
 
 function snap(value: number): number {
   return Math.round(value / PIXEL) * PIXEL;
@@ -302,7 +299,6 @@ export class UnitLayer {
     bottom: number;
   }> = [];
   /** Dither fills and troop icons, built on first use and kept for the battle. */
-  private readonly patterns = new Map<string, CanvasPattern>();
   private readonly icons = new Map<UnitCategory, HTMLCanvasElement>();
 
   public constructor() {
@@ -335,6 +331,7 @@ export class UnitLayer {
       return;
     }
 
+    this.drawCorpses(context, camera, state, interpolation);
     this.fillBatches(camera, state, previous, interpolation);
 
     if (camera.zoom >= DETAIL_ZOOM) {
@@ -367,6 +364,68 @@ export class UnitLayer {
 
     betweenBodiesAndLabels?.();
     this.drawGroupMarkers(context, camera, state, selected, previous, interpolation);
+  }
+
+  /**
+   * The fallen, drawn before the living so the next rank covers them.
+   *
+   * A corpse collapses over a handful of ticks from a tall bar into a flat
+   * body, greys out as it does so, and then fades over the rest of its life.
+   * The animation runs on the tick clock like every other effect, so it freezes
+   * when the battle is paused.
+   */
+  private drawCorpses(
+    context: CanvasRenderingContext2D,
+    camera: Camera,
+    state: GameState,
+    interpolation: number,
+  ): void {
+    const corpses = state.corpses;
+    if (corpses.length === 0) return;
+
+    const bounds = camera.visibleBounds;
+    const margin = 40;
+    const left = bounds.left - margin;
+    const right = bounds.right + margin;
+    const top = bounds.top - margin;
+    const bottom = bounds.bottom + margin;
+
+    for (const corpse of corpses) {
+      if (corpse.x < left || corpse.x > right || corpse.y < top || corpse.y > bottom) continue;
+      if (corpse.owner !== FACTION_PLAYER && visibilityAt(state, 'player', corpse.x, corpse.y) !== 2) {
+        continue;
+      }
+
+      const age = Math.max(0, state.currentTick - corpse.deathTick - (1 - interpolation));
+      const life = Math.max(0, 1 - age / CORPSE_LIFETIME_TICKS);
+      if (life <= 0) continue;
+
+      const category: UnitCategory = corpse.category;
+      const block = SIZE[category];
+      const p = Math.min(1, age / CORPSE_FALL_TICKS);
+      // Collapse: a standing bar folds into a body laid flat on the ground.
+      const height = Math.max(2, block * (0.9 - 0.55 * p));
+      const width = block * (0.4 + 0.6 * p);
+      const bx = corpse.x - width / 2;
+      const by = corpse.y - height;
+
+      // Faction cloth first, then gray drawn over it, taking hold as he falls.
+      context.globalAlpha = life;
+      context.fillStyle = colorFor(corpse.owner, category);
+      context.fillRect(bx, by, width, height);
+      context.globalAlpha = life * p;
+      context.fillStyle = PALETTE.stoneDark;
+      context.fillRect(bx, by, width, height);
+
+      // A small head square at the leading end, gray and fading with the body.
+      const head = Math.max(2, block * 0.3);
+      context.globalAlpha = life * (0.4 + 0.6 * p);
+      context.fillStyle = PALETTE.stone;
+      const hx = corpse.flip === 1 ? bx : bx + width - head;
+      context.fillRect(hx, by - head, head, head);
+    }
+
+    context.globalAlpha = 1;
   }
 
   /**
@@ -693,9 +752,6 @@ export class UnitLayer {
         group.lastCasualtyTick >= 0 && state.currentTick - group.lastCasualtyTick < ENGAGED_TICKS;
 
       if (selected.has(group.id)) {
-        if (isPlayer && selected.size <= MAX_RANGE_FIELDS) {
-          this.drawRangeFields(context, state, group, x, y);
-        }
         this.drawSelectionBracket(context, camera, state, x, y, spread);
       }
 
@@ -867,74 +923,6 @@ export class UnitLayer {
       context.fillRect(armLeft, originY - (sy > 0 ? thickness : 0), arm, thickness);
       context.fillRect(originX - (sx > 0 ? thickness : 0), armTop, thickness, arm);
     }
-  }
-
-  /**
-   * How far these men can march, and how far they can reach.
-   *
-   * Both are drawn as dithered pixel fields, which is the only honest way to
-   * show a soft limit on a hard grid, and the only overlay that can sit on top
-   * of the ground without hiding it.
-   */
-  private drawRangeFields(
-    context: CanvasRenderingContext2D,
-    state: GameState,
-    group: ArmyGroup,
-    x: number,
-    y: number,
-  ): void {
-    const role = this.primaryRole(state, group);
-    const stats = UNIT_STATS[role];
-    const march = stats.speed * TICKS_PER_SECOND * MARCH_PREVIEW_SECONDS;
-
-    const gold = this.ditherPattern(context, PALETTE.selection);
-    if (gold !== null) {
-      context.save();
-      context.globalAlpha = 0.3;
-      context.fillStyle = gold;
-      context.beginPath();
-      context.arc(x, y, march, 0, Math.PI * 2);
-      context.fill();
-      context.restore();
-    }
-
-    // A melee reach of fourteen world units is not worth a field; a siege
-    // engine's is the single most important thing on the commander's screen.
-    if (stats.range < 60) return;
-    const crimson = this.ditherPattern(context, PALETTE.enemyLight);
-    if (crimson === null) return;
-    context.save();
-    context.globalAlpha = 0.3;
-    context.fillStyle = crimson;
-    context.beginPath();
-    context.arc(x, y, stats.range, 0, Math.PI * 2);
-    context.fill();
-    context.restore();
-  }
-
-  /** A four-pixel checkerboard, locked to the world grid, cached per colour. */
-  private ditherPattern(
-    context: CanvasRenderingContext2D,
-    color: string,
-  ): CanvasPattern | null {
-    const cached = this.patterns.get(color);
-    if (cached !== undefined) return cached;
-
-    const tile = document.createElement('canvas');
-    tile.width = 4;
-    tile.height = 4;
-    const tileContext = tile.getContext('2d');
-    if (tileContext === null) return null;
-    tileContext.fillStyle = color;
-    tileContext.fillRect(0, 0, 2, 2);
-    tileContext.fillRect(2, 2, 2, 2);
-
-    const pattern = context.createPattern(tile, 'repeat');
-    if (pattern === null) return null;
-    // One tile pixel to one art pixel, so the dither lines up with the ground.
-    pattern.setTransform(new DOMMatrix().scale(PIXEL));
-    this.patterns.set(color, pattern);
-    return pattern;
   }
 
   /** Troop icons are baked once and blitted; they are drawn every frame. */

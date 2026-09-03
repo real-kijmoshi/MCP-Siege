@@ -9,8 +9,8 @@ demonstration.
 
 ## The fantasy
 
-You command regiments, not soldiers. Around 8,700 men in twenty-six formations
-hold a river line. Reading the battle is meant to be possible at a glance:
+You command regiments, not soldiers. Depending on the operation, roughly 3,100
+to 6,400 men fight in twelve to sixteen formations. Reading the battle is meant to be possible at a glance:
 colour is faction, shape is troop type, and zoomed out each regiment collapses
 to a blob with a name and a morale bar.
 
@@ -123,18 +123,18 @@ Three things follow from it:
 
 ## Intentionally limited scope
 
-Four authored operations, one for each authored battlefield, plus a teaching
-battle laid on the first of those battlefields and the designed operation on the
-War Council table — whose ground is the commander's to choose. Three
-deterministic enemy command presets, one battle at a time. Maps are *written*,
-never generated: each one is hand-placed ground with hand-placed roads, and the
-four share one size, one fog grid and one camera. The authored operations are
-hand-written too — a deployment and a timetable each. The one thing that is not hand-written is the
-operation an external Marshal designs for itself, and even that is assembled
-from the same named ground by the same builder, then validated before anything
-is raised on it. Non-goals: multiplayer, accounts, persistence, campaigns, base
-building, technology trees, heroes, diplomacy, procedural maps, mobile controls,
-per-soldier animation, and any embedded LLM infrastructure.
+Four authored operations, one for each authored battlefield, plus the designed
+operation on the War Council table — whose ground is the commander's to choose.
+Three deterministic enemy command presets, one battle at a time. Maps are
+*written*, never generated: each one is hand-placed ground with hand-placed
+roads, and the four share one size, one fog grid and one camera. The authored
+operations are hand-written too — a deployment and a timetable each. The one
+thing that is not hand-written is the operation an external Marshal designs for
+itself, and even that is assembled from the same named ground by the same
+builder, then validated before anything is raised on it. Non-goals:
+multiplayer, accounts, persistence, campaigns, base building, technology trees,
+heroes, diplomacy, procedural maps, mobile controls, per-soldier animation, and
+any embedded LLM infrastructure.
 
 Ten troop types, fixed at authoring time. The arms exist to make the counter
 matrix worth reading, and each one earns its place by being the answer to
@@ -152,28 +152,13 @@ are not an economy and should not become one.
 
 Four, not seven — one for each battlefield. Each exists to pose a problem the
 other three do not, and an operation that only changed where the regiments
-started was cut rather than kept. The teaching battle in front of them is the
-one exception, and it earns the exception by posing the problem of the trade
-itself.
-
-**0. First Command** (River Vale) is the drill, and it is a real operation
-rather than a mode: one map, one deployment, one written commander, the same
-twenty-six regiments and the same rules. Everything about it is the inverse of
-the battle it shares its ground with. The whole Crown army stands in one body on
-the Central Field with the guns and the bows on the hill behind it and the King
-far to the rear; nothing is bait, nothing is held back for a moment that has to
-be judged, and the first Ashen regiment does not step off until the second
-minute. They come down one road, over one bridge, one regiment at a time, and
-the rest of their host is drawn up but never sent — so a commander who holds the
-near bank and then crosses fights exactly the battle the briefing describes. It
-is deliberately fought on River Vale, so that the ground is already familiar
-when Bridge of Knives lays a trap on it.
+started was cut rather than kept.
 
 **I. Bridge of Knives** (River Vale) is a trap, and the deployment is the whole
-operation. The centre is a corps of bows and a wall of spears standing alone at
-the middle bridge, which reads to the Ashen commander as the thin place worth
-crossing. Both bodies of foot are back and wide of it; both bodies of horse wait
-in the woods on the flanks. A regiment that crosses a bridge arrives crowded —
+operation. Two bow regiments stand alone at the middle bridge, which reads to
+the Ashen commander as the thin place worth crossing. Two knight regiments wait
+back and wide of them, with one cavalry wing hidden in the western wood. A
+regiment that crosses a bridge arrives crowded —
 too packed to swing — and a crowded regiment closed on from two sides is
 surrounded as well, so the crowding and encirclement rules are what actually
 decide this battle. Spring it early and you meet the Cinder Host in the open at

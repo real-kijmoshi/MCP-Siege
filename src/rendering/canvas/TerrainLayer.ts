@@ -96,7 +96,8 @@ const M_GARDEN = 18;
 const M_COBBLE = 19;
 const M_TRACK = 20;
 const M_SCREE = 21;
-const MATERIAL_COUNT = 22;
+const M_ROAD_RUT = 22;
+const MATERIAL_COUNT = 23;
 
 interface Prop {
   /** World coordinates. */
@@ -202,10 +203,10 @@ export class TerrainLayer {
         case 'open':
           // Tilled strips rather than a flat wash, laid out from a stable hash
           // so a field looks the same on every load.
-          this.fillBlob(cx, cy, radius * 0.92, radius * 0.66, M_FIELD, 0.34, zone.id);
+          this.fillBlob(cx, cy, radius * 0.92, radius * 0.66, M_FIELD, 0.16, zone.id);
           break;
         case 'forest':
-          this.fillBlob(cx, cy, radius * 0.98, radius * 0.86, M_FOREST, 0.4, zone.id);
+          this.fillBlob(cx, cy, radius * 0.98, radius * 0.86, M_FOREST, 0.2, zone.id);
           break;
         case 'hill':
           // Five contours rather than three, each drawn from its own seed so the
@@ -256,7 +257,7 @@ export class TerrainLayer {
           this.scatterInBlob(cx, cy, radius * 0.9, radius * 0.6, M_SCREE, 0.07, zone.id + 83, [M_HILL, M_CONTOUR, M_ROCK]);
           break;
         case 'village':
-          this.fillBlob(cx, cy, radius * 0.82, radius * 0.7, M_EARTH, 0.36, zone.id);
+          this.fillBlob(cx, cy, radius * 0.82, radius * 0.7, M_EARTH, 0.18, zone.id);
           break;
         case 'ridge':
           // Rock is built up in bands: a dark body, a lighter shoulder offset
@@ -286,8 +287,8 @@ export class TerrainLayer {
         const center = barrierCenterAt(x * ART_SCALE) / ART_SCALE;
         // A ragged bank. A ruler-straight edge is the one thing that would give
         // the whole bake away as generated.
-        const wobbleTop = (artHash(x, 11) - 0.5) * 2.2;
-        const wobbleBottom = (artHash(x, 29) - 0.5) * 2.2;
+        const wobbleTop = (artHash(x, 11) - 0.5) * 1.2;
+        const wobbleBottom = (artHash(x, 29) - 0.5) * 1.2;
         const top = Math.round(center - half + wobbleTop);
         const bottom = Math.round(center + half + wobbleBottom);
         for (let y = top; y <= bottom; y += 1) this.set(x, y, rock ? M_ROCK : M_WATER);
@@ -309,14 +310,36 @@ export class TerrainLayer {
 
   /** Worn tracks between the places armies actually march between. */
   private paintRoads(): void {
-    for (const route of activeBattleMap().roads) {
-      const points = route.map((id) => ZONES[id].center);
-      for (let index = 0; index < points.length - 1; index += 1) {
-        const from = points[index];
-        const to = points[index + 1];
-        if (from === undefined || to === undefined) continue;
-        this.stampLine(from.x, from.y, to.x, to.y, 2, M_ROAD, M_ROAD_EDGE);
-      }
+    const roads = activeBattleMap().roads;
+
+    // Lay the complete network in passes. If each road paints shoulder and
+    // surface together, the shoulder of the next road cuts a dark stripe
+    // through junctions and makes the map look wired together. A broad first
+    // pass also lets the road settle into the ground instead of reading as a
+    // single hard-edged line.
+    for (const route of roads) this.paintRoadPass(route, 4.25, M_ROAD_EDGE, 17);
+    for (const route of roads) this.paintRoadPass(route, 2.75, M_ROAD, 17);
+    for (const route of roads) this.paintRoadRuts(route, 17);
+  }
+
+  private paintRoadPass(route: readonly ZoneId[], halfWidth: number, material: number, salt: number): void {
+    const points = route.map((id) => ZONES[id].center);
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const from = points[index];
+      const to = points[index + 1];
+      if (from === undefined || to === undefined) continue;
+      this.stampLine(from.x, from.y, to.x, to.y, halfWidth, material, salt + index * 31);
+    }
+  }
+
+  /** Broken twin wheel marks give the warm road surface scale and direction. */
+  private paintRoadRuts(route: readonly ZoneId[], salt: number): void {
+    const points = route.map((id) => ZONES[id].center);
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const from = points[index];
+      const to = points[index + 1];
+      if (from === undefined || to === undefined) continue;
+      this.stampRuts(from.x, from.y, to.x, to.y, salt + index * 31);
     }
   }
 
@@ -745,15 +768,15 @@ export class TerrainLayer {
     }
   }
 
-  /** Stamps a track between two world points, with a darker verge. */
+  /** Stamps one layer of a gently bowed, ragged track. */
   private stampLine(
     fromX: number,
     fromY: number,
     toX: number,
     toY: number,
     halfWidth: number,
-    core: number,
-    verge: number,
+    material: number,
+    salt: number,
   ): void {
     const ax = fromX / ART_SCALE;
     const ay = fromY / ART_SCALE;
@@ -761,39 +784,68 @@ export class TerrainLayer {
     const by = toY / ART_SCALE;
     const length = Math.hypot(bx - ax, by - ay);
     const steps = Math.max(1, Math.ceil(length));
+    const normalX = -(by - ay) / length;
+    const normalY = (bx - ax) / length;
+    const bow = (artHash(Math.round(ax) + salt, Math.round(by)) - 0.5) * 14;
 
     for (let step = 0; step <= steps; step += 1) {
       const t = step / steps;
-      const x = ax + (bx - ax) * t;
-      const y = ay + (by - ay) * t;
-      // Enough wander to look walked rather than surveyed, and no more: at a
-      // pixel and a half either way a track turns into a ribbon of noise.
-      const wander = (artHash(step, 5) - 0.5) * 0.8;
-      const radius = halfWidth + (artHash(step, 9) > 0.92 ? 1 : 0);
-      for (let oy = -radius - 1; oy <= radius + 1; oy += 1) {
-        for (let ox = -radius - 1; ox <= radius + 1; ox += 1) {
+      const bend = Math.sin(t * Math.PI) * bow;
+      const wander = Math.sin((t * 5 + artHash(salt, 5)) * Math.PI * 2) * 0.45;
+      const x = ax + (bx - ax) * t + normalX * (bend + wander);
+      const y = ay + (by - ay) * t + normalY * (bend + wander);
+      const radius = halfWidth + (artHash(step + salt, 9) > 0.9 ? 0.8 : 0);
+      for (let oy = -Math.ceil(radius); oy <= Math.ceil(radius); oy += 1) {
+        for (let ox = -Math.ceil(radius); ox <= Math.ceil(radius); ox += 1) {
           const distance = Math.hypot(ox, oy);
-          if (distance > radius + 1) continue;
-          const px = Math.round(x + ox + wander);
+          if (distance > radius) continue;
+          const px = Math.round(x + ox);
           const py = Math.round(y + oy);
           const existing = this.materials[py * ART_WIDTH + px];
           // A track never paints over water or a bridge deck.
           if (existing === M_WATER || existing === M_DECK || existing === M_DECK_EDGE) continue;
-          this.set(px, py, distance > radius ? verge : core);
+          this.set(px, py, material);
         }
       }
     }
   }
 
-  /** Index buffer to pixels, with the per-pixel dither that sells the style. */
+  private stampRuts(fromX: number, fromY: number, toX: number, toY: number, salt: number): void {
+    const ax = fromX / ART_SCALE;
+    const ay = fromY / ART_SCALE;
+    const bx = toX / ART_SCALE;
+    const by = toY / ART_SCALE;
+    const length = Math.hypot(bx - ax, by - ay);
+    const steps = Math.max(1, Math.ceil(length));
+    const normalX = -(by - ay) / length;
+    const normalY = (bx - ax) / length;
+    const bow = (artHash(Math.round(ax) + salt, Math.round(by)) - 0.5) * 14;
+
+    for (let step = 0; step <= steps; step += 1) {
+      if (artHash(step >> 2, salt) < 0.68) continue;
+      const t = step / steps;
+      const bend = Math.sin(t * Math.PI) * bow;
+      const wander = Math.sin((t * 5 + artHash(salt, 5)) * Math.PI * 2) * 0.45;
+      const centerX = ax + (bx - ax) * t + normalX * (bend + wander);
+      const centerY = ay + (by - ay) * t + normalY * (bend + wander);
+      for (const offset of [-1.35, 1.35]) {
+        const x = Math.round(centerX + normalX * offset);
+        const y = Math.round(centerY + normalY * offset);
+        if (this.materials[y * ART_WIDTH + x] === M_ROAD) this.set(x, y, M_ROAD_RUT);
+      }
+    }
+  }
+
+  /** Index buffer to pixels, with broad, restrained texture patches. */
   private resolveMaterials(colors: Record<string, string>): void {
     const context = this.bitmap.getContext('2d');
     if (context === null) return;
     const image = context.createImageData(ART_WIDTH, ART_HEIGHT);
     const data = image.data;
 
-    // Two shades per material, chosen per pixel from a stable hash. Flat colour
-    // at this resolution looks like a wireframe; a two-tone dither looks woven.
+    // Two shades per material, chosen in broad patches from a stable hash. The
+    // old per-pixel dither made the whole map read as static when zoomed out;
+    // large quiet areas make terrain boundaries and formations easier to read.
     const ramp: Array<[string, string]> = new Array(MATERIAL_COUNT).fill(['#000', '#000']);
     // Both ground shades are derived from the map's own colour rather than
     // paired with the palette's default green. A map that tints its earth ash
@@ -835,6 +887,7 @@ export class TerrainLayer {
     ramp[M_COBBLE] = [PALETTE.cobbleDark, PALETTE.cobble];
     ramp[M_TRACK] = [colors.road ?? PALETTE.road, PALETTE.sandDark];
     ramp[M_SCREE] = [PALETTE.stone, PALETTE.scree];
+    ramp[M_ROAD_RUT] = [PALETTE.earth, PALETTE.sandDark];
 
     const channels = ramp.map(([low, high]) => [hexToRgb(low), hexToRgb(high)] as const);
 
@@ -844,8 +897,9 @@ export class TerrainLayer {
         const material = this.materials[index] ?? M_GRASS;
         const pair = channels[material] ?? channels[M_GRASS];
         if (pair === undefined) continue;
-        // Coarse 2×2 blocks, so the dither reads as texture and not as static.
-        const bright = artHash(x >> 1, y >> 1) > 0.74;
+        // Coarse patches preserve the pixel-art grain without covering the
+        // ground in a checkerboard of competing colours.
+        const bright = artHash(x >> 2, y >> 2) > 0.84;
         const rgb = bright ? pair[1] : pair[0];
         const offset = index * 4;
         data[offset] = rgb[0];

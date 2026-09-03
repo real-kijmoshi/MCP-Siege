@@ -177,17 +177,11 @@ where he stands.
 
 ## Operations and difficulty
 
-The War Council — the home screen — offers a teaching battle and four authored
-operations, one for each hand-built 8,000 × 5,000 battlefield, plus the designed
-operation on the table. Each map is shaped around one dividing feature and the
-few places it can be passed, and the portrait on the council screen is drawn
-from the map data itself, so a battle designed thirty seconds ago gets a real
-portrait too.
-
-**0. First Command** — River Vale, the same ground as the operation after it and
-none of its cunning. Your whole army in one body, a quiet first minute, and the
-Ashen coming down one road over one bridge a regiment at a time. The rest of
-their host is drawn up and never sent.
+The War Council — the home screen — offers four authored operations, one for
+each hand-built 8,000 × 5,000 battlefield, plus the designed operation on the
+table. Each map is shaped around one dividing feature and the few places it can
+be passed, and the portrait on the council screen is drawn from the map data
+itself, so a battle designed thirty seconds ago gets a real portrait too.
 
 **I. Bridge of Knives** — River Vale, a slow river with three crossings. Your
 centre is bait. Let the Cinder Host cross, let the bridgehead crowd, then close

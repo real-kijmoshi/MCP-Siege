@@ -4,7 +4,12 @@ import { SCENARIOS, createGroupFromSpec, type GroupSpec } from '../src/game/conf
 import { GameQueries } from '../src/game/queries/GameQueries';
 import { evaluateCondition } from '../src/game/simulation/Conditions';
 import { SimulationEngine } from '../src/game/simulation/Engine';
-import { createEmptyState, findGroup, type GameState } from '../src/game/simulation/GameState';
+import {
+  activeGroups,
+  createEmptyState,
+  findGroup,
+  type GameState,
+} from '../src/game/simulation/GameState';
 import { advanceMorale } from '../src/game/simulation/Morale';
 import { advanceObjective, livingStrengthOf } from '../src/game/simulation/Objective';
 import type { UnitCategory } from '../src/game/types/domain';
@@ -207,7 +212,7 @@ describe('the objective in the scenario', () => {
       const king = state.objective.kings[playerId];
       const guard = findGroup(state, king.guardGroupId);
       expect(guard?.ownerId).toBe(playerId);
-      expect(king.guardStrength).toBeGreaterThan(300);
+      expect(king.guardStrength).toBe(120);
       expect(king.position).toEqual({ x: guard?.anchor.x, y: guard?.anchor.y });
       expect(state.objective.initialStrength[playerId]).toBe(livingStrengthOf(state, playerId));
     }
@@ -235,7 +240,8 @@ describe('the objective in the scenario', () => {
 
   it('does not reveal the enemy king before he has been sighted', () => {
     const engine = new SimulationEngine();
-    const queries = new GameQueries(() => engine.getState());
+    const state = engine.getState();
+    const queries = new GameQueries(() => state);
     const report = queries.getObjective('player');
 
     expect(report.enemyKing.lastSeenZone).toBeUndefined();
@@ -243,14 +249,14 @@ describe('the objective in the scenario', () => {
     expect(report.enemyKing.note).toContain('Never sighted');
     expect(report.result).toEqual({
       elapsedSeconds: 0,
-      initialUnits: 3931,
-      survivingUnits: 3931,
+      initialUnits: state.objective.initialStrength.player,
+      survivingUnits: state.objective.initialStrength.player,
       losses: 0,
-      survivingRegiments: 13,
+      survivingRegiments: activeGroups(state, 'player').length,
     });
 
     // Nothing in the projection carries his true position, in any form.
-    const trueY = engine.getState().objective.kings.enemy.position.y;
+    const trueY = state.objective.kings.enemy.position.y;
     expect(JSON.stringify(report)).not.toContain(String(Math.round(trueY)));
   });
 

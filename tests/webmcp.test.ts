@@ -71,7 +71,7 @@ describe('registration', () => {
 describe('reads', () => {
   it('returns a strategic overview rather than a state dump', () => {
     const data = unwrap(tools.getBattleOverview());
-    expect(data.playerUnits).toBeGreaterThan(3000);
+    expect(data.playerUnits).toBeGreaterThan(1000);
     expect(data.fronts).toBeTruthy();
     expect(data.operation).toEqual({
       id: 'bridge_of_knives',
@@ -239,6 +239,8 @@ describe('commands', () => {
   });
 
   it('splits a group while preserving its mix of troops', async () => {
+    engine = new SimulationEngine({ scenarioId: 'ember_gate', seed: 7 });
+    tools = createWebMcpToolHandlers({ engine, queries: new GameQueries(() => engine.getState()) });
     const before = activeGroups(engine.getState(), 'player').find((g) => g.id === 'fenmen');
     const beforeStrength = before?.members.length ?? 0;
 
@@ -270,6 +272,8 @@ describe('commands', () => {
   });
 
   it('detaches a troop category into a new regiment without soldier ids', async () => {
+    engine = new SimulationEngine({ scenarioId: 'ember_gate', seed: 7 });
+    tools = createWebMcpToolHandlers({ engine, queries: new GameQueries(() => engine.getState()) });
     const state = engine.getState();
     const source = activeGroups(state, 'player').find((group) => group.id === 'fenmen')!;
     const before = source.members.length;

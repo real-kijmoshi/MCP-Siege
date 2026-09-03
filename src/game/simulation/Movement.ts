@@ -110,7 +110,12 @@ function assessEngagement(state: GameState, group: ArmyGroup): void {
   }
 }
 
-/** Missile-led regiments halt an assault to fire, but an explicit move keeps moving. */
+/**
+ * Missile-led regiments halt an assault to fire, but an explicit move keeps
+ * moving, and a regiment standing on a crossing never halts at all: a bridge
+ * or ford is ground you have to get off, not ground you fight from, and a
+ * stopped regiment there wedges the whole column against the bank behind it.
+ */
 function shouldHaltForVolley(group: ArmyGroup): boolean {
   if (
     group.routing ||
@@ -120,6 +125,7 @@ function shouldHaltForVolley(group: ArmyGroup): boolean {
   ) {
     return false;
   }
+  if (terrainAt(group.anchor.x, group.anchor.y) === 'crossing') return false;
   const ranged = engagementAssessment[3] ?? 0;
   const firing = engagementAssessment[4] ?? 0;
   return ranged * 2 >= group.members.length && firing >= Math.max(1, Math.ceil(ranged * 0.02));

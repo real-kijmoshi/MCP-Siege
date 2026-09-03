@@ -4,6 +4,12 @@ import { stateChecksum } from '../src/game/simulation/GameState';
 import { activeGroups } from '../src/game/simulation/GameState';
 import { TICKS_PER_SECOND } from '../src/game/config/battle';
 import { AUTHORED_SCENARIO_IDS } from '../src/game/config/matches';
+import {
+  ASHEN_ARMY,
+  CROWN_ARMY,
+  SCENARIOS,
+  type ScenarioDefinition,
+} from '../src/game/config/scenario';
 import { barrierCenterAt, useBattleMap } from '../src/game/simulation/Zones';
 
 function run(engine: SimulationEngine, ticks: number): void {
@@ -21,22 +27,34 @@ async function breathe(tick: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+const FULL_VALE: ScenarioDefinition = {
+  ...SCENARIOS.bridge_of_knives,
+  id: 'custom',
+  origin: 'designed',
+  playerGroups: CROWN_ARMY,
+  enemyGroups: ASHEN_ARMY,
+  aiScript: SCENARIOS.bridge_of_knives.aiScript.filter(
+    (order) => order.groupId !== 'cinder_bowmen',
+  ),
+};
+
 describe('scenario', () => {
-  it('deploys both armies with thousands of units', () => {
+  it('deploys a readable field force with thousands of units', () => {
     const engine = new SimulationEngine();
     const state = engine.getState();
 
     const player = activeGroups(state, 'player');
     const enemy = activeGroups(state, 'enemy');
 
-    // Twelve field regiments a side, plus the Royal Guard each king rides with.
-    expect(player.length).toBe(13);
-    expect(enemy.length).toBe(13);
+    expect(player.length).toBe(state.scenario.playerGroups.length);
+    expect(enemy.length).toBe(state.scenario.enemyGroups.length);
+    expect(player.length).toBeLessThanOrEqual(8);
+    expect(enemy.length).toBeLessThanOrEqual(8);
     expect(state.objective.kings.player.guardGroupId).toBe('kingsguard');
     expect(state.objective.kings.enemy.guardGroupId).toBe('ashen_guard');
 
     const total = state.units.livingCount();
-    expect(total).toBeGreaterThan(7000);
+    expect(total).toBeGreaterThan(2500);
     expect(total).toBeLessThan(10_000);
   });
 
@@ -67,13 +85,38 @@ describe('scenario', () => {
     const state = engine.getState();
 
     expect(state.scenarioId).toBe(scenarioId);
-    expect(activeGroups(state, 'player')).toHaveLength(13);
-    expect(activeGroups(state, 'enemy')).toHaveLength(13);
-    expect(state.objective.initialStrength.player).toBeGreaterThan(3000);
-    expect(state.objective.initialStrength.enemy).toBeGreaterThan(3000);
+    expect(activeGroups(state, 'player')).toHaveLength(state.scenario.playerGroups.length);
+    expect(activeGroups(state, 'enemy')).toHaveLength(state.scenario.enemyGroups.length);
+    expect(state.scenario.playerGroups.length).toBeGreaterThanOrEqual(6);
+    expect(state.scenario.playerGroups.length).toBeLessThanOrEqual(8);
+    expect(state.scenario.enemyGroups.length).toBeGreaterThanOrEqual(6);
+    expect(state.scenario.enemyGroups.length).toBeLessThanOrEqual(8);
+    expect(state.objective.initialStrength.player).toBeGreaterThan(1500);
+    expect(state.objective.initialStrength.enemy).toBeGreaterThan(1500);
     expect(state.objective.kings.player.guardGroupId).toBe('kingsguard');
     expect(state.objective.kings.enemy.guardGroupId).toBe('ashen_guard');
   });
+
+  it.each(['bridge_of_knives'] as const)(
+    'keeps the %s order of battle to two knights, one cavalry, two bows and a small guard',
+    (scenarioId) => {
+      const state = new SimulationEngine({ scenarioId }).getState();
+
+      for (const playerId of ['player', 'enemy'] as const) {
+        const groups = activeGroups(state, playerId);
+        const guardId = state.objective.kings[playerId].guardGroupId;
+        const guard = groups.find((group) => group.id === guardId);
+        expect(groups).toHaveLength(6);
+        expect(guard?.initialStrength).toBe(120);
+
+        const roleOf = (group: (typeof groups)[number]): string =>
+          state.units.categoryOf(group.members[0] ?? -1);
+        expect(groups.filter((group) => group.id !== guardId && roleOf(group) === 'heavy_infantry')).toHaveLength(2);
+        expect(groups.filter((group) => roleOf(group) === 'cavalry')).toHaveLength(1);
+        expect(groups.filter((group) => roleOf(group) === 'archer')).toHaveLength(2);
+      }
+    },
+  );
 
   it('gives each operation a materially different opening deployment', () => {
     // Four operations, one order of battle, four genuinely different
@@ -219,7 +262,7 @@ describe('morale', () => {
       state.groups[state.groupIndexById.get('vanguard') ?? -1];
 
     const initial = legion()?.initialStrength ?? 0;
-    expect(initial).toBeGreaterThan(500);
+    expect(initial).toBeGreaterThan(300);
 
     engine.dispatch('human', {
       type: 'order_groups',
@@ -247,9 +290,9 @@ describe('morale', () => {
   });
 
   it('will not let a shattered regiment recover full confidence', async () => {
-    const engine = new SimulationEngine();
+    const engine = new SimulationEngine({ scenarioId: 'bridge_of_knives' });
     const state = engine.getState();
-    const group = state.groups[state.groupIndexById.get('outrunners') ?? -1];
+    const group = state.groups[state.groupIndexById.get('greyriders') ?? -1];
     expect(group).toBeDefined();
     if (group === undefined) return;
 
@@ -279,9 +322,9 @@ describe('battle tempo', () => {
     const state = engine.getState();
 
     const script: Array<[number, string[], 'central_field' | 'central_bridge' | 'enemy_base']> = [
-      [20, ['vanguard', 'ironbacks', 'hedge', 'longbows'], 'central_field'],
-      [120, ['vanguard', 'ironbacks', 'hedge'], 'central_bridge'],
-      [300, ['vanguard', 'ironbacks', 'fenmen'], 'enemy_base'],
+      [20, ['vanguard', 'ironbacks', 'longbows', 'vale_bowmen'], 'central_field'],
+      [120, ['vanguard', 'ironbacks'], 'central_bridge'],
+      [300, ['vanguard', 'ironbacks', 'kingsguard'], 'enemy_base'],
     ];
 
     for (let tick = 0; tick < TICKS_PER_SECOND * 60 * 25; tick += 1) {
@@ -343,7 +386,11 @@ describe('battle tempo', () => {
    * way, at the sovereign the player has just left behind.
    */
   it('refuses a hopeless assault and marches around an army that has committed itself', async () => {
-    const engine = new SimulationEngine({ difficultyId: 'captain' });
+    const engine = new SimulationEngine({
+      scenarioId: 'custom',
+      scenario: FULL_VALE,
+      difficultyId: 'captain',
+    });
     const state = engine.getState();
 
     const committed = activeGroups(state, 'player')

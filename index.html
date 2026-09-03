@@ -36,60 +36,55 @@
       <main class="council-table">
         <nav class="operation-ledger" aria-label="Choose an operation">
           <h1>CHOOSE AN OPERATION</h1>
+          <p class="ledger-intro">You command the <b>Crown</b>. The first battle is the gentlest.</p>
           <div class="operation-list" id="lobby-operations"></div>
-          <p class="ledger-note" id="ledger-note">
-            The last seal is the table itself: a blank battle on any of the four battlefields,
-            yours to fight as it stands and your Marshal's to rewrite through WebMCP.
-          </p>
         </nav>
 
         <section class="operation-brief" aria-label="Operation briefing">
           <figure class="field-portrait">
-            <canvas id="lobby-map" aria-label="Battlefield portrait"></canvas>
+            <div class="portrait-plate">
+              <canvas id="lobby-map" aria-label="Battlefield portrait"></canvas>
+              <ul class="portrait-key" aria-hidden="true">
+                <li><i class="key-block key-crown"></i>YOUR ARMY</li>
+                <li><i class="key-block key-ashen"></i>THE ENEMY</li>
+                <li><i class="key-block key-king"></i>KINGS</li>
+                <li><i class="key-block key-cross"></i>CROSSINGS</li>
+              </ul>
+            </div>
             <figcaption>
               <span class="icon" data-icon="map"></span>
               <b id="brief-battlefield">RIVER VALE</b>
               <em id="brief-terrain"></em>
             </figcaption>
-            <ul class="portrait-key" aria-hidden="true">
-              <li><i class="key-block key-crown"></i>CROWN</li>
-              <li><i class="key-block key-ashen"></i>ASHEN</li>
-              <li><i class="key-block key-king"></i>KINGS</li>
-              <li><i class="key-block key-cross"></i>CROSSING</li>
-            </ul>
           </figure>
 
-          <div class="brief-body">
-            <p class="brief-eyebrow">
-              <b id="brief-numeral">I</b><span id="brief-location"></span>
-            </p>
-            <h2 id="brief-name">Bridge of Knives</h2>
-            <p class="brief-summary" id="brief-summary"></p>
-            <p class="brief-twist" id="brief-twist"></p>
+          <div class="brief-sheet">
+            <div class="brief-body">
+              <p class="brief-eyebrow">
+                <b id="brief-numeral">I</b><span id="brief-location"></span>
+              </p>
+              <h2 id="brief-name">Bridge of Knives</h2>
+              <p class="brief-summary" id="brief-summary"></p>
+              <p class="brief-twist" id="brief-twist"></p>
 
-            <div class="table-ground" id="table-ground" hidden>
-              <p><b>TABLE GROUND</b><em id="table-ground-note"></em></p>
-              <div class="ground-choices" id="table-ground-choices"></div>
+              <div class="table-ground" id="table-ground" hidden>
+                <p><b>TABLE GROUND</b><em id="table-ground-note"></em></p>
+                <div class="ground-choices" id="table-ground-choices"></div>
+              </div>
+
+              <h3>HOW YOU WIN</h3>
+              <ul class="brief-orders" id="brief-orders"></ul>
+
+              <h3>ENEMY COMMANDER</h3>
+              <div class="commander-list" id="lobby-difficulties"></div>
             </div>
-
-            <ul class="brief-orders" id="brief-orders"></ul>
-            <div class="brief-facts" id="brief-facts"></div>
-          </div>
-
-          <aside class="deploy-column">
-            <h3>ENEMY COMMANDER</h3>
-            <div class="commander-list" id="lobby-difficulties"></div>
-            <p class="commander-note" id="difficulty-description"></p>
-
-            <h3>ORDER OF BATTLE</h3>
-            <dl class="order-of-battle" id="brief-armies"></dl>
 
             <button class="deploy-seal" id="lobby-deploy" type="button">
               <span class="icon" data-icon="banner"></span>
-              <b>DEPLOY ARMY</b>
+              <b>BEGIN BATTLE</b>
               <em id="deploy-strength"></em>
             </button>
-          </aside>
+          </div>
         </section>
       </main>
     </section>
@@ -140,6 +135,7 @@
 
         <div class="speed-control" role="group" aria-label="Simulation speed">
           <button type="button" data-speed="0" id="speed-pause" class="active" title="Pause [Space]" aria-label="Pause battle" aria-pressed="true">❚❚</button>
+          <button type="button" data-speed="0.5" aria-label="Half speed" aria-pressed="false">½×</button>
           <button type="button" data-speed="1" aria-label="Normal speed" aria-pressed="false">1×</button>
           <button type="button" data-speed="2" aria-label="Double speed" aria-pressed="false">2×</button>
           <button type="button" data-speed="4" aria-label="Quadruple speed" aria-pressed="false">4×</button>

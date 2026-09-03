@@ -31,7 +31,7 @@ export const PALETTE = {
   riverEdge: '#4682a4',
   crossing: '#7b5a34',
   crossingEdge: '#ab8049',
-  road: '#7d6746',
+  road: '#8d784f',
   village: '#6a4c32',
   villageRoof: '#8e3f34',
 

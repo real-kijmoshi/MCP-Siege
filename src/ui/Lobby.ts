@@ -50,19 +50,23 @@ function armyStrength(operation: ScenarioDefinition, side: 'player' | 'enemy'): 
   const groups = side === 'player' ? operation.playerGroups : operation.enemyGroups;
   let total = 0;
   for (const group of groups) {
-    for (const [, count] of group.composition) total += count;
+    for (const [, men] of group.composition) total += men;
   }
   return total;
 }
 
-/** One row of the order of battle: a label, a figure, and whose figure it is. */
-function orderRow(label: string, value: string, side?: 'player' | 'enemy'): [HTMLElement, HTMLElement] {
-  const term = document.createElement('dt');
-  term.textContent = label;
-  const detail = document.createElement('dd');
-  detail.textContent = value;
-  if (side !== undefined) detail.dataset.side = side;
-  return [term, detail];
+function count(value: number): string {
+  return value.toLocaleString('en-GB');
+}
+
+/** Names, summaries and army names can come from a Marshal, so nothing is markup. */
+function labelled<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  text: string,
+): HTMLElementTagNameMap[K] {
+  const element = document.createElement(tag);
+  element.textContent = text;
+  return element;
 }
 
 const DIFFICULTY_GLYPH: Record<DifficultyId, string> = {
@@ -75,19 +79,16 @@ export function showWarCouncil(): Promise<MatchSelection> {
   const root = requireElement<HTMLElement>('lobby');
   const operationList = requireElement<HTMLElement>('lobby-operations');
   const difficultyList = requireElement<HTMLElement>('lobby-difficulties');
-  const difficultyDescription = requireElement<HTMLElement>('difficulty-description');
   const numeral = requireElement<HTMLElement>('brief-numeral');
   const location = requireElement<HTMLElement>('brief-location');
   const name = requireElement<HTMLElement>('brief-name');
   const summary = requireElement<HTMLElement>('brief-summary');
   const twist = requireElement<HTMLElement>('brief-twist');
   const orders = requireElement<HTMLElement>('brief-orders');
-  const facts = requireElement<HTMLElement>('brief-facts');
   const battlefield = requireElement<HTMLElement>('brief-battlefield');
   const terrain = requireElement<HTMLElement>('brief-terrain');
   const deploy = requireElement<HTMLButtonElement>('lobby-deploy');
   const deployStrength = requireElement<HTMLElement>('deploy-strength');
-  const armies = requireElement<HTMLElement>('brief-armies');
   const marshal = requireElement<HTMLElement>('council-marshal');
   const marshalLabel = requireElement<HTMLElement>('council-marshal-label');
   const tableGround = requireElement<HTMLElement>('table-ground');
@@ -150,14 +151,26 @@ export function showWarCouncil(): Promise<MatchSelection> {
         const chosen = operation.id === selectedId;
         button.classList.toggle('selected', chosen);
         button.setAttribute('aria-pressed', String(chosen));
-        button.innerHTML =
-          `<span class="entry-seal">${operation.numeral}</span>` +
-          '<span class="entry-name">' +
-          `<strong>${operation.name}</strong>` +
-          `<small>${operation.location}</small>` +
-          '</span>' +
-          `<span class="entry-pressure">${operation.pressure}</span>` +
-          `<span class="entry-mark">${iconMarkup(operation.origin === 'designed' ? 'map' : 'crest')}</span>`;
+
+        const seal = labelled('span', operation.numeral);
+        seal.className = 'entry-seal';
+        const name = document.createElement('span');
+        name.className = 'entry-name';
+        name.append(labelled('strong', operation.name), labelled('small', operation.location));
+        // How long it takes, which a newcomer can act on, in place of a tempo
+        // word that told him nothing. A designed operation is not timed — its
+        // `duration` counts its enemy script — so it keeps the word that says
+        // where it came from.
+        const pressure = labelled(
+          'span',
+          operation.origin === 'designed' ? operation.pressure : operation.duration,
+        );
+        pressure.className = 'entry-pressure';
+        const mark = document.createElement('span');
+        mark.className = 'entry-mark';
+        mark.innerHTML = iconMarkup(operation.origin === 'designed' ? 'map' : 'crest');
+        button.append(seal, name, pressure, mark);
+
         button.addEventListener('click', () => {
           selectedId = operation.id;
           rememberSelection();
@@ -188,26 +201,9 @@ export function showWarCouncil(): Promise<MatchSelection> {
         return item;
       }),
     );
-    facts.replaceChildren(
-      ...operation.battleFacts.map((fact) => {
-        const item = document.createElement('span');
-        item.textContent = fact;
-        return item;
-      }),
-    );
 
-    const mine = armyStrength(operation, 'player');
-    const theirs = armyStrength(operation, 'enemy');
-    deployStrength.textContent = `${mine.toLocaleString('en-GB')} men under your hand`;
-
-    // The figures a commander weighs before he presses the seal, beside it.
-    armies.replaceChildren(
-      ...orderRow(operation.playerArmyName, `${operation.playerGroups.length} · ${mine.toLocaleString('en-GB')}`, 'player'),
-      ...orderRow(operation.enemyArmyName, `${operation.enemyGroups.length} · ${theirs.toLocaleString('en-GB')}`, 'enemy'),
-      ...orderRow('Ground', map.name),
-      // An authored operation is timed; the table is measured by its script.
-      ...orderRow(operation.origin === 'designed' ? 'Enemy plan' : 'Expected', operation.duration),
-    );
+    deployStrength.textContent =
+      `Deploy ${count(armyStrength(operation, 'player'))} men · Opens paused`;
 
     root.dataset.map = operation.mapId;
     root.dataset.operation = operation.id;
@@ -238,7 +234,6 @@ export function showWarCouncil(): Promise<MatchSelection> {
       button.classList.toggle('selected', chosen);
       button.setAttribute('aria-pressed', String(chosen));
     }
-    difficultyDescription.textContent = DIFFICULTIES[difficultyId].description;
   };
 
   tableGroundChoices.replaceChildren(
@@ -267,6 +262,10 @@ export function showWarCouncil(): Promise<MatchSelection> {
       button.type = 'button';
       button.className = 'commander-choice';
       button.dataset.difficulty = id;
+      // How a commander fights, on the card itself rather than as a paragraph
+      // standing under the three of them. It is worth reading once and never
+      // again, and the council screen has to be readable at a glance.
+      button.title = DIFFICULTIES[id].description;
       button.innerHTML =
         `<span class="icon">${iconMarkup(DIFFICULTY_GLYPH[id])}</span>` +
         `<strong>${DIFFICULTIES[id].name}</strong>` +

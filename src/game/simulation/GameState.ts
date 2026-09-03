@@ -7,6 +7,7 @@ import type {
   BattleAlert,
   BattlePlan,
   CombatEvent,
+  CorpseRecord,
   EnemyContact,
   KingState,
   ObjectiveState,
@@ -78,6 +79,8 @@ export interface GameState {
 
   /** Cosmetic, bounded, render-only. Excluded from the determinism checksum. */
   combatEvents: CombatEvent[];
+  /** Fallen soldiers, kept only for the death fade. Excluded from the checksum. */
+  corpses: CorpseRecord[];
 }
 
 function createVisibilityGrid(): VisibilityGrid {
@@ -154,6 +157,7 @@ export function createEmptyState(
     alertCooldowns: new Map(),
 
     combatEvents: [],
+    corpses: [],
   };
 }
 
