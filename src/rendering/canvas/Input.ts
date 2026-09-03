@@ -18,6 +18,7 @@ export interface InputCallbacks {
   onSelectionChange: () => void;
   onTogglePause: () => void;
   onSpeedChange: (delta: number) => void;
+  onNotice: (summary: string) => void;
   onOrderIssued: (summary: string) => void;
 }
 
@@ -429,7 +430,7 @@ export class Input {
     if (event.key >= '1' && event.key <= '9') {
       if (event.ctrlKey || event.metaKey) {
         this.controlGroups.set(event.key, [...this.renderer.selection]);
-        this.callbacks.onOrderIssued(`Control group ${event.key} assigned.`);
+        this.callbacks.onNotice(`Control group ${event.key} assigned.`);
       } else {
         const stored = this.controlGroups.get(event.key);
         if (stored !== undefined) {
@@ -484,7 +485,7 @@ export class Input {
     this.renderer.selection.clear();
     for (const group of activeGroups(this.state, 'player')) this.renderer.selection.add(group.id);
     this.callbacks.onSelectionChange();
-    this.callbacks.onOrderIssued(`${this.renderer.selection.size} regiments selected.`);
+    this.callbacks.onNotice(`${this.renderer.selection.size} regiments selected.`);
   }
 
   /**
