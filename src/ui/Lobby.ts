@@ -33,16 +33,27 @@ export function showLobby(): Promise<MatchSelection> {
   const mapCaption = requireElement<HTMLElement>('briefing-map-caption');
   const deploy = requireElement<HTMLButtonElement>('lobby-deploy');
 
-  const savedScenario = window.localStorage.getItem('siege:last-scenario');
-  const savedDifficulty = window.localStorage.getItem('siege:last-difficulty');
+  let savedScenario: string | null = null;
+  let savedDifficulty: string | null = null;
+  try {
+    savedScenario = window.localStorage.getItem('siege:last-scenario');
+    savedDifficulty = window.localStorage.getItem('siege:last-difficulty');
+  } catch {
+    // Sandboxed and privacy-hardened browsers can deny storage. Setup still
+    // works normally; it simply returns to the recommended defaults next time.
+  }
   let scenarioId: ScenarioId =
     SCENARIO_IDS.find((id) => id === savedScenario) ?? 'riverwatch';
   let difficultyId: DifficultyId =
     DIFFICULTY_IDS.find((id) => id === savedDifficulty) ?? 'captain';
 
   const rememberSelection = (): void => {
-    window.localStorage.setItem('siege:last-scenario', scenarioId);
-    window.localStorage.setItem('siege:last-difficulty', difficultyId);
+    try {
+      window.localStorage.setItem('siege:last-scenario', scenarioId);
+      window.localStorage.setItem('siege:last-difficulty', difficultyId);
+    } catch {
+      // Persistence is a convenience, never a requirement for deployment.
+    }
   };
 
   const updateDeployLabel = (): void => {
