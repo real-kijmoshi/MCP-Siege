@@ -28,7 +28,7 @@ import {
  * then fight it: a map, two orders of battle placed by named ground, and a
  * written enemy commander. This module is the only door into that, and it
  * turns a submitted design into an ordinary `ScenarioDefinition` — the same
- * shape the four authored operations have, so nothing downstream of here can
+ * shape the authored operations have, so nothing downstream of here can
  * tell the difference or needs a second code path.
  *
  * Everything the caller sends is treated as hostile until proved otherwise.

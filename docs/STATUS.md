@@ -6,6 +6,49 @@ seven authored scenarios have been replaced by four written from scratch — one
 for each battlefield — and an external Marshal can now design an operation of
 its own, on ground of its own choosing, and fight it. No simulation rule
 changed: combat, morale, fog, the objective and the command queue are untouched.
+A teaching battle now stands in front of the four, written the same way and
+fought by the same engine.
+
+# The Teaching Battle
+
+A fifth authored operation stands in front of the other four: **First Command**,
+numeral 0, fought on River Vale. It is an operation in every sense the others
+are — one map, one deployment, one written enemy commander, the same twenty-six
+regiments, the same engine, the same objective — and it is registered, listed,
+described and launched through exactly the paths they are. No simulation,
+command, query or WebMCP rule changed to make room for it.
+
+- **A battle, not a mode.** `tutorial` is an `AuthoredScenarioId` like any
+  other, so it appears in the War Council list, in `list_operations`, in
+  `select_operation`'s enum and in every test that iterates the authored
+  operations, without one branch anywhere asking whether the battle in hand is
+  the teaching one. A teaching battle that is not a real battle teaches the
+  wrong game.
+- **The inverse of the battle it shares its ground with.** It is fought on River
+  Vale on purpose: the ground is already familiar when Bridge of Knives lays a
+  trap on it. Where that operation hides both wings and baits the centre, this
+  one puts the whole Crown army in one body on the Central Field, the guns and
+  bows on Central Hill behind it, the horse out on either shoulder in plain
+  sight, and King Aldric far to the rear.
+- **A quiet minute to begin in.** The timetable opens with a scout and nothing
+  else; the Cinder Host does not step off until the second minute and arrives
+  over the central bridge alone. Blackforge follows only once the first regiment
+  has been met, the Emberbows come up to the bank after that, and one wing of
+  horse — one, never both — tries the eastern crossing late. Measured on the
+  intended commander, the player takes his first casualty at 154 seconds against
+  84 in Bridge of Knives on the same ground and seed.
+- **Drawn up but not sent.** The rest of the Ashen host stands around its own
+  base for the length of the script. It is not absent, and a commander who
+  marches north early meets all of it; it is simply not ordered forward, so the
+  battle happens in the order the briefing describes it.
+- **Verified.** `npm run typecheck`, `npm run test` and `npm run build` all
+  pass. The operation satisfies the standards every authored one is held to
+  without those tests being relaxed: it deploys both armies on legal ground, its
+  script names only River Vale zones and only regiments that exist, it raises
+  thirteen regiments and a sovereign a side, its opening deployment is
+  materially different from the other four, and it fights to a decision under an
+  aggressive commander. The one test changed is the War Council listing, which
+  asserts the operation list exactly and now expects the teaching battle first.
 
 # Pixel-Art Soldiers
 

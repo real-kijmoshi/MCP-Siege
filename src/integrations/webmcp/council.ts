@@ -28,7 +28,7 @@ import { InputError, asObject, optionalEnum, rejectUnknown, requireEnum } from '
  * A designed operation is data, never code. It goes through
  * `config/customBattle.ts`, which is the only thing that turns a submission
  * into a battle, and it is fought by exactly the same engine, enemy commander
- * and tool surface as the four authored operations.
+ * and tool surface as the authored operations.
  *
  * The council closes the moment an army deploys. Every tool here refuses after
  * that with `BATTLE_BEGUN`, so a late call cannot rebuild the field under a
