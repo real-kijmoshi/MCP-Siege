@@ -117,6 +117,24 @@ const FIGURE_SCATTER = 1.6;
 const FIGURE_FEET = 1.2;
 
 /**
+ * The gait.
+ *
+ * A marching man swaps his legs and rises a little on the step, on a two-frame
+ * cycle: at this size a leg is two pixels, and anything smoother than a swap
+ * would be a blur rather than a step. The phase is taken from the tick clock
+ * and not from the frame clock, so the whole army halts mid-stride when the
+ * battle is paused, as every other moving thing on this map does; and it is
+ * offset by the soldier's own index, so a regiment does not march in lockstep
+ * like one animation played eight hundred times.
+ */
+const GAIT_TICKS = 4;
+const GAIT_SWING = 0.45;
+const GAIT_BOB = 0.5;
+
+/** Below this speed, squared, a man is standing rather than marching. */
+const MARCH_EPSILON_SQUARED = 0.05 * 0.05;
+
+/**
  * The four inks a figure shares with the ground it stands on. Cloth is missing
  * because cloth is the regiment's own colour, and comes from `colorFor`.
  */
@@ -141,11 +159,21 @@ const FIGURE_INK: readonly string[] = [
  */
 interface FigureGeometry {
   readonly quads: Float32Array;
+  /** Per cell: -1 and 1 are the two legs, 0 is everything that does not swing. */
+  readonly stride: Int8Array;
+  /** Per cell: 1 for the ground shadow, which stays put while the man steps. */
+  readonly planted: Uint8Array;
   readonly count: number;
   readonly coreCount: number;
 }
 
-const EMPTY_GEOMETRY: FigureGeometry = { quads: new Float32Array(0), count: 0, coreCount: 0 };
+const EMPTY_GEOMETRY: FigureGeometry = {
+  quads: new Float32Array(0),
+  stride: new Int8Array(0),
+  planted: new Uint8Array(0),
+  count: 0,
+  coreCount: 0,
+};
 
 function packFigure(cells: readonly FigureCell[], layer: number): FigureGeometry {
   const mine = cells.filter((cell) => cell.layer === layer);
@@ -154,14 +182,20 @@ function packFigure(cells: readonly FigureCell[], layer: number): FigureGeometry
     ...mine.filter((cell) => cell.core !== true),
   ];
   const quads = new Float32Array(ordered.length * 4);
+  const stride = new Int8Array(ordered.length);
+  const planted = new Uint8Array(ordered.length);
   ordered.forEach((cell, index) => {
     quads[index * 4] = cell.x;
     quads[index * 4 + 1] = cell.y;
     quads[index * 4 + 2] = cell.w;
     quads[index * 4 + 3] = cell.h;
+    stride[index] = cell.stride ?? 0;
+    planted[index] = cell.planted === true ? 1 : 0;
   });
   return {
     quads,
+    stride,
+    planted,
     count: ordered.length,
     coreCount: ordered.filter((cell) => cell.core === true).length,
   };
@@ -254,6 +288,8 @@ export class UnitLayer {
   private readonly batchY: Float32Array[] = [];
   /** 1 where a man is drawn mirrored, because he is facing left. */
   private readonly batchFlip: Uint8Array[] = [];
+  /** Which half of the stride a man is on: 1, -1, or 0 where he is standing. */
+  private readonly batchGait: Int8Array[] = [];
   private readonly batchCount = new Int32Array(BATCH_COUNT);
   /** How many men the last `fillBatches` actually put on screen. */
   private visibleUnits = 0;
@@ -274,6 +310,7 @@ export class UnitLayer {
       this.batchX.push(new Float32Array(CAPACITY));
       this.batchY.push(new Float32Array(CAPACITY));
       this.batchFlip.push(new Uint8Array(CAPACITY));
+      this.batchGait.push(new Int8Array(CAPACITY));
     }
   }
 
@@ -376,7 +413,15 @@ export class UnitLayer {
     }
   }
 
-  /** One ink of one batch's figures, mirrored per man to the way he is facing. */
+  /**
+   * One ink of one batch's figures, mirrored to the way each man faces and
+   * stepped to where he is in his stride.
+   *
+   * The gait is applied in figure space, before the mirror, so a man marching
+   * west swings the same leg forward as a man marching east. It is skipped
+   * entirely at command zoom: the legs are not drawn there, and bobbing a
+   * two-pixel silhouette would only make the mass shimmer.
+   */
   private addFigureLayer(
     context: CanvasRenderingContext2D,
     batch: number,
@@ -393,12 +438,17 @@ export class UnitLayer {
     const xs = this.batchX[batch];
     const ys = this.batchY[batch];
     const flips = this.batchFlip[batch];
-    if (xs === undefined || ys === undefined || flips === undefined) return;
+    const gaits = this.batchGait[batch];
+    if (xs === undefined || ys === undefined || flips === undefined || gaits === undefined) {
+      return;
+    }
 
     const category = UNIT_CATEGORIES[ordinal] as UnitCategory;
     const block = Math.max(2, Math.round(SIZE[category] / 2) * 2);
     const grid = block / FIGURE_GRID[category];
     const quads = geometry.quads;
+    const strides = geometry.stride;
+    const planted = geometry.planted;
 
     for (let n = 0; n < count; n += 1) {
       const originX = xs[n] ?? 0;
@@ -406,17 +456,21 @@ export class UnitLayer {
       // his shadow lands where the simulation says his feet are.
       const ground = (ys[n] ?? 0) + FIGURE_FEET * grid;
       const facingLeft = flips[n] === 1;
+      const gait = coreOnly ? 0 : gaits[n] ?? 0;
+      const lift = gait > 0 ? GAIT_BOB * grid : 0;
 
       for (let cell = 0; cell < cells; cell += 1) {
         const at = cell * 4;
-        const cellX = quads[at] ?? 0;
+        const swing = (strides[cell] ?? 0) * gait * GAIT_SWING;
+        const cellX = (quads[at] ?? 0) + swing;
         const cellY = quads[at + 1] ?? 0;
         const width = (quads[at + 2] ?? 0) * grid;
         const height = (quads[at + 3] ?? 0) * grid;
         const left = facingLeft
           ? originX - (cellX * grid + width)
           : originX + cellX * grid;
-        context.rect(left, ground - cellY * grid - height, width, height);
+        const rise = planted[cell] === 1 ? 0 : lift;
+        context.rect(left, ground - cellY * grid - height - rise, width, height);
       }
     }
   }
@@ -464,19 +518,35 @@ export class UnitLayer {
       const xs = this.batchX[batch];
       const ys = this.batchY[batch];
       const flips = this.batchFlip[batch];
-      if (xs === undefined || ys === undefined || flips === undefined) continue;
+      const gaits = this.batchGait[batch];
+      if (xs === undefined || ys === undefined || flips === undefined || gaits === undefined) {
+        continue;
+      }
       xs[slot] = x + (artHash(index, 0x51ed) - 0.5) * FIGURE_SCATTER;
       ys[slot] = y + (artHash(index, 0x2f19) - 0.5) * FIGURE_SCATTER;
       // A man faces the way he is marching, and when he is standing still, the
       // way his regiment is turned. An army holding a line therefore faces its
       // enemy rather than all facing east out of the drawing.
       const velocityX = units.velocityX[index] ?? 0;
+      const velocityY = units.velocityY[index] ?? 0;
       let facingLeft = velocityX < 0;
       if (Math.abs(velocityX) < STRIDE_EPSILON) {
         const group = state.groups[units.group[index] ?? -1];
         facingLeft = group !== undefined && Math.cos(group.facing) < 0;
       }
       flips[slot] = facingLeft ? 1 : 0;
+      // Men on their feet step; men standing in the line do not, so a halted
+      // formation is still rather than jogging on the spot. Which foot a man
+      // leads with is hashed rather than taken from the parity of his index,
+      // which would put every neighbour in a rank on the opposite foot and
+      // leave the whole line zigzagging instead of marching.
+      const marching = velocityX * velocityX + velocityY * velocityY > MARCH_EPSILON_SQUARED;
+      const lead = artHash(index, 0x9e37) < 0.5 ? 0 : 1;
+      gaits[slot] = marching
+        ? (((state.currentTick / GAIT_TICKS) | 0) + lead) % 2 === 0
+          ? 1
+          : -1
+        : 0;
       this.batchCount[batch] = slot + 1;
       this.visibleUnits += 1;
     }

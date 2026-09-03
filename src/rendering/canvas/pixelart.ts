@@ -148,7 +148,12 @@ export function artHash(a: number, b: number): number {
   value ^= value >>> 15;
   value = Math.imul(value, 0x2c1b_3c6d) >>> 0;
   value ^= value >>> 12;
-  return value / 0x1_0000_0000;
+  // The final XOR yields a *signed* int32, so without this the result landed in
+  // (-0.5, 0.5) rather than [0, 1). Every caller reads it as a fraction: it made
+  // `> 0.55` and every threshold above it unreachable, so a whole class of
+  // speckle never drew at all, turned `Math.sqrt(artHash(...))` into NaN for
+  // half the scattered trees and rocks, and biased every `- 0.5` wobble one way.
+  return (value >>> 0) / 0x1_0000_0000;
 }
 
 /* ------------------------------------------------------------------ terrain */
@@ -428,10 +433,26 @@ export interface FigureCell {
    * these are the cells that tell him.
    */
   readonly core?: boolean;
+  /**
+   * Which way this cell swings when the man is marching.
+   *
+   * `1` is the leg that goes forward as the other goes back, `-1` its
+   * opposite. Two frames is the whole gait: at this size a leg is two pixels,
+   * and anything smoother than a swap would be a blur rather than a step.
+   */
+  readonly stride?: number;
+  /** Stays on the ground while the rest of the figure rises with the step. */
+  readonly planted?: boolean;
 }
 
 const shadow = (x: number, y: number, w: number, h: number, core = false): FigureCell =>
   ({ layer: FIGURE_SHADOW, x, y, w, h, core });
+/** The shadow a man casts where he stands. It is core, and it never bobs. */
+const ground = (x: number, y: number, w: number, h: number): FigureCell =>
+  ({ layer: FIGURE_SHADOW, x, y, w, h, core: true, planted: true });
+/** A leg, cut in shadow, that swings with the gait. */
+const leg = (x: number, y: number, w: number, h: number, stride: number): FigureCell =>
+  ({ layer: FIGURE_SHADOW, x, y, w, h, stride });
 const wood = (x: number, y: number, w: number, h: number, core = false): FigureCell =>
   ({ layer: FIGURE_WOOD, x, y, w, h, core });
 const cloth = (x: number, y: number, w: number, h: number, core = false): FigureCell =>
@@ -451,9 +472,9 @@ const steel = (x: number, y: number, w: number, h: number, core = false): Figure
 export const FIGURES: Record<string, readonly FigureCell[]> = {
   /** Sword and shield. The plainest figure, and the one all the others answer to. */
   infantry: [
-    shadow(-2.1, 0, 4.2, 0.8, true),
-    shadow(-1.3, 0.5, 1.1, 2.1),
-    shadow(0.2, 0.5, 1.1, 2.1),
+    ground(-2.1, 0, 4.2, 0.8),
+    leg(-1.3, 0.5, 1.1, 2.1, -1),
+    leg(0.2, 0.5, 1.1, 2.1, 1),
     cloth(-1.6, 2.2, 3.2, 2.6, true),
     skin(-0.8, 4.7, 1.6, 1),
     steel(-1.3, 5.5, 2.6, 1.2, true),
@@ -463,9 +484,9 @@ export const FIGURES: Record<string, readonly FigureCell[]> = {
 
   /** The shaft is the whole point: a spear block should read as a hedge. */
   spearman: [
-    shadow(-2.1, 0, 4.2, 0.8, true),
-    shadow(-1.3, 0.5, 1.1, 2.1),
-    shadow(0.2, 0.5, 1.1, 2.1),
+    ground(-2.1, 0, 4.2, 0.8),
+    leg(-1.3, 0.5, 1.1, 2.1, -1),
+    leg(0.2, 0.5, 1.1, 2.1, 1),
     cloth(-1.6, 2.2, 3.2, 2.6, true),
     skin(-0.9, 4.7, 1.8, 1.1),
     steel(-1.3, 5.6, 2.6, 1.2),
@@ -475,9 +496,9 @@ export const FIGURES: Record<string, readonly FigureCell[]> = {
 
   /** Broader, helmed to the eyes, and carrying more iron than anyone else. */
   heavy_infantry: [
-    shadow(-2.4, 0, 4.8, 0.8, true),
-    shadow(-1.5, 0.5, 1.2, 2.1),
-    shadow(0.3, 0.5, 1.2, 2.1),
+    ground(-2.4, 0, 4.8, 0.8),
+    leg(-1.5, 0.5, 1.2, 2.1, -1),
+    leg(0.3, 0.5, 1.2, 2.1, 1),
     cloth(-1.9, 2.1, 3.8, 2.8, true),
     steel(-2.1, 4.2, 4.2, 0.8),
     skin(-0.7, 4.9, 1.4, 0.7),
@@ -488,9 +509,9 @@ export const FIGURES: Record<string, readonly FigureCell[]> = {
 
   /** The bow is drawn as three cells of a curve, which is enough to read as one. */
   archer: [
-    shadow(-2, 0, 4, 0.8, true),
-    shadow(-1.2, 0.5, 1, 2.1),
-    shadow(0.2, 0.5, 1, 2.1),
+    ground(-2, 0, 4, 0.8),
+    leg(-1.2, 0.5, 1, 2.1, -1),
+    leg(0.2, 0.5, 1, 2.1, 1),
     cloth(-1.5, 2.2, 3, 2.5, true),
     skin(-0.9, 4.6, 1.8, 1.1),
     cloth(-1.3, 5.5, 2.6, 1),
@@ -501,9 +522,9 @@ export const FIGURES: Record<string, readonly FigureCell[]> = {
 
   /** A long barrel held level: unmistakable beside a bow at any distance. */
   handgunner: [
-    shadow(-2, 0, 4, 0.8, true),
-    shadow(-1.2, 0.5, 1, 2.1),
-    shadow(0.2, 0.5, 1, 2.1),
+    ground(-2, 0, 4, 0.8),
+    leg(-1.2, 0.5, 1, 2.1, -1),
+    leg(0.2, 0.5, 1, 2.1, 1),
     cloth(-1.5, 2.2, 3, 2.5, true),
     skin(-0.9, 4.6, 1.8, 1.1),
     steel(-1.3, 5.5, 2.6, 1.1),
@@ -513,9 +534,9 @@ export const FIGURES: Record<string, readonly FigureCell[]> = {
 
   /** Hooded, unarmoured and small. He is not meant to look like a line of battle. */
   scout: [
-    shadow(-1.7, 0, 3.4, 0.7, true),
-    shadow(-1.1, 0.4, 0.9, 1.9),
-    shadow(0.2, 0.4, 0.9, 1.9),
+    ground(-1.7, 0, 3.4, 0.7),
+    leg(-1.1, 0.4, 0.9, 1.9, -1),
+    leg(0.2, 0.4, 0.9, 1.9, 1),
     cloth(-1.3, 2, 2.6, 2.2, true),
     skin(-0.8, 4.1, 1.6, 1),
     cloth(-1.2, 4.9, 2.4, 1.1, true),
@@ -524,9 +545,9 @@ export const FIGURES: Record<string, readonly FigureCell[]> = {
 
   /** Linen, a cross on the chest, and a satchel. No weapon at all. */
   surgeon: [
-    shadow(-1.8, 0, 3.6, 0.7, true),
-    shadow(-1.1, 0.4, 0.9, 1.9),
-    shadow(0.2, 0.4, 0.9, 1.9),
+    ground(-1.8, 0, 3.6, 0.7),
+    leg(-1.1, 0.4, 0.9, 1.9, -1),
+    leg(0.2, 0.4, 0.9, 1.9, 1),
     cloth(-1.4, 2, 2.8, 2.5, true),
     skin(-0.5, 2.6, 1, 1.6),
     skin(-1.1, 3.1, 2.2, 0.6),
@@ -537,10 +558,10 @@ export const FIGURES: Record<string, readonly FigureCell[]> = {
 
   /** Horse first, man second. The barrel and the lance are what carry at distance. */
   cavalry: [
-    shadow(-3.3, 0, 6.6, 0.8, true),
-    shadow(-2.4, 0.4, 0.9, 1.6),
-    shadow(-0.5, 0.4, 0.9, 1.6),
-    shadow(1.4, 0.4, 0.9, 1.6),
+    ground(-3.3, 0, 6.6, 0.8),
+    leg(-2.4, 0.4, 0.9, 1.6, -1),
+    leg(-0.5, 0.4, 0.9, 1.6, 1),
+    leg(1.4, 0.4, 0.9, 1.6, -1),
     wood(-3, 1.7, 5.6, 2, true),
     wood(2.2, 2.5, 1.4, 1.8),
     wood(3.1, 3.9, 1.7, 1),
@@ -554,7 +575,7 @@ export const FIGURES: Record<string, readonly FigureCell[]> = {
 
   /** A trebuchet: bed, frame, and an arm thrown up into the air. */
   siege: [
-    shadow(-4.2, 0, 8.4, 0.8, true),
+    ground(-4.2, 0, 8.4, 0.8),
     shadow(-3, 0.2, 2, 1.5),
     shadow(1.2, 0.2, 2, 1.5),
     wood(-3.6, 1.4, 7.2, 1.4, true),
@@ -569,7 +590,7 @@ export const FIGURES: Record<string, readonly FigureCell[]> = {
 
   /** The longest thing on the field, and the one a commander must be able to find. */
   cannon: [
-    shadow(-4.6, 0, 9.2, 0.8, true),
+    ground(-4.6, 0, 9.2, 0.8),
     shadow(-3.2, 0.2, 2.1, 1.6),
     shadow(0.9, 0.2, 2.1, 1.6),
     wood(-4, 1.4, 6.6, 1.4, true),

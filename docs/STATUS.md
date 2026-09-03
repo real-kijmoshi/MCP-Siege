@@ -7,6 +7,32 @@ for each battlefield — and an external Marshal can now design an operation of
 its own, on ground of its own choosing, and fight it. No simulation rule
 changed: combat, morale, fog, the objective and the command queue are untouched.
 
+# The Art Hash Returned Half a Number
+
+`artHash` is the deterministic hash every drawn thing on the map uses for
+cosmetic scatter, and it was returning values in **(-0.5, 0.5)** rather than the
+`[0, 1)` its name and all twenty-odd call sites assume: the final `value ^=
+value >>> 12` yields a *signed* int32 in JavaScript, and nothing put it back
+into unsigned range before the divide. One `>>> 0` fixes it. What it was
+costing, all of it silent:
+
+- **Every threshold above 0.5 was unreachable.** `artHash(x, y) > 0.985`,
+  `> 0.92`, `> 0.76`, `> 0.74`, `> 0.62`, `> 0.55` — the speckle, the bright
+  flecks, the larger crags, the lobby portrait's grain — none of it had ever
+  drawn a single pixel.
+- **Half the scattered trees and rocks were placed at NaN.**
+  `Math.sqrt(artHash(...))` is NaN for a negative input, so every woodland and
+  crag zone silently dropped about half the trees it meant to plant.
+- **Every wobble leaned one way.** `(artHash(...) - 0.5) * k` was meant to
+  scatter about zero and instead only ever went negative, so river banks, road
+  wander and hill edges were all biased in one direction.
+
+The effect on the battlefield is large: hillsides that were a flat brown wash
+now carry the two-tone dither this document has described since the pixel-art
+pass, and the woods are as dense as they were written to be. The simulation
+never touches this function — it is rendering and lobby art only — so no
+behaviour, checksum or test moves.
+
 # Pixel-Art Soldiers
 
 Every man on the battlefield was a flat single-colour block — a square, circle,
@@ -37,6 +63,17 @@ or WebMCP behaviour changed; this is `UnitLayer` and `pixelart.ts` only.
   soldier's own velocity, and fall back to his regiment's facing when he is
   standing, so a line holding ground faces its enemy instead of all facing east
   out of the drawing.
+- **And he marches.** A moving soldier swaps his legs and rises on the step, on
+  a two-frame cycle — at this size a leg is two pixels, and anything smoother
+  than a swap would be a blur rather than a step. The phase comes off the tick
+  clock, never the frame clock, so the army halts mid-stride when the battle is
+  paused as every other moving thing on this map does; men standing in the line
+  do not step at all, so a halted formation is still rather than jogging on the
+  spot. Which foot a man leads with is hashed from his index rather than taken
+  from its parity, which would put every neighbour in a rank on the opposite
+  foot and leave the line zigzagging instead of marching. The gait is skipped
+  at command zoom, where the legs are not drawn and bobbing a two-pixel
+  silhouette would only make the mass shimmer. Wheeled engines do not step.
 - **Four rungs of detail, one set of drawings.** Cells are flagged as
   silhouette-carrying and packed first, so command zoom draws a prefix of the
   same art rather than a second set of drawings that could drift from it:
@@ -52,7 +89,9 @@ or WebMCP behaviour changed; this is `UnitLayer` and `pixelart.ts` only.
   than anything measured rather than a limit ordinary play reaches.
 - **Driven in a browser.** All ten troop types, an enemy army in contact and
   every level-of-detail rung were checked on the running game with no console
-  errors.
+  errors. The gait was proven by pausing a battle mid-march and re-rendering
+  the same frozen state four ticks apart: with every position identical, the
+  frames still differ, which is the animation and nothing else.
 
 # The War Council
 
